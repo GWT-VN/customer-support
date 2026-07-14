@@ -1,0 +1,29 @@
+# Repo git riêng — có remote riêng (AIGWTVN/GWT-Masterdata), không commit vào đây.
+# Clone riêng: git clone https://github.com/AIGWTVN/GWT-Masterdata.git
+GWT-Masterdata/
+
+# Claude Code — cấu hình cục bộ cá nhân (settings.json dùng chung thì commit được)
+.claude/settings.local.json
+
+# Secrets — không bao giờ commit
+.env
+.env.*
+!.env.example
+*.key
+service_role*
+
+# macOS / OS junk
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Excel temp
+~$*.xlsx
