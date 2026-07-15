@@ -1,0 +1,149 @@
+import Link from 'next/link'
+import { coreForecast, coreCounts } from '@/app/actions'
+import { ThayLoiButton } from '@/components/ThayLoiButton'
+import { vnDate } from '@/components/Badge'
+
+const SAP = 'sắp đến hạn (≤30 ngày)'
+
+function HanBadge({ tt, ngay }: { tt: string; ngay: number | null }) {
+  if (tt === 'QUÁ HẠN')
+    return <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 whitespace-nowrap">
+      Quá {Math.abs(ngay ?? 0)} ngày
+    </span>
+  if (tt === SAP)
+    return <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 whitespace-nowrap">
+      Còn {ngay} ngày
+    </span>
+  if (tt.startsWith('không rõ'))
+    return <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500">Không rõ</span>
+  return <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 whitespace-nowrap">
+    Còn {ngay} ngày
+  </span>
+}
+
+export default async function LoiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; tt?: string }>
+}) {
+  const { q = '', tt } = await searchParams
+  const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
+  const [rows, counts] = await Promise.all([coreForecast(tinhTrang, q), coreCounts()])
+
+  const tabs = [
+    { key: SAP, label: `Sắp đến hạn (${counts[SAP] ?? 0})` },
+    { key: 'QUÁ HẠN', label: `Quá hạn (${counts['QUÁ HẠN'] ?? 0})` },
+    { key: 'còn hạn', label: `Còn hạn (${counts['còn hạn'] ?? 0})` },
+    { key: 'all', label: 'Tất cả' },
+  ]
+
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
+        <header className="flex items-center justify-between gap-4">
+          <h1 className="text-xl font-semibold text-slate-900">Lịch thay lõi</h1>
+          <div className="flex gap-4">
+            <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 underline">Tra máy</Link>
+            <Link href="/ticket" className="text-sm text-slate-600 hover:text-slate-900 underline">Ticket</Link>
+          </div>
+        </header>
+
+        <div className="flex gap-2 flex-wrap">
+          {tabs.map((t) => (
+            <Link
+              key={t.key}
+              href={`/loi?${new URLSearchParams({ ...(q && { q }), tt: t.key === 'all' ? '' : t.key })}`}
+              className={`px-3 py-1.5 rounded-lg text-sm border ${
+                tinhTrang === t.key || (t.key === 'all' && !tt && false)
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600'
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+
+        {tinhTrang === 'QUÁ HẠN' && (
+          <p className="text-sm bg-amber-50 text-amber-900 rounded-lg px-3 py-2">
+            ⚠️ <strong>Đây KHÔNG phải danh sách gọi bán.</strong> Nhật ký thay lõi mới bắt đầu ghi, nên
+            máy cũ nào chưa từng log đều hiện quá hạn — dù thực tế đã được thay rồi. Hãy dùng làm
+            <strong> danh sách cần xác minh</strong>: gọi hỏi khách đã thay chưa, rồi bấm “Đã thay” kèm
+            đúng ngày. Ghi dần thì con số này tự đúng lên.
+          </p>
+        )}
+
+        <form className="flex gap-2">
+          {tt !== undefined && <input type="hidden" name="tt" value={tt} />}
+          <input
+            name="q" defaultValue={q}
+            placeholder="Gõ serial, tên khách, SĐT, mã lõi…"
+            className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white"
+          />
+          <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
+        </form>
+
+        <p className="text-sm text-slate-500">
+          {rows.length} dòng (máy × lõi){rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
+        </p>
+
+        <div className="bg-white rounded-xl border overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium">Khách</th>
+                <th className="text-left px-4 py-3 font-medium">Máy</th>
+                <th className="text-left px-4 py-3 font-medium">Lõi cần thay</th>
+                <th className="text-left px-4 py-3 font-medium">Chu kỳ</th>
+                <th className="text-left px-4 py-3 font-medium">Mốc tính</th>
+                <th className="text-left px-4 py-3 font-medium">Đến hạn</th>
+                <th className="text-left px-4 py-3 font-medium">Ghi log</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((r) => (
+                <tr key={`${r.serial}-${r.filter_code}`} className="hover:bg-slate-50 align-top">
+                  <td className="px-4 py-3">
+                    {r.customer_id ? (
+                      <Link href={`/khach/${r.customer_id}`} className="text-slate-900 underline">{r.customer_name}</Link>
+                    ) : <span className="text-slate-400">—</span>}
+                    <div className="font-mono text-xs text-slate-500">
+                      {r.primary_phone ?? <span className="text-amber-600">thiếu SĐT</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link href={`/may/${encodeURIComponent(r.serial)}`} className="text-slate-900 underline">
+                      {r.product_name}
+                    </Link>
+                    <div className="font-mono text-[10px] text-slate-400">{r.serial}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-mono text-xs text-slate-900">{r.filter_code}</div>
+                    <div className="text-xs text-slate-500">{r.filter_name}</div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.chu_ky_raw}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                    {vnDate(r.moc_tinh)}
+                    <div className="text-[10px] text-slate-400">
+                      {r.lan_thay_gan_nhat ? 'lần thay gần nhất' : 'ngày lắp (chưa có log thay)'}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <HanBadge tt={r.tinh_trang} ngay={r.con_bao_nhieu_ngay} />
+                    <div className="text-[10px] text-slate-400 mt-0.5">{vnDate(r.han_som)}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ThayLoiButton serial={r.serial} filterCode={r.filter_code} filterName={r.filter_name} compact />
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Không có dòng nào.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  )
+}

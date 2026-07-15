@@ -147,6 +147,115 @@ export async function deleteContact(id: string, customerId: string) {
   return { ok: true as const }
 }
 
+// ── Lịch thay lõi (Phase 3) ─────────────────────────────────────────────────
+export type CoreDue = {
+  serial: string
+  internal_code: string | null
+  product_name: string | null
+  filter_code: string
+  filter_name: string | null
+  chu_ky_raw: string | null
+  thang_min: number
+  thang_max: number
+  install_date: string | null
+  lan_thay_gan_nhat: string | null
+  moc_tinh: string | null
+  han_som: string | null
+  han_muon: string | null
+  con_bao_nhieu_ngay: number | null
+  tinh_trang: string
+  customer_id: string | null
+  customer_name: string | null
+  primary_phone: string | null
+  needs_phone: boolean | null
+}
+
+/**
+ * Lịch thay lõi. Mặc định "sắp đến hạn" — đó là danh sách gọi được ngay.
+ *
+ * ⚠️ "QUÁ HẠN" KHÔNG chắc khách cần thay: filter_replacement mới bắt đầu ghi, nên máy cũ
+ * nào chưa từng log đều hiện quá hạn dù thực tế GWT đã thay rồi. Dùng làm danh sách XÁC MINH.
+ */
+export async function coreForecast(tinhTrang: string, q: string): Promise<CoreDue[]> {
+  await requireStaff()
+  let query = dataClient().from('v_core_forecast').select('*')
+
+  if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `serial.ilike.%${safe}%,customer_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%,` +
+        `filter_code.ilike.%${safe}%,product_name.ilike.%${safe}%`
+    )
+  }
+  const { data, error } = await query
+    .order('con_bao_nhieu_ngay', { ascending: true, nullsFirst: false })
+    .limit(100)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CoreDue[]
+}
+
+export async function coreCounts() {
+  await requireStaff()
+  const db = dataClient()
+  const keys = ['QUÁ HẠN', 'sắp đến hạn (≤30 ngày)', 'còn hạn']
+  const out: Record<string, number> = {}
+  await Promise.all(
+    keys.map(async (k) => {
+      const { count } = await db
+        .from('v_core_forecast').select('*', { count: 'exact', head: true }).eq('tinh_trang', k)
+      out[k] = count ?? 0
+    })
+  )
+  return out
+}
+
+/** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
+export async function replacementsOfSerial(serial: string) {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('filter_replacement').select('*').eq('serial', serial)
+    .order('replaced_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as { id: string; filter_code: string; replaced_at: string; note: string | null }[]
+}
+
+/** Ghi 1 lần thay lõi. Đây là thứ làm v_core_forecast chính xác dần lên. */
+export async function logReplacement(input: {
+  serial: string
+  filter_code: string
+  replaced_at: string
+  note?: string
+}) {
+  await requireStaff()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.replaced_at)) {
+    return { ok: false as const, error: 'Ngày không hợp lệ.' }
+  }
+  if (input.replaced_at > new Date().toISOString().slice(0, 10)) {
+    return { ok: false as const, error: 'Không ghi được ngày thay ở tương lai.' }
+  }
+  const { error } = await dataClient().from('filter_replacement').insert({
+    serial: input.serial,
+    filter_code: input.filter_code,
+    replaced_at: input.replaced_at,
+    note: input.note || null,
+  })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/loi')
+  revalidatePath(`/may/${encodeURIComponent(input.serial)}`)
+  return { ok: true as const }
+}
+
+export async function deleteReplacement(id: string, serial: string) {
+  await requireStaff()
+  const { error } = await dataClient().from('filter_replacement').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/loi')
+  revalidatePath(`/may/${encodeURIComponent(serial)}`)
+  return { ok: true as const }
+}
+
 // ── Tickets (Phase 1) ───────────────────────────────────────────────────────
 export type Ticket = {
   ticket_code: string

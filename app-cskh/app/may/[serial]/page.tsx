@@ -4,6 +4,7 @@ import { getMachine, ticketsOfSerial } from '@/app/actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
+import { LoiCuaMay } from '@/components/LoiCuaMay'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
@@ -56,6 +57,11 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
               </div>
             ))}
           </dl>
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Lõi lọc & lịch thay</h2>
+          <LoiCuaMay serial={m.serial} />
         </section>
 
         <section className="bg-white rounded-xl border p-5">
