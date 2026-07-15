@@ -12,7 +12,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Máy đã lắp</h1>
           <Link href="/khach" className="text-sm text-slate-600 hover:text-slate-900 underline">
-            Khách cần bổ sung SĐT
+            Khách cần dọn dữ liệu
           </Link>
         </header>
 

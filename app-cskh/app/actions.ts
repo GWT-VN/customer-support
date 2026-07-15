@@ -147,11 +147,29 @@ export async function deleteContact(id: string, customerId: string) {
   return { ok: true as const }
 }
 
-/** 11 khách thiếu/lỗi SĐT — việc cần dọn. */
-export async function listNeedsPhone(): Promise<Customer[]> {
+/** Khách cần dọn: thiếu/lỗi SĐT HOẶC thiếu địa chỉ. Di trú Odoo không lấp được, phải sửa tay. */
+export async function listToFix(): Promise<(Customer & { machines: number })[]> {
   await requireStaff()
-  const { data, error } = await dataClient()
-    .from('customers').select('*').eq('needs_phone', true).order('full_name')
+  const db = dataClient()
+  const { data, error } = await db
+    .from('customers')
+    .select('*')
+    .or('needs_phone.eq.true,address.is.null')
+    .order('full_name')
   if (error) throw new Error(error.message)
-  return (data ?? []) as Customer[]
+  const customers = (data ?? []) as Customer[]
+
+  // đếm máy mỗi khách -> biết khách nào đáng ưu tiên
+  const { data: ibs, error: e2 } = await db
+    .from('installed_base')
+    .select('customer_id')
+    .in('customer_id', customers.map((c) => c.id))
+  if (e2) throw new Error(e2.message)
+
+  const count = new Map<string, number>()
+  for (const r of ibs ?? []) {
+    const id = (r as { customer_id: string }).customer_id
+    count.set(id, (count.get(id) ?? 0) + 1)
+  }
+  return customers.map((c) => ({ ...c, machines: count.get(c.id) ?? 0 }))
 }
