@@ -552,7 +552,12 @@ Run: `python -m pytest migrate/tests/test_migrate_integration.py -v` — assert 
 
 ## Ngoài phạm vi Phase 0
 
-- **Phase 0.5** — Enrich SĐT/địa chỉ/liên hệ phụ từ Excel "Theo Dõi Bảo Hành", nối bằng **serial**; điền `primary_phone`, hạ cờ `needs_phone`; dedup/gộp khách trùng. (Cần vì khoá khách = SĐT mà Odoo không có SĐT.)
+- ~~**Phase 0.5** — Enrich SĐT/địa chỉ/liên hệ phụ từ Excel "Theo Dõi Bảo Hành"~~ **XONG 2026-07-15** — nhưng kết quả khác hẳn dự kiến:
+  - ✅ **Địa chỉ: 277/293 khách** — nguồn hoá ra là `Contact (res.partner).xlsx` (Phone + Street), khớp bằng SĐT. Không phải file Theo Dõi BH.
+  - ✅ **SĐT chính: 284/293** — đã xong ngay ở Phase 0 nhờ export Odoo mới có cột `Customer/Phone`. Mục tiêu gốc của Phase 0.5 thành thừa.
+  - ❌ **SĐT phụ: KHÔNG nhập được.** 4/11 "SĐT phụ" thực ra **đã là `primary_phone` của khách khác** (Odoo lưu SĐT người liên hệ làm SĐT chính) → nhập vào là nhân đôi. 7/11 còn lại thuộc khách **không có trong DB**. Thêm nữa vài dòng bị **kéo-thả fill Excel** nên số tự tăng dần (`Mrs.Thuỷ/Thành` 0865884194/195/196; `Anh Cường` 098 6667622→6667628) — SĐT giả. Chứng minh + test: `migrate/contacts.py::audit_lien_he`.
+  - ❌ **11 khách thiếu/lỗi SĐT: 0/11 dò được** — file Theo Dõi BH không chứa serial nào của họ.
+  - Còn lại: 16 khách thiếu địa chỉ, 11 khách thiếu/lỗi SĐT → **sửa tay qua app** (`/khach`), không có nguồn tự động.
 - **Phase 1** — `tickets` + ops ghi nhận lỗi.
 - **Phase 2** — `ticket_issue_groups` + báo cáo lãnh đạo WhatsApp.
 - **Phase 3** — `filter_schedule`/`salt_schedule`/`maintenance_*`/`water_profile` + reminder Zalo ZNS + `v_core_forecast` + mở rộng RPC thành `activate_and_seed`. (Dữ liệu lịch bảo trì có sẵn ở Excel "Theo Dõi" + `product_filter` 37 dòng máy↔lõi.)
