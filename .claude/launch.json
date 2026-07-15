@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cskh",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "app-cskh", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}
