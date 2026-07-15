@@ -33,3 +33,6 @@ migrate/out/
 *.tsv
 load.sql
 catalog.json
+
+# File soát dữ liệu xuất ra (CHỨA TÊN/SĐT/ĐỊA CHỈ KHÁCH)
+GWT_Khach_hang_soat_du_lieu_*.xlsx
