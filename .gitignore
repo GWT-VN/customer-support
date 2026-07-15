@@ -27,3 +27,9 @@ venv/
 
 # Excel temp
 ~$*.xlsx
+
+# Dữ liệu di trú sinh ra (CHỨA TÊN/SĐT KHÁCH — không bao giờ commit)
+migrate/out/
+*.tsv
+load.sql
+catalog.json
