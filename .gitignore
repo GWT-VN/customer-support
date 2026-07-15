@@ -34,5 +34,5 @@ migrate/out/
 load.sql
 catalog.json
 
-# File soát dữ liệu xuất ra (CHỨA TÊN/SĐT/ĐỊA CHỈ KHÁCH)
-GWT_Khach_hang_soat_du_lieu_*.xlsx
+# Mọi file Excel xuất ra từ DB (CHỨA TÊN/SĐT/ĐỊA CHỈ KHÁCH) — không bao giờ commit
+Phiếu theo dõi/GWT_*.xlsx

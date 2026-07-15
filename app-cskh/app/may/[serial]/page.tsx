@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getMachine } from '@/app/actions'
+import { getMachine, ticketsOfSerial } from '@/app/actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
+import { TicketList } from '@/components/TicketList'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
+  const tickets = await ticketsOfSerial(m.serial)
 
   const rows: [string, React.ReactNode][] = [
     ['Serial', <span className="font-mono text-xs">{m.serial}</span>],
@@ -54,6 +56,11 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
               </div>
             ))}
           </dl>
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Ticket của máy này ({tickets.length})</h2>
+          <TicketList tickets={tickets} empty="Máy này chưa có ticket nào." />
         </section>
 
         <section className="bg-white rounded-xl border p-5">

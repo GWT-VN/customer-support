@@ -147,6 +147,139 @@ export async function deleteContact(id: string, customerId: string) {
   return { ok: true as const }
 }
 
+// ── Tickets (Phase 1) ───────────────────────────────────────────────────────
+export type Ticket = {
+  ticket_code: string
+  state: 'Open' | 'Done' | 'Cancel'
+  ticket_type: string | null
+  description: string | null
+  last_note: string | null
+  province: string | null
+  created_at: string
+  serial: string | null
+  source_serial: string | null
+  product_name: string | null
+  internal_code: string | null
+  may_khong_trong_he_thong: boolean
+  customer_id: string | null
+  customer_name: string | null
+  primary_phone: string | null
+  warranty_activated: boolean | null
+  warranty_full_end: string | null
+  con_han_may: boolean | null
+  con_han_loi: boolean | null
+}
+
+/** Tra ticket theo mã / serial / tên khách / SĐT / nội dung. Rỗng -> 50 ticket mới nhất. */
+export async function searchTickets(q: string, state?: string): Promise<Ticket[]> {
+  await requireStaff()
+  let query = dataClient().from('v_tickets').select('*')
+
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `ticket_code.ilike.%${safe}%,source_serial.ilike.%${safe}%,customer_name.ilike.%${safe}%,` +
+        `primary_phone.ilike.%${safe}%,description.ilike.%${safe}%,ticket_type.ilike.%${safe}%`
+    )
+  }
+  if (state) query = query.eq('state', state)
+
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(50)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Ticket[]
+}
+
+/** Ticket của 1 máy — dùng ở trang chi tiết máy. */
+export async function ticketsOfSerial(serial: string): Promise<Ticket[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_tickets').select('*').eq('serial', serial)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Ticket[]
+}
+
+/** Ticket của 1 khách — dùng ở trang khách. */
+export async function ticketsOfCustomer(customerId: string): Promise<Ticket[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_tickets').select('*').eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Ticket[]
+}
+
+export async function getTicket(code: string): Promise<Ticket | null> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_tickets').select('*').eq('ticket_code', code).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as Ticket) ?? null
+}
+
+/** Đổi trạng thái + ghi chú xử lý. */
+export async function updateTicket(code: string, patch: { state?: string; last_note?: string }) {
+  await requireStaff()
+  if (patch.state && !['Open', 'Done', 'Cancel'].includes(patch.state)) {
+    return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
+  }
+  const { error } = await dataClient().from('tickets').update(patch).eq('ticket_code', code)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/ticket')
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+/** Tạo ticket mới. Mã tự sinh GWT-YYnnnn theo năm hiện tại. */
+export async function createTicket(input: {
+  serial?: string
+  customer_id?: string
+  ticket_type: string
+  description: string
+  province?: string
+}) {
+  await requireStaff()
+  if (!input.ticket_type?.trim()) return { ok: false as const, error: 'Chọn loại ticket.' }
+  if (!input.description?.trim()) return { ok: false as const, error: 'Nhập mô tả sự cố.' }
+
+  const db = dataClient()
+  const yy = String(new Date().getFullYear()).slice(2)
+
+  // lấy số lớn nhất của năm nay rồi +1 (mã GWT-YYnnnn)
+  const { data: last, error: e1 } = await db
+    .from('tickets').select('ticket_code')
+    .like('ticket_code', `GWT-${yy}%`)
+    .order('ticket_code', { ascending: false }).limit(1)
+  if (e1) return { ok: false as const, error: e1.message }
+
+  const next = last?.length ? parseInt(last[0].ticket_code.slice(-4), 10) + 1 : 1
+  const code = `GWT-${yy}${String(next).padStart(4, '0')}`
+
+  const { error } = await db.from('tickets').insert({
+    ticket_code: code,
+    serial: input.serial || null,
+    source_serial: input.serial || null,
+    customer_id: input.customer_id || null,
+    ticket_type: input.ticket_type.trim(),
+    description: input.description.trim(),
+    province: input.province || null,
+    state: 'Open',
+  })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/ticket')
+  return { ok: true as const, code }
+}
+
+/** Các loại ticket đã dùng — gợi ý cho form tạo mới (Odoo có 18 loại). */
+export async function ticketTypes(): Promise<string[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('tickets').select('ticket_type').not('ticket_type', 'is', null)
+  if (error) throw new Error(error.message)
+  return [...new Set((data ?? []).map((r) => (r as { ticket_type: string }).ticket_type))].sort()
+}
+
 /** Khách cần dọn: thiếu/lỗi SĐT HOẶC thiếu địa chỉ. Di trú Odoo không lấp được, phải sửa tay. */
 export async function listToFix(): Promise<(Customer & { machines: number })[]> {
   await requireStaff()
