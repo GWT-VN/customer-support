@@ -36,3 +36,4 @@ catalog.json
 
 # Mọi file Excel xuất ra từ DB (CHỨA TÊN/SĐT/ĐỊA CHỈ KHÁCH) — không bao giờ commit
 Phiếu theo dõi/GWT_*.xlsx
+/GWT_*.xlsx

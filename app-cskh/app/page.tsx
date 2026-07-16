@@ -18,6 +18,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
             <Link href="/ticket" className="text-sm text-slate-600 hover:text-slate-900 underline">
               Ticket
             </Link>
+            <Link href="/nhom-loi" className="text-sm text-slate-600 hover:text-slate-900 underline">
+              Nhóm lỗi
+            </Link>
             <Link href="/khach" className="text-sm text-slate-600 hover:text-slate-900 underline">
               Khách cần dọn dữ liệu
             </Link>

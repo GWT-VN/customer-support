@@ -1,5 +1,8 @@
 # GWT Customer Care — Phase 0 Implementation Plan (Nền + kích hoạt bảo hành)
 
+> ✅ **PHASE 0 ĐÃ HOÀN THÀNH 2026-07-15.** Checkbox trong file này KHÔNG được tick (giữ nguyên làm tài liệu).
+> Tiến độ toàn dự án theo dõi tại **[../CHECKLIST.md](../CHECKLIST.md)** — cập nhật sau mỗi việc xong.
+
 > **Bản v2 — cập nhật 2026-07-15** theo masterdata catalog v4. Thay đổi lớn so với v1 (2026-07-12):
 > nhóm `products` (website) **đã bị XOÁ khỏi DB** ngày 2026-07-14 → không còn nguồn số năm bảo hành;
 > khoá sản phẩm chuyển sang `catalog_item."Mã nội bộ"`; `v_catalog_all_codes` đã xoá → tra mã qua

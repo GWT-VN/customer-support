@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getTicket } from '@/app/actions'
+import { getTicket, groupsOfTicket } from '@/app/actions'
 import { StateBadge, vnDateTime } from '@/components/TicketBadge'
+import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
 import { vnDate } from '@/components/Badge'
 
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
-  const t = await getTicket(decodeURIComponent(code))
+  const ma = decodeURIComponent(code)
+  const [t, nhom] = await Promise.all([getTicket(ma), groupsOfTicket(ma)])
   if (!t) notFound()
 
   return (
@@ -27,6 +29,27 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
             máy <strong>không có trong hệ thống</strong> — Odoo đang ghi máy là tồn kho dù nó có ticket
             (tức đang ở nhà khách). Cần gán khách cho serial này trong Odoo rồi export lại.
           </p>
+        )}
+
+        {nhom.length > 0 && (
+          <section className="bg-white rounded-xl border p-5 space-y-2">
+            <h2 className="font-medium text-slate-900">Thuộc nhóm lỗi</h2>
+            <div className="flex flex-wrap gap-2">
+              {nhom.map((n) => (
+                <Link
+                  key={n.group_code}
+                  href={`/nhom-loi/${n.group_code}`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-slate-50"
+                >
+                  <span className="text-sm text-slate-900">{n.nhom_ten}</span>
+                  <MucDoBadge muc_do={n.muc_do} />
+                </Link>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500">
+              Gom tự động từ nội dung mô tả. Xem cả cụm để biết đây là ca lẻ hay lỗi hàng loạt.
+            </p>
+          </section>
         )}
 
         <section className="bg-white rounded-xl border p-5 space-y-3">

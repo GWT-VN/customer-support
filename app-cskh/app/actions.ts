@@ -415,3 +415,104 @@ export async function listToFix(): Promise<(Customer & { machines: number })[]> 
   }
   return customers.map((c) => ({ ...c, machines: count.get(c.id) ?? 0 }))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2 — nhóm lỗi + báo cáo lãnh đạo / công ty mẹ
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type MucDo = 'an_toan' | 'nghiem_trong' | 'thuong' | 'nhe' | 'khong_loi'
+
+export type IssueReport = {
+  code: string
+  ten: string
+  muc_do: MucDo
+  bao_hang: boolean
+  mo_ta: string | null
+  thu_tu: number
+  so_ticket: number
+  dang_mo: number
+  da_xong: number
+  da_huy: number
+  so_khach: number
+  so_may: number
+  so_model: number
+  cac_model: string | null
+  som_nhat: string | null
+  gan_nhat: string | null
+  trong_90_ngay: number
+}
+
+export type TicketIssue = {
+  ticket_code: string
+  group_code: string
+  nguon: string
+  nhom_ten: string
+  muc_do: MucDo
+  state: string
+  ticket_type: string | null
+  description: string | null
+  created_at: string
+  serial: string | null
+  internal_code: string | null
+  product_name: string | null
+  customer_id: string | null
+  customer_name: string | null
+  primary_phone: string | null
+}
+
+/** Thứ tự ưu tiên đọc báo cáo: an toàn trước hết, "không lỗi" xuống cuối. */
+const UU_TIEN: Record<MucDo, number> = {
+  an_toan: 1, nghiem_trong: 2, thuong: 3, nhe: 4, khong_loi: 5,
+}
+
+/** Báo cáo nhóm lỗi. baoHangOnly=true -> chỉ nhóm gửi công ty mẹ. */
+export async function issueReport(baoHangOnly = false): Promise<IssueReport[]> {
+  await requireStaff()
+  let q = dataClient().from('v_issue_report').select('*').gt('so_ticket', 0)
+  if (baoHangOnly) q = q.eq('bao_hang', true)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as IssueReport[]).sort(
+    (a, b) => UU_TIEN[a.muc_do] - UU_TIEN[b.muc_do] || b.so_ticket - a.so_ticket
+  )
+}
+
+/** Ticket trong một nhóm lỗi — để soi bằng chứng, không tin số liệu suông. */
+export async function ticketsInGroup(groupCode: string): Promise<TicketIssue[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_ticket_issue').select('*')
+    .eq('group_code', groupCode)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TicketIssue[]
+}
+
+/** Nhóm lỗi của MỘT ticket — nhúng vào trang chi tiết ticket. */
+export async function groupsOfTicket(ticketCode: string): Promise<TicketIssue[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_ticket_issue').select('*').eq('ticket_code', ticketCode)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as TicketIssue[]).sort((a, b) => UU_TIEN[a.muc_do] - UU_TIEN[b.muc_do])
+}
+
+export type ChuaPhanNhom = {
+  ticket_code: string
+  state: string
+  ticket_type: string | null
+  description: string | null
+  created_at: string
+  serial: string | null
+  ly_do: string
+}
+
+/** Ticket chưa vào nhóm nào — việc cần người làm, không gom mù được. */
+export async function ticketsChuaPhanNhom(): Promise<ChuaPhanNhom[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_ticket_chua_phan_nhom').select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ChuaPhanNhom[]
+}

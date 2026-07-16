@@ -23,6 +23,7 @@ export default async function TicketsPage({
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Ticket CSKH</h1>
           <div className="flex gap-4">
+            <Link href="/nhom-loi" className="text-sm text-slate-600 hover:text-slate-900 underline">Nhóm lỗi</Link>
             <Link href="/loi" className="text-sm text-slate-600 hover:text-slate-900 underline">Lịch thay lõi</Link>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 underline">Tra máy đã lắp</Link>
           </div>
