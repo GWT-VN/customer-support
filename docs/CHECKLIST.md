@@ -116,8 +116,10 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
 - [x] **Quét 100 hợp đồng POE** (`migrate/quet_hop_dong.py`) → Excel `GWT_goi_bao_tri_tu_hop_dong_2026-07-16.xlsx` (2026-07-16)
   - **63/98 khách đọc ra gói** · 35 không rõ (thiếu HĐMB, chỉ có biên bản/báo giá) · 1 hợp đồng kẹt định dạng `.doc`/`.pdf`
   - User chốt thứ tự tra: **hợp đồng → biên bản xác nhận → báo giá**
-- [ ] **1 ca LỆCH duy nhất — user quyết**: `46. Anh Minh chị My - Zeit Thủ Thiêm` — hợp đồng ghi `1 năm × 3 tháng/lần` = **4 lần**, file thống kê ghi **`0/2`**. Tin bên nào?
-- [ ] 35 khách chưa rõ gói → cần bổ sung hợp đồng, hoặc convert `.doc`/`.pdf` sang `.docx`
+- [x] **Ca lệch Zeit đã giải thích** (user 2026-07-16): `Anh Minh chị My - Zeit` ban đầu mua **15A → 4 lần**, sau **đổi sang 15A ECO → còn 2 lần**. ⇒ **File thống kê ĐÚNG (2)**, hợp đồng trong folder là **bản ban đầu trước khi đổi máy**.
+  > ⚠️ **Bài học cho schema**: hợp đồng có thể bị **thay thế khi khách đổi sản phẩm** → gói bảo trì phải theo **hợp đồng HIỆN HÀNH**, không phải file HĐ cũ nhất trong thư mục. Cần cột `ghi_chu`/`nguon` để truy vết ca đổi máy.
+- [ ] **32 khách chưa rõ gói → user điền tay** (sheet `THIẾU GÓI - ĐIỀN TAY` trong Excel): 29 "không thấy điều khoản" · 2 "chỉ có số năm" · 1 "chỉ có chu kỳ". Đa số thư mục **không có hợp đồng mua bán** (chỉ Quotation/PXK/ĐNTT/Biên bản giao hàng), hoặc hợp đồng cũ 2024 **chưa có điều khoản dịch vụ bảo trì** (chỉ có điều khoản bảo hành).
+- [ ] 1 hợp đồng kẹt `.doc`/`.pdf` (sheet `KẸT ĐỊNH DẠNG`) — mở ra lưu lại thành `.docx` là đọc được
 
 > **🐛 3 BUG của script đã bắt được khi tự kiểm chứng** (nếu không sẽ đưa bảng SAI cho user):
 > 1. **Regex nuốt số thứ tự dòng**: `"1 ⇥ 03 năm dịch vụ bảo trì"` → bắt `1` thay vì `03` → Trang Bùi ra 4 thay vì 12. Phần đệm `[^)\n]{0,10}` quá tham lam.

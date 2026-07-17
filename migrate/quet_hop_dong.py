@@ -31,6 +31,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+POE_INDEX = {}
 POE = ROOT / "Các khách lọc tổng POE"
 THONG_KE = ROOT / "Lịch bảo trì - Lịch kĩ thuật/GWT - Lịch bảo trì - Asana.xlsx"
 TODAY = date(2026, 7, 16)
@@ -98,6 +99,17 @@ RE_NAM_ONLY = re.compile(
 RE_CK_ONLY = re.compile(r"\(\s*(\d{1,2})\s*tháng\s*/\s*lần\s*\)", re.I)
 RE_BO = re.compile(r"WH\s*(15|30)\s*A(\s*ECO)?", re.I)
 
+# ── Các mẫu viết KHÁC (quét toàn bộ HĐ mới tìm ra — mẫu chuẩn chỉ chiếm 56/100) ──
+# "dịch vụ bảo trì 5 sao 4 lần/1 năm"  (KH anh Tâm)
+RE_LAN_TREN_NAM = re.compile(
+    r"dịch vụ bảo trì\s*(?:định kỳ\s*)?\d?\s*sao\s*(\d{1,2})\s*lần\s*/\s*(\d{1,2})?\s*năm", re.I)
+# "4.2. Tần suất bảo trì: 4 lần/năm"
+RE_TAN_SUAT = re.compile(r"tần suất bảo trì\s*:?\s*(\d{1,2})\s*lần\s*/\s*năm", re.I)
+# "- Gói bảo trì định kỳ 3 tháng/lần hàng năm cho hệ lọc nước đầu nguồn GE WH30A"
+RE_GOI_THANG = re.compile(r"gói bảo trì định kỳ\s*(\d{1,2})\s*tháng\s*/\s*lần\s+hàng năm", re.I)
+# Mẫu HĐ MỚI: điều khoản bảo trì nằm ở PHỤ LỤC I, không phải hợp đồng chính
+RE_PHU_LUC = re.compile(r"thỏa thuận khác tại Phụ lục", re.I)
+
 
 def so(v):
     v = str(v).strip().lower()
@@ -105,10 +117,34 @@ def so(v):
 
 
 def trich(txt):
-    """-> (số năm, chu kỳ tháng, cách lấy) hoặc (None, None, lý do)"""
-    m = RE_GOI.search(txt)
+    """-> (số năm, chu kỳ tháng, cách lấy) hoặc (None, None, lý do).
+
+    Thứ tự ưu tiên = độ tin cậy giảm dần. KHÔNG dùng "Bảo trì bảo dưỡng N lần/năm"
+    (46 HĐ có dòng này) vì đó là template điều khoản bảo hành copy cứng, mâu thuẫn
+    với chu kỳ thật ghi ngay bên cạnh.
+    """
+    m = RE_GOI.search(txt)                       # "03 năm ... (3 tháng/lần)" — 56 HĐ
     if m:
         return so(m.group(1)), int(m.group(2)), "đủ cụm"
+
+    m = RE_LAN_TREN_NAM.search(txt)              # "dịch vụ bảo trì 5 sao 4 lần/1 năm"
+    if m:
+        lan, nam = int(m.group(1)), int(m.group(2) or 1)
+        if 12 % lan == 0:
+            return nam, 12 // lan, "mẫu 'N lần/năm'"
+
+    m = RE_TAN_SUAT.search(txt)                  # "Tần suất bảo trì: 4 lần/năm"
+    if m:
+        lan = int(m.group(1))
+        if 12 % lan == 0:
+            n = RE_NAM_ONLY.search(txt)
+            return (so(n.group(1)) if n else 1), 12 // lan, "mẫu 'tần suất N lần/năm'"
+
+    m = RE_GOI_THANG.search(txt)                 # "Gói bảo trì định kỳ 3 tháng/lần hàng năm"
+    if m:
+        n = RE_NAM_ONLY.search(txt)
+        return (so(n.group(1)) if n else 1), int(m.group(1)), "mẫu 'gói N tháng/lần hàng năm'"
+
     n = RE_NAM_ONLY.search(txt)
     c = RE_CK_ONLY.search(txt)
     if n and c:
@@ -117,6 +153,9 @@ def trich(txt):
         return so(n.group(1)), None, "chỉ có số năm"
     if c:
         return None, int(c.group(1)), "chỉ có chu kỳ"
+    if RE_PHU_LUC.search(txt):
+        # HĐ mẫu mới đẩy điều khoản sang Phụ lục I -> phải tìm file phụ lục riêng
+        return None, None, "HĐ trỏ sang PHỤ LỤC — tìm file phụ lục"
     return None, None, "không thấy điều khoản"
 
 
@@ -160,6 +199,8 @@ def main():
     #    rglob("*") trả 144 -> gồm cả thư mục con ("01. Chi phí đầu ra"...) -> nhân bản khách.
     khach_dirs = sorted([q for p in POE.iterdir() if p.is_dir()
                          for q in p.iterdir() if q.is_dir()])
+    global POE_INDEX
+    POE_INDEX = {nfc(d.name): d for d in khach_dirs}
 
     ket_qua, khong_doc_duoc = [], []
     for d in khach_dirs:
@@ -167,26 +208,37 @@ def main():
         files = [p for p in d.rglob("*") if p.is_file() and not p.name.startswith("~$")]
         if not files:
             continue
-        # ưu tiên: hợp đồng > biên bản xác nhận > báo giá (user chốt thứ tự này)
+        # Thứ tự tra user chốt: hợp đồng > phụ lục > biên bản xác nhận > báo giá.
+        # (HĐ mẫu mới ghi "thỏa thuận khác tại Phụ lục I" -> gói nằm ở phụ lục.)
         def uu_tien(p):
             n = khong_dau(p.name)
             if "hop dong" in n or "hdmb" in n: return 0
-            if "bien ban" in n: return 1
-            if "bao gia" in n: return 2
-            return 3
+            if "phu luc" in n: return 1
+            if "bien ban" in n: return 2
+            if "bao gia" in n or "quotation" in n: return 3
+            return 4
 
         nam = ck = None
-        cach = nguon = ""
-        bo = ""
+        cach = nguon = bo = ""
+        ly_do_cuoi = "không thấy điều khoản"
+        # Duyệt HẾT file (không break sớm): HĐ chính có thể trỏ sang phụ lục.
         for p in sorted(files, key=uu_tien):
             txt = doc_file(p)
             if not txt:
                 continue
             n2, c2, cach2 = trich(txt)
-            if n2 or c2:
+            if n2 and c2:                       # đủ thông tin -> chốt, dừng
                 nam, ck, cach, nguon = n2, c2, cach2, nfc(p.name)
                 bo = bo_may(txt, nfc(p.name))
                 break
+            if n2 or c2:                        # thiếu 1 vế -> giữ tạm, tìm tiếp
+                if not (nam or ck):
+                    nam, ck, cach, nguon = n2, c2, cach2, nfc(p.name)
+                    bo = bo_may(txt, nfc(p.name))
+            elif "PHỤ LỤC" in cach2:
+                ly_do_cuoi = cach2
+        if not nguon:
+            cach = ly_do_cuoi
         if not nguon:
             # có file hợp đồng nhưng không đọc được (.doc/.pdf)?
             kho = [nfc(p.name) for p in files
@@ -254,9 +306,48 @@ def main():
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{ws.max_row}"
 
+    # ── Sheet ĐIỀN TAY: khách chưa đọc ra gói + lý do + file có sẵn ───────────
+    EDIT = PatternFill("solid", fgColor="DDEBF7")
+    ws3 = wb.create_sheet("THIẾU GÓI - ĐIỀN TAY")
+    cols3 = ["Thư mục khách (KHÔNG SỬA)", "Vì sao chưa đọc được", "Các file có trong thư mục",
+             "→ Số năm", "→ Chu kỳ (tháng/lần)", "→ TỔNG LẦN", "→ Ghi chú của bạn"]
+    ws3.append(cols3)
+    for j in range(1, len(cols3) + 1):
+        c = ws3.cell(row=1, column=j)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = HEAD if j <= 3 else PatternFill("solid", fgColor="2E75B6")
+        c.alignment = Alignment(wrap_text=True, vertical="center")
+    for r in ket_qua:
+        if r[4]:
+            continue                       # đã có tổng lần -> bỏ qua
+        d = POE_INDEX.get(r[0])
+        fs = []
+        if d:
+            fs = sorted({nfc(p.name) for p in d.rglob("*")
+                         if p.is_file() and not p.name.startswith("~$")
+                         and p.suffix.lower() in (".docx", ".doc", ".pdf", ".xlsx")})
+        ws3.append([r[0], r[9] or "không rõ", " · ".join(fs[:8]) or "(không có file tài liệu)",
+                    None, None, None, None])
+        i = ws3.max_row
+        for j in range(1, len(cols3) + 1):
+            cell = ws3.cell(row=i, column=j)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+            if j >= 4:
+                cell.fill = EDIT
+    for j, w in enumerate([40, 34, 62, 10, 15, 12, 26], 1):
+        ws3.column_dimensions[get_column_letter(j)].width = w
+    ws3.freeze_panes = "A2"
+    ws3.auto_filter.ref = f"A1:{get_column_letter(len(cols3))}{ws3.max_row}"
+    ws3.insert_rows(1)
+    ws3["A1"] = ("CÁCH ĐIỀN: mở file trong cột C, tìm dòng kiểu \"03 năm dịch vụ bảo trì định kỳ 5 sao "
+                 "(3 tháng/lần)\" → điền Số năm=3, Chu kỳ=3 → TỔNG LẦN tự tính = năm × (12÷chu kỳ). "
+                 "KHÔNG có điều khoản bảo trì thì ghi rõ ở cột Ghi chú.")
+    ws3["A1"].font = Font(bold=True, color="9C0006")
+    ws3.row_dimensions[1].height = 30
+
     if khong_doc_duoc:
-        ws2 = wb.create_sheet("KHÔNG ĐỌC ĐƯỢC")
-        ws2.append(["Thư mục", "File (.doc cũ / .pdf — cần convert sang .docx)"])
+        ws2 = wb.create_sheet("KẸT ĐỊNH DẠNG")
+        ws2.append(["Thư mục", "File (.doc cũ / .pdf — mở ra lưu lại thành .docx là đọc được)"])
         for j in (1, 2):
             c = ws2.cell(row=1, column=j); c.font = Font(bold=True, color="FFFFFF"); c.fill = HEAD
         for d, fs in khong_doc_duoc:
