@@ -134,7 +134,10 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
 | **Máy khớp nhầm tên** (script sai, user sửa) | 6 ca — `Chị Phương Anh Homeland` ≠ `Cẩm Anh Long Biên` · `Chị Hậu Aspen` ≠ `Linh Thảo Điền` · `Chị Hiền Khai Sơn` ≠ `Hà Khai Sơn` · `Anh Hào` ≠ `Vân Anh Thái Nguyên` · `Bùi Thanh Tú` ≠ `Bùi Phúc` | → phải bỏ khớp tự động các ca này |
 | **Đặc biệt** | `42. Trang Suki`: **"Xung đột nên ko bảo trì cho khách nữa"** → dừng dịch vụ dù còn gói | |
 
-- [ ] ⚠️ **MÂU THUẪN cần user quyết**: `68. Chị Yến - Hải Phòng` — tab 1 ghi **"1 năm 4 lần, 3 tháng/lần"** nhưng tab 2 ghi **"Chưa mua"**. Hai ghi chú trái nhau.
+- [x] **Mâu thuẫn Chị Yến đã giải quyết** (user 2026-07-17): có **HAI khách tên "Chị Yến"** —
+  - `68. Chị Yến - **Hải Phòng**` = **CHƯA MUA** → loại. (Ghi chú "1 năm 4 lần" ở tab 1 là user nhầm sang khách kia; đã sửa lại trong file.)
+  - `40. Chị Yến - **Hạ Long** - 15A` = **đã mua**, HĐ ký 10/03/2025, 1 năm × 3 tháng = **4 lần**, khớp đúng file thống kê — vốn không cần ghi chú.
+  > ⚠️ **Rủi ro hệ thống, phải nhớ khi nạp DB**: khách trùng tên chỉ phân biệt được bằng **địa điểm** (Yến Hải Phòng vs Yến Hạ Long · Ngọc Ciputra vs Hà Lan Ciputra · Hiền Khai Sơn vs Hà Khai Sơn · Phương Anh Homeland vs Cẩm Anh Long Biên). **Tuyệt đối không khớp khách bằng tên trần** — chính user cũng nhầm. Khoá đúng vẫn là **SĐT** (`customers.primary_phone`).
 - [ ] 1 hợp đồng kẹt `.doc`/`.pdf` (sheet `KẸT ĐỊNH DẠNG`) — mở ra lưu lại thành `.docx` là đọc được
 
 > **🐛 3 BUG của script đã bắt được khi tự kiểm chứng** (nếu không sẽ đưa bảng SAI cho user):

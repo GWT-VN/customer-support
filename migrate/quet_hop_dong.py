@@ -38,7 +38,7 @@ TODAY = date(2026, 7, 17)
 OUT = ROOT / f"GWT_goi_bao_tri_tu_hop_dong_{TODAY.isoformat()}.xlsx"
 # File bản trước: user đã điền tay cột ĐỐI CHIẾU (tab 1) + Ghi chú (tab 2).
 # BẮT BUỘC đọc lại và giữ nguyên — không được để lần chạy sau xoá công của user.
-CU = ROOT / "GWT_goi_bao_tri_tu_hop_dong_2026-07-16.xlsx"
+CU = ROOT / "GWT_goi_bao_tri_tu_hop_dong_2026-07-17.xlsx"
 
 SO_CHU = {"một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5, "mười": 10}
 
