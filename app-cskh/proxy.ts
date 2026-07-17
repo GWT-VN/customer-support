@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
  * Chặn MỌI trang trừ /login. Chưa đăng nhập -> đá về /login.
  * Đây là hàng rào đầu tiên; mỗi Server Action vẫn tự gọi requireStaff() (defence in depth).
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(

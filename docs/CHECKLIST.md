@@ -58,8 +58,10 @@
 - [x] App `/nhom-loi` (báo cáo + lọc "báo hãng") · `/nhom-loi/[code]` (soi từng ticket + model dính) · nhúng nhóm vào trang ticket (2026-07-16)
 - [ ] **Bổ sung mô tả cho 9 ticket trống** (Odoo để trống → không gom mù được) + gắn máy cho GWT-250033
 - [ ] Duyệt lại 13 nhóm + mức độ (`muc_do`, `bao_hang`) — hiện do tôi suy từ dữ liệu, cần nghiệp vụ xác nhận
-- [ ] Leadership report worker → WhatsApp (tổng hợp lắp mới + ca lỗi + folder "Báo cáo CEO")
-- [ ] Xuất báo cáo nhóm lỗi gửi công ty mẹ (định dạng chưa chốt)
+- [x] **Xuất báo cáo nhóm lỗi** (`migrate/bao_cao_nhom_loi.py`) — 3 file: bản NỘI BỘ (có khách) · bản GỬI HÃNG (**ẩn danh khách**, verify 0 tên/0 SĐT lọt) · bản TÓM TẮT .md dán WhatsApp được (2026-07-16)
+- [x] Thêm chỉ số **tỷ lệ lỗi theo model** (ticket lỗi / máy đã lắp) — nêu rõ là cận dưới vì 27 ticket chưa gắn serial
+- [ ] Leadership report worker → tự động gửi WhatsApp (cần token; hiện gửi tay bằng file TÓM TẮT)
+- [ ] Đọc folder "Báo cáo CEO" để ghép vào báo cáo định kỳ
 
 ### 🚨 Phát hiện cần xử lý ngay (từ gom nhóm 2026-07-16)
 
@@ -77,7 +79,9 @@
 
 ## Nợ kỹ thuật / việc lặt vặt
 
-- [ ] Snapshot `schema/current_schema.sql` + `docs/schema-description.md` (GWT-Masterdata) thiếu bảng Phase 1/3: tickets, product_warranty, filter_replacement (đã tạo task chip 2026-07-16)
+- [x] Dọn 2 cảnh báo Next 16 khi `npm run dev`: ghim `turbopack.root` (next.config.ts) + đổi `middleware.ts` → `proxy.ts` (hàm `middleware` → `proxy`) (2026-07-16)
+- [x] Hợp thức hoá snapshot `schema/current_schema.sql` + `docs/schema-description.md`: bổ sung 4 bảng thiếu (tickets, filter_replacement, issue_group, issue_override) + mô tả 6 view CSKH — verify cột khớp DB live 4/4, commit `41cf454` GWT-Masterdata (2026-07-16)
+- [ ] ⚠️ Preview server không chạy được trong Claude Code: `npm EPERM uv_cwd` vì repo nằm trong iCloud Drive → không bấm được UI để verify (đã thử 3 cách cấu hình). Cách khắc phục bền: chuyển repo ra ngoài iCloud (vd `~/code/customer-support`). App vẫn chạy bình thường bằng Terminal `npm run dev`.
 - [ ] Sửa tay 16 khách thiếu địa chỉ + 11 khách thiếu/lỗi SĐT qua app /khach (không có nguồn tự động)
 - [ ] App: cân nhắc hiện badge "BH theo bộ (mẹ)" ở trang máy/ticket (view đã có cột `bh_theo_me`)
 - [ ] DB role least-privilege cho lớp vận hành (MVP đang dùng service_role)

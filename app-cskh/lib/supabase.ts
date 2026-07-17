@@ -24,7 +24,7 @@ export async function authClient() {
         try {
           list.forEach(({ name, value, options }) => store.set(name, value, options))
         } catch {
-          // gọi từ Server Component -> bỏ qua, middleware đã refresh session
+          // gọi từ Server Component -> bỏ qua, proxy đã refresh session
         }
       },
     },

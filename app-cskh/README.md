@@ -45,8 +45,8 @@ Supabase Auth chỉ làm **cổng vào**. Nếu mở RLS policy cho `authenticat
 tự đăng ký cũng đọc được toàn bộ khách — nên không làm vậy.
 
 Hai lớp bảo vệ:
-1. `middleware.ts` — chưa đăng nhập → đá về `/login`.
-2. Mỗi Server Action tự gọi `requireStaff()` — middleware bị bypass thì vẫn chặn.
+1. `proxy.ts` — chưa đăng nhập → đá về `/login`.
+2. Mỗi Server Action tự gọi `requireStaff()` — proxy bị bypass thì vẫn chặn.
 
 ## Màn hình
 
