@@ -34,8 +34,11 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 POE_INDEX = {}
 POE = ROOT / "Các khách lọc tổng POE"
 THONG_KE = ROOT / "Lịch bảo trì - Lịch kĩ thuật/GWT - Lịch bảo trì - Asana.xlsx"
-TODAY = date(2026, 7, 16)
+TODAY = date(2026, 7, 17)
 OUT = ROOT / f"GWT_goi_bao_tri_tu_hop_dong_{TODAY.isoformat()}.xlsx"
+# File bản trước: user đã điền tay cột ĐỐI CHIẾU (tab 1) + Ghi chú (tab 2).
+# BẮT BUỘC đọc lại và giữ nguyên — không được để lần chạy sau xoá công của user.
+CU = ROOT / "GWT_goi_bao_tri_tu_hop_dong_2026-07-16.xlsx"
 
 SO_CHU = {"một": 1, "hai": 2, "ba": 3, "bốn": 4, "năm": 5, "mười": 10}
 
@@ -166,6 +169,82 @@ def bo_may(txt, ten_file):
     return f"WH{m.group(1)}A" + (" ECO" if m.group(2) else "")
 
 
+# ── Ngày ký hợp đồng ─────────────────────────────────────────────────────────
+# Nguồn 1 (tốt nhất, 100 HĐ có): nội dung ghi "ngày 23 tháng 08 năm 2025".
+# Nguồn 2 (22 file): số HĐ trong TÊN FILE dạng "001_0424_HĐMB_GWT" -> 0424 = tháng 04/2024.
+RE_NGAY = re.compile(r"ngày\s*(\d{1,2})\s*tháng\s*(\d{1,2})\s*năm\s*(\d{4})", re.I)
+# ⚠️ CHUẨN hợp đồng VN: ngày ký đứng ngay sau "Hôm nay,". Các ngày khác trong file là
+#    ngày phụ lục / căn cứ pháp lý / bàn giao -> lấy "ngày đầu tiên" là SAI.
+#    Bằng chứng: 01. Ocean Park — HĐ ghi "Hôm nay, ngày 02 tháng 01 năm 2024" nhưng lấy
+#    ngày đầu ra 2025-08-07 (của file khác trong thư mục).
+RE_NGAY_KY = re.compile(
+    r"Hôm nay,?\s*(?:vào\s*)?ngày\s*(\d{1,2})\s*tháng\s*(\d{1,2})\s*năm\s*(\d{4})", re.I)
+RE_SO_HD = re.compile(r"(\d{3})[_/](\d{2})(\d{2})[_/](HĐMB|HDMB|BBBG|ĐNTT|DNTT)", re.I)
+
+
+def _to_date(m):
+    try:
+        dt = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    except ValueError:
+        return None
+    return dt if 2020 <= dt.year <= TODAY.year else None
+
+
+def ngay_ky(txt, ten_file):
+    """-> (ngày, nguồn). Ưu tiên cụm "Hôm nay, ngày…" = ngày ký thật.
+    Không thấy -> KHÔNG đoán, trả ('','') để người tự điền."""
+    txt = txt or ""
+    m = RE_NGAY_KY.search(txt)
+    if m and (dt := _to_date(m)):
+        return dt.isoformat(), "ký tại HĐ ('Hôm nay, ngày…')"
+
+    # Fallback 1: số hợp đồng trong TÊN FILE hoặc NỘI DUNG (001/0426/HĐMB -> 04/2026)
+    m = RE_SO_HD.search(nfc(ten_file)) or RE_SO_HD.search(txt)
+    if m:
+        mm, yy = int(m.group(2)), int(m.group(3))
+        if 1 <= mm <= 12:
+            return f"20{yy:02d}-{mm:02d}", f"suy từ số HĐ {m.group(1)}/{m.group(2)}{m.group(3)} — chỉ tháng/năm"
+
+    # Fallback 2: chỉ khi file có DUY NHẤT 1 ngày -> không thể nhầm
+    ngay = [x for x in (_to_date(x) for x in RE_NGAY.finditer(txt)) if x]
+    if len(set(ngay)) == 1:
+        return ngay[0].isoformat(), "ngày duy nhất trong file (không có 'Hôm nay')"
+    if ngay:
+        return "", f"⚠️ file có {len(set(ngay))} ngày khác nhau, không có 'Hôm nay' — cần điền tay"
+    return "", ""
+
+
+# ── Giữ ghi chú user từ file bản trước ───────────────────────────────────────
+def doc_ghi_chu_cu():
+    """-> ({thư mục: đối chiếu}, {thư mục: (năm, ck, tổng, ghi chú)}). File chưa có -> rỗng."""
+    dc, dien = {}, {}
+    if not CU.exists():
+        return dc, dien
+    wb = openpyxl.load_workbook(CU, data_only=True)
+    if "GÓI BẢO TRÌ TỪ HỢP ĐỒNG" in wb.sheetnames:
+        ws = wb["GÓI BẢO TRÌ TỪ HỢP ĐỒNG"]
+        hdr = [nfc(c.value) for c in ws[1]]
+        if "ĐỐI CHIẾU" in hdr:
+            k = hdr.index("ĐỐI CHIẾU")
+            for r in ws.iter_rows(min_row=2, values_only=True):
+                if r[0] and r[k] and str(r[k]).strip():
+                    dc[nfc(r[0])] = nfc(r[k])
+    if "THIẾU GÓI - ĐIỀN TAY" in wb.sheetnames:
+        ws = wb["THIẾU GÓI - ĐIỀN TAY"]
+        hr = next((i for i in range(1, 4)
+                   if any(nfc(c.value).startswith("→") for c in ws[i])), 2)
+        hdr = [nfc(c.value) for c in ws[hr]]
+        idx = {h: i for i, h in enumerate(hdr) if h}
+        for r in ws.iter_rows(min_row=hr + 1, values_only=True):
+            if not r[0]:
+                continue
+            g = lambda h: r[idx[h]] if h in idx and idx[h] < len(r) else None
+            vals = (g("→ Số năm"), g("→ Chu kỳ (tháng/lần)"), g("→ TỔNG LẦN"), g("→ Ghi chú của bạn"))
+            if any(v not in (None, "") for v in vals):
+                dien[nfc(r[0])] = vals
+    return dc, dien
+
+
 # ── File thống kê tay (để đối chiếu) ─────────────────────────────────────────
 def doc_thong_ke():
     wb = openpyxl.load_workbook(THONG_KE, data_only=True)
@@ -192,6 +271,7 @@ def doc_thong_ke():
 
 
 def main():
+    dc_cu, dien_cu = doc_ghi_chu_cu()   # GIỮ ghi chú user đã điền ở bản trước
     thong_ke = doc_thong_ke()
     tk_index = [(khong_dau(t), t, x, tg, raw) for t, x, tg, raw in thong_ke]
 
@@ -220,25 +300,49 @@ def main():
 
         nam = ck = None
         cach = nguon = bo = ""
+        ngay = ng_nguon = ""
+        ngay_tim_duoc = []
         ly_do_cuoi = "không thấy điều khoản"
         # Duyệt HẾT file (không break sớm): HĐ chính có thể trỏ sang phụ lục.
         for p in sorted(files, key=uu_tien):
             txt = doc_file(p)
             if not txt:
                 continue
+            # Ngày ký: gom TỪ MỌI file hợp đồng (uu_tien 0) rồi mới quyết — 1 thư mục có
+            # thể chứa NHIỀU hợp đồng ký ngày khác nhau (mua thêm / đổi máy).
+            if uu_tien(p) == 0:
+                n_moi, ng_moi = ngay_ky(txt, p.name)
+                if n_moi:
+                    ngay_tim_duoc.append((n_moi, ng_moi, nfc(p.name)))
+            # KHÔNG break sớm: 1 thư mục có thể có nhiều HĐ (mua thêm/đổi máy) — phải
+            # duyệt hết để gom đủ ngày ký, nếu không sẽ lấy nhầm ngày của HĐ khác.
             n2, c2, cach2 = trich(txt)
-            if n2 and c2:                       # đủ thông tin -> chốt, dừng
+            if n2 and c2 and not (nam and ck):   # gói: lấy cái ĐẦU tiên đủ thông tin
                 nam, ck, cach, nguon = n2, c2, cach2, nfc(p.name)
                 bo = bo_may(txt, nfc(p.name))
-                break
-            if n2 or c2:                        # thiếu 1 vế -> giữ tạm, tìm tiếp
-                if not (nam or ck):
-                    nam, ck, cach, nguon = n2, c2, cach2, nfc(p.name)
-                    bo = bo_may(txt, nfc(p.name))
+            elif (n2 or c2) and not (nam or ck):  # thiếu 1 vế -> giữ tạm
+                nam, ck, cach, nguon = n2, c2, cach2, nfc(p.name)
+                bo = bo_may(txt, nfc(p.name))
             elif "PHỤ LỤC" in cach2:
                 ly_do_cuoi = cach2
         if not nguon:
             cach = ly_do_cuoi
+        # Quyết ngày ký từ các hợp đồng gom được.
+        # Nhiều HĐ ngày khác nhau (mua thêm/đổi máy) -> lấy SỚM NHẤT = hợp đồng gốc,
+        # nhưng ghi rõ ra để user biết mà kiểm, KHÔNG im lặng chọn hộ.
+        ky_that = sorted({x[0] for x in ngay_tim_duoc if "ký tại HĐ" in x[1]})
+        if len(ky_that) == 1:
+            ngay, ng_nguon = ky_that[0], "ký tại HĐ"
+        elif len(ky_that) > 1:
+            ngay = ky_that[0]
+            ng_nguon = f"⚠️ thư mục có {len(ky_that)} HĐ ký khác ngày ({', '.join(ky_that)}) — lấy sớm nhất"
+        elif ngay_tim_duoc:
+            ngay, ng_nguon, _ = ngay_tim_duoc[0]
+        if not ngay:
+            for p in sorted(files, key=uu_tien):
+                ngay, ng_nguon = ngay_ky("", p.name)
+                if ngay:
+                    break
         if not nguon:
             # có file hợp đồng nhưng không đọc được (.doc/.pdf)?
             kho = [nfc(p.name) for p in files
@@ -273,9 +377,9 @@ def main():
         if hit and tong and hit[2] and tong != hit[2]:
             lech = f"LỆCH: hợp đồng {tong} ≠ thống kê {hit[2]}"
         ket_qua.append([
-            nfc(d.name), bo, nam, ck, tong,
+            nfc(d.name), bo, ngay, ng_nguon, nam, ck, tong,
             hit[0] if hit else "", hit[2] if hit else None, hit[3] if hit else "",
-            lech, cach, nguon,
+            lech, dc_cu.get(nfc(d.name), ""), cach, nguon,
         ])
 
     # ── Excel ────────────────────────────────────────────────────────────────
@@ -286,22 +390,23 @@ def main():
     VANG = PatternFill("solid", fgColor="FFEB9C")
 
     ws = wb.create_sheet("GÓI BẢO TRÌ TỪ HỢP ĐỒNG")
-    cols = ["Thư mục hợp đồng", "Bộ", "Số năm (HĐ)", "Chu kỳ tháng (HĐ)", "→ TỔNG LẦN (tính)",
-            "Khách (file thống kê)", "Gói (thống kê)", "Ô gốc", "ĐỐI CHIẾU", "Cách lấy", "File nguồn"]
+    cols = ["Thư mục hợp đồng", "Bộ", "NGÀY KÝ HĐ", "Nguồn ngày", "Số năm (HĐ)", "Chu kỳ tháng (HĐ)",
+            "→ TỔNG LẦN (tính)", "Khách (file thống kê)", "Gói (thống kê)", "Ô gốc", "Máy tự đối chiếu",
+            "ĐỐI CHIẾU (ghi chú của bạn)", "Cách lấy", "File nguồn"]
     ws.append(cols)
     for j in range(1, len(cols) + 1):
         c = ws.cell(row=1, column=j)
         c.font = Font(bold=True, color="FFFFFF"); c.fill = HEAD
         c.alignment = Alignment(wrap_text=True, vertical="center")
-    for r in sorted(ket_qua, key=lambda x: (not x[8], x[0])):   # lệch lên đầu
+    for r in sorted(ket_qua, key=lambda x: (not x[10], x[0])):   # lệch lên đầu
         ws.append(r)
         i = ws.max_row
-        fill = DO if r[8] else (VANG if not r[4] else None)
+        fill = DO if r[10] else (VANG if not r[6] else None)
         for j in range(1, len(cols) + 1):
             cell = ws.cell(row=i, column=j)
             cell.alignment = Alignment(wrap_text=True, vertical="top")
             if fill: cell.fill = fill
-    for j, w in enumerate([42, 10, 11, 13, 14, 26, 11, 10, 34, 18, 40], 1):
+    for j, w in enumerate([40, 10, 12, 26, 10, 12, 13, 24, 11, 9, 30, 44, 17, 34], 1):
         ws.column_dimensions[get_column_letter(j)].width = w
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{ws.max_row}"
@@ -318,7 +423,7 @@ def main():
         c.fill = HEAD if j <= 3 else PatternFill("solid", fgColor="2E75B6")
         c.alignment = Alignment(wrap_text=True, vertical="center")
     for r in ket_qua:
-        if r[4]:
+        if r[6]:
             continue                       # đã có tổng lần -> bỏ qua
         d = POE_INDEX.get(r[0])
         fs = []
@@ -326,8 +431,9 @@ def main():
             fs = sorted({nfc(p.name) for p in d.rglob("*")
                          if p.is_file() and not p.name.startswith("~$")
                          and p.suffix.lower() in (".docx", ".doc", ".pdf", ".xlsx")})
-        ws3.append([r[0], r[9] or "không rõ", " · ".join(fs[:8]) or "(không có file tài liệu)",
-                    None, None, None, None])
+        cu = dien_cu.get(r[0], (None, None, None, None))   # giữ nguyên ô user đã điền
+        ws3.append([r[0], r[12] or "không rõ", " · ".join(fs[:8]) or "(không có file tài liệu)",
+                    cu[0], cu[1], cu[2], cu[3]])
         i = ws3.max_row
         for j in range(1, len(cols3) + 1):
             cell = ws3.cell(row=i, column=j)
@@ -357,23 +463,26 @@ def main():
 
     wb.save(OUT)
 
-    co_goi = [r for r in ket_qua if r[4]]
-    lech = [r for r in ket_qua if r[8]]
+    co_goi = [r for r in ket_qua if r[6]]
+    lech = [r for r in ket_qua if r[10]]
+    co_ngay = [r for r in ket_qua if r[2]]
     print(f"✓ {OUT.name}\n")
     print(f"  Thư mục khách quét   : {len(ket_qua)}")
     print(f"  Đọc ra gói bảo trì   : {len(co_goi)}")
     print(f"  Không rõ gói         : {len(ket_qua) - len(co_goi)}")
     print(f"  File .doc/.pdf kẹt   : {len(khong_doc_duoc)}")
     print(f"  ⚠️ LỆCH thống kê     : {len(lech)}")
+    print(f"  Có NGÀY KÝ hợp đồng  : {len(co_ngay)}")
+    print(f"  Giữ ghi chú của user : {len(dc_cu)} (tab 1) + {len(dien_cu)} (tab 2)")
     from collections import Counter
     print("\n  Phân bố gói (theo hợp đồng):")
-    for (n, c, t), k in sorted(Counter((r[2], r[3], r[4]) for r in co_goi).items(),
+    for (n, c, t), k in sorted(Counter((r[4], r[5], r[6]) for r in co_goi).items(),
                               key=lambda x: -x[1]):
         print(f"    {k:3} khách: {n} năm × {c} tháng/lần → gói {t} lần")
     if lech:
         print("\n  Các ca LỆCH (user quyết sau):")
         for r in lech:
-            print(f"    {r[0][:40]:42} HĐ {r[4]:>2} ≠ thống kê {r[6]:>2}  ({r[5]})")
+            print(f"    {r[0][:40]:42} HĐ {r[6]:>2} ≠ thống kê {r[8]:>2}  ({r[7]})")
 
 
 if __name__ == "__main__":

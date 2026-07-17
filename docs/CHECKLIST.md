@@ -118,7 +118,23 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
   - User chốt thứ tự tra: **hợp đồng → biên bản xác nhận → báo giá**
 - [x] **Ca lệch Zeit đã giải thích** (user 2026-07-16): `Anh Minh chị My - Zeit` ban đầu mua **15A → 4 lần**, sau **đổi sang 15A ECO → còn 2 lần**. ⇒ **File thống kê ĐÚNG (2)**, hợp đồng trong folder là **bản ban đầu trước khi đổi máy**.
   > ⚠️ **Bài học cho schema**: hợp đồng có thể bị **thay thế khi khách đổi sản phẩm** → gói bảo trì phải theo **hợp đồng HIỆN HÀNH**, không phải file HĐ cũ nhất trong thư mục. Cần cột `ghi_chu`/`nguon` để truy vết ca đổi máy.
-- [ ] **32 khách chưa rõ gói → user điền tay** (sheet `THIẾU GÓI - ĐIỀN TAY` trong Excel): 29 "không thấy điều khoản" · 2 "chỉ có số năm" · 1 "chỉ có chu kỳ". Đa số thư mục **không có hợp đồng mua bán** (chỉ Quotation/PXK/ĐNTT/Biên bản giao hàng), hoặc hợp đồng cũ 2024 **chưa có điều khoản dịch vụ bảo trì** (chỉ có điều khoản bảo hành).
+- [x] **Thêm NGÀY KÝ hợp đồng** (2026-07-17) → **75/98 khách**. Ưu tiên cụm chuẩn HĐ Việt Nam **`"Hôm nay, ngày 02 tháng 01 năm 2024"`** (64 ca chắc chắn); fallback: số HĐ `001/0426/HĐMB` → 04/2026; hoặc ngày duy nhất trong file. Không thấy → **để trống, không đoán**.
+  - 🐛 Bug bắt được: lấy "ngày đầu tiên gặp" là SAI (vớ nhầm ngày phụ lục/căn cứ pháp lý). Ca Ocean Park: thư mục ghi `2024.R2C.0201` nhưng ra `2025-08-07` → sau khi sửa ra đúng `2024-01-02`.
+  - ⚠️ **9 thư mục có NHIỀU hợp đồng ký khác ngày** (mua thêm / đổi máy) → lấy **sớm nhất** + ghi rõ tất cả ngày ra cột "Nguồn ngày" để user kiểm. VD Ocean Park: 2024-01-02, 2024-04-08, 2025-08-07. **Liên quan ca Zeit** (đổi máy → HĐ mới thay HĐ cũ).
+- [x] **Đọc + GIỮ NGUYÊN ghi chú user**: 40 dòng cột ĐỐI CHIẾU (tab 1) + 3 dòng tab 2. Script tự nạp lại từ file bản trước mỗi lần chạy → **không xoá công user điền**.
+- [ ] **32 khách chưa rõ gói → user điền tay** (sheet `THIẾU GÓI - ĐIỀN TAY`): 29 "không thấy điều khoản" · 2 "chỉ có số năm" · 1 "chỉ có chu kỳ". Đa số thư mục **không có hợp đồng mua bán** (chỉ Quotation/PXK/ĐNTT/BBGH), hoặc hợp đồng cũ 2024 **chưa có điều khoản dịch vụ bảo trì**.
+
+### 📋 Ghi chú user (40 dòng, 2026-07-17) — phân loại để dựng schema
+| Nhóm | Nghĩa | Ví dụ |
+|---|---|---|
+| **Loại khỏi phạm vi POE** | "Khách lọc nước uống" (11 ca — là POU) · "Không mua bỏ qua" (4) · "Chưa mua" · "Không mua chuyển thành POU" | `09.A Tùng Kangen`, `13. Chị Nga Cafe`, `49. Chị Đỗ Trang` |
+| **Không có gói bảo trì** | "Mua thẳng bên TQ nên ko có gói bảo trì/hợp đồng" · "Gói không có bảo trì" · "Bên Thiên An bảo trì cho khách" (đối tác tự lo) | `02. KH anh Tuấn Tita`, `31. Chị Hồng Nga`, `19. Khách Thiên An` |
+| **Tặng / nội bộ** | "Khách được tặng" (3) · "Khách nội bộ nhà đầu tư/người quen" (3) · **"Hàng tặng đối tác, ko tính phí, cứ bảo trì 3 tháng/lần"** ← gói **VÔ THỜI HẠN**, loại mới chưa có trong công thức | `07. KH Dino Vũ`, `29. Mr.Chih`, `35. Trâm Tài`, `96. Anh Cường` |
+| **Có gói (user cho biết)** | "1 năm 4 lần đã bảo trì xong hết" (4 ca) · "Chu kì 3 tháng/lần" | `08. Anh Vũ`, `11. Anh Tiến`, `16. Mr. Quang Anh` |
+| **Máy khớp nhầm tên** (script sai, user sửa) | 6 ca — `Chị Phương Anh Homeland` ≠ `Cẩm Anh Long Biên` · `Chị Hậu Aspen` ≠ `Linh Thảo Điền` · `Chị Hiền Khai Sơn` ≠ `Hà Khai Sơn` · `Anh Hào` ≠ `Vân Anh Thái Nguyên` · `Bùi Thanh Tú` ≠ `Bùi Phúc` | → phải bỏ khớp tự động các ca này |
+| **Đặc biệt** | `42. Trang Suki`: **"Xung đột nên ko bảo trì cho khách nữa"** → dừng dịch vụ dù còn gói | |
+
+- [ ] ⚠️ **MÂU THUẪN cần user quyết**: `68. Chị Yến - Hải Phòng` — tab 1 ghi **"1 năm 4 lần, 3 tháng/lần"** nhưng tab 2 ghi **"Chưa mua"**. Hai ghi chú trái nhau.
 - [ ] 1 hợp đồng kẹt `.doc`/`.pdf` (sheet `KẸT ĐỊNH DẠNG`) — mở ra lưu lại thành `.docx` là đọc được
 
 > **🐛 3 BUG của script đã bắt được khi tự kiểm chứng** (nếu không sẽ đưa bảng SAI cho user):
