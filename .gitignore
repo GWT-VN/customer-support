@@ -38,3 +38,30 @@ catalog.json
 Phiếu theo dõi/GWT_*.xlsx
 /GWT_*.xlsx
 /GWT_*.md
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NGUỒN DỮ LIỆU THÔ — TUYỆT ĐỐI KHÔNG COMMIT
+# Repo này là repo CODE. Data thô chỉ nằm trên máy + iCloud, không lên GitHub.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Hợp đồng POE: hợp đồng ký, báo giá, CHI PHÍ ĐẦU VÀO (giá vốn NCC) + đầu ra,
+# phiếu xuất kho, PDF/scan. Lộ ra là lộ biên lợi nhuận + giá vốn nhà cung cấp.
+/Các khách lọc tổng POE/
+
+# Lịch bảo trì + lịch kỹ thuật (tên khách, địa chỉ, lịch hẹn)
+/Lịch bảo trì - Lịch kĩ thuật/
+
+# CRM leads (tên, SĐT, kênh, lịch sử mua)
+/Danh sách khách hàng từ Pancake CRM.xlsx
+
+# File CS tự theo dõi ticket lỗi (nội dung khiếu nại khách)
+/260624_Ticket lỗi.xlsx
+
+# Bảng phí dịch vụ (số liệu kinh doanh)
+/GWT - Chi phí dịch vụ.xlsx
+
+# Excel gốc Theo Dõi Bảo Hành + export Odoo (tên/SĐT/địa chỉ khách)
+/Theo Dõi Bảo Hành*.xlsx
+/Hệ thống CRM/
+/Phiếu theo dõi/
+/Báo cáo ceo/

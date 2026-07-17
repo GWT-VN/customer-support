@@ -41,6 +41,28 @@
 
 ## Phase 3 — Lịch lõi / bảo trì / muối / Water Profile ⏳ MỘT PHẦN
 
+> 📥 **Đã nhận tài liệu 2026-07-16** (đã khảo sát, chưa code). Nguồn:
+> | File | Nội dung | Dùng được gì |
+> |---|---|---|
+> | `Lịch bảo trì - Lịch kĩ thuật/GWT-Lịch bảo trì - Theo dõi quản lý.xlsx` | **Export Asana thật, 469 task** — Task ID · Name `Khách_Bộ_TP_BTn` · Section (`Mr. Dino Vũ Estella - 15A`) · Due Date · Completed At | **NGUỒN CHÍNH cho lịch bảo trì** → không cần API Asana |
+> | `.../GWT - Lịch bảo trì - Asana.xlsx` | Thống kê tay: Tổng hợp 74 · Bảo trì 35 · **Bảo trì-Tặng 9** · 9 tab lịch theo tháng (có SĐT/địa chỉ/máy/checklist/water profile) | Gói bảo trì đã mua/tặng + lịch từng tháng |
+> | `.../GWT - Lịch làm việc kỹ thuật HN.xlsx` + `HCM.xlsx` | Template **calendar Excel** 25 sheet (Year 2025/2026 + từng tháng) — dạng lịch nhìn, không phải bảng | ⚠️ khó parse, cần bàn cách |
+> | `GWT - Chi phí dịch vụ.xlsx` | Bảng giá: Lắp POU 500k / POE 5tr · **Bảo trì POU 300k / POE chung cư 660k, nhà đất 1.1tr** · Thay lõi 300k · Đổ muối 250k · Bình gas 200k | Giá cho gói bảo trì |
+> | `Danh sách khách hàng từ Pancake CRM.xlsx` | **1.570 lead × 74 cột** — Name/Phone/Address/province/district/Status/`ngay_thang_lap_dat`/`bt3`/`bt4`/`bao_tri`/`purchased_amount` | **Map khách thiếu SĐT/địa chỉ** |
+> | `260624_Ticket lỗi.xlsx` | CS tự theo dõi: Ticket lọc tổng 11 · bình gas 6 — **CÓ Serial ID** | **Vá serial cho ticket thiếu** + xác nhận nhóm POE-MAIN-DO |
+> | `Các khách lọc tổng POE/` | **100 thư mục hợp đồng** (2025 + 2026), có hợp đồng/báo giá/chi phí | Thông tin bộ đã bán + khách |
+>
+> **🐛 LỖI DỮ LIỆU ĐÃ XÁC MINH — file `GWT - Lịch bảo trì - Asana.xlsx`, cột `SỐ LẦN BẢO TRÌ`:**
+> Excel **tự đổi `"3/4"` → ngày `03/04/2026`**. 35/70 dòng bị hỏng kiểu này.
+> Bằng chứng: 35 dòng còn nguyên text đều bắt đầu bằng `0/` (`0/4`×23, `0/2`×7, `0/8`×3, `0/12`, `0/10 năm`) — vì **không có ngày 0** nên Excel không đổi được; mọi giá trị `n/m` với n≥1 đều thành ngày.
+> ✅ **Khôi phục được 100%**: `date(2026, m, d)` → `"d/m"` (đã xong d lần / tổng m lần). Mẫu số 2,4,8,10,12 khớp đúng các gói.
+> → **Cần user sửa file gốc**: định dạng cột thành **Text** trước khi nhập, không thì lần sau lại hỏng.
+>
+> **Còn cần user chốt:**
+> - *"Tính từ ngày lắp"*: hiện `v_core_forecast` lấy mốc = **lần thay gần nhất**, chưa có log mới lùi về `install_date`. Ý bạn là **luôn** tính từ ngày lắp?
+> - Lịch kỹ thuật HN/HCM là template calendar → parse rất khó. Có bản dạng bảng không?
+> - Gói bảo trì bán thế nào (0/2, 0/4, 0/8, 0/12, "0/10 năm" = gói mấy lần / bao lâu)?
+
 - [x] `v_machine_filter` giải mã product_filter (376/379 máy tra được lõi) + `filter_replacement` + `v_core_forecast` (2026-07-15)
 - [x] App: /loi (tab sắp đến hạn / quá hạn có cảnh báo) + nút "Đã thay hôm nay" + nhúng vào trang máy (2026-07-15)
 - [ ] `salt_schedule` + `maintenance_plan/visit` (dữ liệu POE từ Excel "Theo Dõi" sheet Bảo trì / Thay mua muối)
