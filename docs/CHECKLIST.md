@@ -39,6 +39,31 @@
 - [ ] Quyết định 5 serial mẹ chưa kích hoạt BH (Odoo cũng ghi False dù có ngày) — cột "→ Kích hoạt BH?" trong Excel
 - [ ] 14 ticket trỏ serial tồn kho không mẹ + 13 ticket không ghi serial — xử lý tay (1 ca nghi gõ nhầm: GWT-260004 `...V9l...` → `...V9I...`?)
 
+## Kết quả khảo sát tài liệu mới (2026-07-16) — ĐÃ KIỂM CHỨNG BẰNG DỮ LIỆU
+
+### ✅ Chốt: cách tính hạn thay lõi HIỆN TẠI LÀ ĐÚNG — không sửa
+User chốt 2026-07-16: *"tính từ ngày lắp máy, còn nếu có lịch thay lõi thì ưu tiên theo lịch thay lõi"*
+→ Đúng y hệt `v_core_forecast` đang làm: `coalesce(lần thay gần nhất, install_date)`. **Giữ nguyên.**
+User cũng chốt: **lõi POE thay RIÊNG, hẹn riêng với khách** (không gộp vào buổi bảo trì 3 tháng) → `v_core_forecast` áp cho POE là đúng.
+
+### ❌ `260624_Ticket lỗi.xlsx` KHÔNG vá được serial (khác kỳ vọng ban đầu)
+Đối chiếu bằng độ giống mô tả: 3 ca khớp 100% (`Phượng Anh`→GWT-260028, `Chị Trang Gamuda`→GWT-260032, `Kim Anh`→GWT-260034) — **cả 3 đều ĐÃ có serial rồi**. Không ca nào vá được.
+→ **Giá trị thật: 11 ticket MỚI chưa có trong hệ thống**, cần nhập:
+- Lọc tổng (6): `Tạ Phú Vương` GTEC-30A02 lỗi main + rơ le · `(không tên)` GTEF-30A02 · `Anh Tuấn Tita` màn hình mờ sọc trắng · `Anh Cường` + `Chị Linh` **màn hình đốm đen** · `Nguyen Hai` CTS20 chảy nước đáy
+- 🆕 **Bình gas (5): NHÓM LỖI MỚI chưa có trong 13 nhóm** — CTS20NG hết gas bất thường sau lắp (`Chị Maily` 2 tuần hết gas · `Chị Thanh`/`Chị Thuỳ Dương`/`Chị Hương`/`Chị Nhật` báo đỏ sau 1 ngày). GWT đang **tặng bình gas mới** để xử lý → tốn chi phí, cần báo hãng.
+- 5 serial trong file KHÔNG có trong `installed_base` (máy lắp sau kỳ export Odoo?)
+
+### ❌ Pancake CRM gần như KHÔNG map được khách thiếu dữ liệu
+- **Địa chỉ: 0/15** — khách thiếu địa chỉ không nằm trong tập trùng
+- **SĐT: 2/10** (`Lê Hường`, `Anh Minh`) — mà khớp bằng TÊN, tên phổ biến → **rủi ro nhầm người, không tự áp**
+- Lý do: chỉ **103/283 (36%)** khách DB có SĐT trùng Pancake. Pancake là CRM lead Facebook (703 "chưa mua"), DB là khách đã mua từ Odoo — hai tập lệch nhau.
+
+### 🚨 PHÁT HIỆN LỚN từ Pancake — cần user xác minh
+**216 khách Pancake gắn tag "Đã mua" nhưng KHÔNG có trong DB CSKH**, trong đó **55 khách mua POE (lọc tổng)**.
+Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `Tra Phan 0909155859` · `Hiep Dang 0939777779`
+⚠️ **Chưa kết luận được** — con số này CÓ THỂ sai vì: tag "Đã mua" do NV gắn tay · Pancake có bản ghi trùng (cùng SĐT, tên khác: `Vu Bui`/`Bùi Hoàng Vũ` = 0948878811) · `purchased_amount`=0 toàn bộ · có tên là tên page chat (`Lọc Nước GE x Chị Thanh`).
+→ **Cần user trả lời: khách mua qua Facebook/Shopee/đại lý có được nhập vào Odoo không?** Nếu có mà thiếu → hệ thống đang sót khách POE giá trị cao.
+
 ## Phase 3 — Lịch lõi / bảo trì / muối / Water Profile ⏳ MỘT PHẦN
 
 > 📥 **Đã nhận tài liệu 2026-07-16** (đã khảo sát, chưa code). Nguồn:
@@ -58,10 +83,47 @@
 > ✅ **Khôi phục được 100%**: `date(2026, m, d)` → `"d/m"` (đã xong d lần / tổng m lần). Mẫu số 2,4,8,10,12 khớp đúng các gói.
 > → **Cần user sửa file gốc**: định dạng cột thành **Text** trước khi nhập, không thì lần sau lại hỏng.
 >
-> **Còn cần user chốt:**
-> - *"Tính từ ngày lắp"*: hiện `v_core_forecast` lấy mốc = **lần thay gần nhất**, chưa có log mới lùi về `install_date`. Ý bạn là **luôn** tính từ ngày lắp?
-> - Lịch kỹ thuật HN/HCM là template calendar → parse rất khó. Có bản dạng bảng không?
-> - Gói bảo trì bán thế nào (0/2, 0/4, 0/8, 0/12, "0/10 năm" = gói mấy lần / bao lâu)?
+> **📊 Đã phân tích 467 task Asana (2026-07-16) — dữ liệu tự trả lời:**
+> - **Chu kỳ bảo trì thật = 3 tháng/lần** (283/368 khoảng cách = 77%)
+> - **Gói phổ biến = 4 lần** (49/81 khách) → 4 lần × 3 tháng = **1 năm**. Gói 8 lần (10 khách) = 2 năm · 12 lần (5 khách) = 3 năm · 2 lần (7 khách)
+> - 81 section = 1 khách + 1 bộ máy · 178 đã xong / 289 chưa · 257 việc đã lên lịch sẵn tới tương lai
+> - ⚠️ **Quy ước tên KHÔNG nhất quán**: 160/467 task lệch mẫu — `_BT4` vs `- BT5` vs `BT 4` vs không có BT (`Ms. Trang Bella - Nội bộ`) → parse phải linh hoạt
+>
+> **🚨 19 LỊCH BẢO TRÌ QUÁ HẠN CHƯA LÀM** (tính tới 16/07/2026) — cũ nhất quá hạn ~18 tháng:
+> `Mrs.Linh - 65 Chế Lan Viên` (hạn 09/01/2025) · `Mrs. Mai - Trung Phụng - 24home` (18/03/2025) · `Anh Tới_30A_Hạ Long` (BT1 hạn 28/12/2025 chưa làm, BT2 28/03/2026 cũng quá hạn) · `Chị Trang Suki_15A ECO_Đồng Nai_BT1` (09/04/2026)
+>
+> **Lịch kỹ thuật HN/HCM — user chốt 2026-07-16: chỉ ĐỌC THAM KHẢO, không nạp.**
+> Sẽ build app mới quản lý phân bổ lịch kỹ thuật, **lấy việc từ 3 nguồn: lịch bảo trì · đơn lắp máy · ticket lỗi**.
+> Rút ra từ file hiện tại: đơn vị lịch = **buổi (Sáng/Chiều)** không phải giờ · mỗi việc cần *loại việc + khách + máy + địa chỉ + SĐT* · **chưa ghi tên thợ** (mỗi TP 1 lịch chung) · HN/HCM có thợ hãng, tỉnh khác dùng **freelancer** · cần đánh dấu ngày nghỉ lễ.
+>
+> **📜 Đã quét 217 file .docx trong `Các khách lọc tổng POE/` (2026-07-16) — hợp đồng ĐỌC ĐƯỢC, là nguồn gốc đáng tin:**
+> - **81 hợp đồng** có điều khoản bảo trì. Mẫu chuẩn: `"01 năm dịch vụ bảo trì định kỳ 5 sao (3 tháng/lần)"` + `"Bảo trì bảo dưỡng 4 lần/năm"` → **gói 4 lần** (50 HĐ + 14 HĐ = 64/81)
+> - ✅ Kiểm chứng khớp: `54. Chị Trang Bùi - Park City` HĐ ghi **"03 năm … (3 tháng/lần)"** = 3×4 = **12 lần** — đúng y `0/12` trong file thống kê
+> - ✅ **Tìm ra HĐ 10 năm** = `"10 năm dịch vụ bảo trì định kỳ 5 sao (3 tháng/lần)"` = **40 lần**, khớp user chốt. **NHƯNG hợp đồng đứng tên `86. Sixdo`, KHÔNG phải "Anh Huy Cân"** như file thống kê ghi → cần user xác nhận có phải cùng một khách.
+> - 🆕 **Mẫu hợp đồng MỚI** (`88. Chị Liên`, WH30A **ECO`): `"02 năm dịch vụ bảo trì định kỳ 5 sao (6 tháng/lần)"` → chu kỳ **6 tháng**, khác hẳn mẫu cũ 3 tháng
+> - ⚠️ **Hợp đồng MÂU THUẪN NỘI BỘ**: cùng 1 file vừa ghi `"Bảo trì bảo dưỡng 4 lần/năm"` vừa ghi `"(6 tháng/lần)"` (= 2 lần/năm). Điều khoản bảo hành và chính sách bán hàng đá nhau → máy không tự quyết được.
+> - ❌ **BẾ TẮC: 7/8 khách gói `/2` KHÔNG có file hợp đồng trong folder** (Hoài Ngân, Nhung Ecopark, My Zeit, Trang Suki, Hiền Metropolis, Hà Lan Ciputra, Trang Gamuda — chỉ có biên bản/báo giá, không có HĐMB) → không check được như user chỉ dẫn.
+> - ❌ Giả thuyết "ECO → gói 2" **SAI**: `Chị Linh Thảo Điền` bộ 15A ECO nhưng gói **4**. Cũng không có quy luật theo thời gian (gói 4 có khách bắt đầu 2026-08, muộn hơn gói 2 tháng 2026-01).
+>
+### ✅ ĐÃ CHỐT — công thức gói bảo trì (user xác nhận 2026-07-16)
+> **Tổng lần bảo trì = số năm × (12 ÷ chu kỳ tháng)** — lấy từ dòng hợp đồng
+> `"NN năm dịch vụ bảo trì định kỳ 5 sao (M tháng/lần)"`. Kiểm chứng đúng 5/5 ca đã biết đáp án.
+> - `1 năm × 3 th` → **4 lần** (49 khách — mẫu chuẩn) · `1 năm × 6 th` → **2 lần** (3 khách — gói `/2`)
+> - `2 năm × 3 th` → **8** (6 khách) · `2 năm × 6 th` → **4** (Chị Liên) · `3 năm × 3 th` → **12** (Chị Trang Bùi)
+> - `10 năm × 3 th` → **40** = `86. Sixdo` = **Anh Huy Cận** (user xác nhận) → file thống kê phải sửa `0/10 năm` → **`0/40`**
+> ⚠️ KHÔNG dùng dòng `"Bảo trì bảo dưỡng 4 lần/năm"` để tính — đó là template bảo hành copy cứng, mâu thuẫn với chu kỳ thật.
+
+- [x] **Quét 100 hợp đồng POE** (`migrate/quet_hop_dong.py`) → Excel `GWT_goi_bao_tri_tu_hop_dong_2026-07-16.xlsx` (2026-07-16)
+  - **63/98 khách đọc ra gói** · 35 không rõ (thiếu HĐMB, chỉ có biên bản/báo giá) · 1 hợp đồng kẹt định dạng `.doc`/`.pdf`
+  - User chốt thứ tự tra: **hợp đồng → biên bản xác nhận → báo giá**
+- [ ] **1 ca LỆCH duy nhất — user quyết**: `46. Anh Minh chị My - Zeit Thủ Thiêm` — hợp đồng ghi `1 năm × 3 tháng/lần` = **4 lần**, file thống kê ghi **`0/2`**. Tin bên nào?
+- [ ] 35 khách chưa rõ gói → cần bổ sung hợp đồng, hoặc convert `.doc`/`.pdf` sang `.docx`
+
+> **🐛 3 BUG của script đã bắt được khi tự kiểm chứng** (nếu không sẽ đưa bảng SAI cho user):
+> 1. **Regex nuốt số thứ tự dòng**: `"1 ⇥ 03 năm dịch vụ bảo trì"` → bắt `1` thay vì `03` → Trang Bùi ra 4 thay vì 12. Phần đệm `[^)\n]{0,10}` quá tham lam.
+> 2. **Chữ `đ` không bỏ dấu được bằng NFD** (U+0111 không decompose) → `"hợp đồng"` → `"hop ong"` → mọi ưu tiên tìm file hợp đồng đều trượt, script đọc nhầm biên bản.
+> 3. **Khớp tên quá lỏng** (chỉ cần 2 từ chung) → `"Anh Hiếu Park City"` khớp nhầm `"Chị Trang Bùi Park City"`.
+> → Trước khi sửa: báo **15 ca lệch**. Sau khi sửa: **1 ca**. 14 ca kia là bug, không phải data sai.
 
 - [x] `v_machine_filter` giải mã product_filter (376/379 máy tra được lõi) + `filter_replacement` + `v_core_forecast` (2026-07-15)
 - [x] App: /loi (tab sắp đến hạn / quá hạn có cảnh báo) + nút "Đã thay hôm nay" + nhúng vào trang máy (2026-07-15)
