@@ -122,7 +122,24 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
   - 🐛 Bug bắt được: lấy "ngày đầu tiên gặp" là SAI (vớ nhầm ngày phụ lục/căn cứ pháp lý). Ca Ocean Park: thư mục ghi `2024.R2C.0201` nhưng ra `2025-08-07` → sau khi sửa ra đúng `2024-01-02`.
   - ⚠️ **9 thư mục có NHIỀU hợp đồng ký khác ngày** (mua thêm / đổi máy) → lấy **sớm nhất** + ghi rõ tất cả ngày ra cột "Nguồn ngày" để user kiểm. VD Ocean Park: 2024-01-02, 2024-04-08, 2025-08-07. **Liên quan ca Zeit** (đổi máy → HĐ mới thay HĐ cũ).
 - [x] **Đọc + GIỮ NGUYÊN ghi chú user**: 40 dòng cột ĐỐI CHIẾU (tab 1) + 3 dòng tab 2. Script tự nạp lại từ file bản trước mỗi lần chạy → **không xoá công user điền**.
-- [ ] **32 khách chưa rõ gói → user điền tay** (sheet `THIẾU GÓI - ĐIỀN TAY`): 29 "không thấy điều khoản" · 2 "chỉ có số năm" · 1 "chỉ có chu kỳ". Đa số thư mục **không có hợp đồng mua bán** (chỉ Quotation/PXK/ĐNTT/BBGH), hoặc hợp đồng cũ 2024 **chưa có điều khoản dịch vụ bảo trì**.
+- [x] **`GWT_goi_bao_tri_tu_hop_dong_2026-07-17.xlsx` = BẢN CUỐI** (user chốt 2026-07-17). User đã tự dọn:
+  - Xoá 17 khách (chưa mua / khách lọc nước uống — cũng xoá luôn folder cho gọn) → còn **81 khách**
+  - Sửa cột Số năm/Chu kỳ/Tổng lần cho **4 ca khớp lệch công thức**: `46. Zeit Thủ Thiêm` · `11. Phương Anh Homeland` · `36. Vũ Phan Hiền Metropolis` · `47. Hoài Ngân Heritage` — cả 4 đều **1 năm × 3 tháng/lần nhưng TỔNG chỉ 2 lần** (không phải 4)
+  - **73/81 có tổng lần · 73/81 có ngày ký**
+  > ✅ **Chính sách xác nhận (user 2026-07-17): bộ ECO hiện tại dùng chu kỳ 3 tháng/lần** (không phải 6 tháng). 2 khách ECO cũ ghi 6 tháng/lần trong hợp đồng (`Nhung Vũ`, `Tuấn Anh Tây Mỗ`) là theo **chính sách cũ đã đổi** — giữ nguyên số liệu hợp đồng của họ (lịch sử), nhưng khách MỚI ký sau này áp chu kỳ 3 tháng.
+  - **KHÔNG chạy lại `quet_hop_dong.py` đè file này** — mọi thay đổi tiếp theo sửa tay trực tiếp trong Excel.
+- [x] **8 khách tặng/nội bộ → KHÔNG có gói cố định**, CSKH chăm sóc riêng (có thể bán gói mới hoặc tiếp tục tặng miễn phí): `07. Dino Vũ` · `19. Thiên An` (đối tác tự bảo trì) · `29. Mr.Chih Empire City` · `31. Chị Hồng Nga` · `35. Trâm Tài` · `37. Anh Hải Starlake` · `42. Trang Suki` (dừng do xung đột) · `96. Anh Cường`
+- [x] **File HOÀN THIỆN 2026-07-17 (chỉnh trực tiếp, không chạy lại script)**:
+  1. Thêm cột **"LOẠI GÓI"** (`HỢP ĐỒNG` 73 / `TẶNG/NỘI BỘ` 8, tô màu tím riêng) — đánh dấu để sau này DB phân biệt lịch tự sinh vs CSKH chăm sóc tay
+  2. Bỏ tab "THIẾU GÓI - ĐIỀN TAY" — xác nhận cả 32 dòng đã giải quyết xong trong tab 1 (15 bị xoá vì chưa mua/lọc nước uống, 17 còn lại đã có tổng lần hoặc thuộc nhóm tặng/nội bộ)
+  3. Bỏ tab "KẸT ĐỊNH DẠNG" — Hoài Ngân đã có tổng lần=2 điền tay trong tab 1, không cần đọc PDF nữa
+  - **Còn 1 sheet duy nhất, 81 khách, 15 cột.** Verify: 73 có ngày ký, 73 HỢP ĐỒNG + 8 TẶNG/NỘI BỘ, mọi ca đã biết đáp án khớp đúng.
+- [x] **Đọc + xử lý comment mới của user ở cột M** (file `(1)`, 2026-07-20) → còn **78 khách, 70 HỢP ĐỒNG + 5 TẶNG/NỘI BỘ + 3 chưa phân loại**:
+  - Xoá 3 dòng thư mục đã mất trên đĩa: `10. Anh Công Q1` ("Không mua bỏ qua"), `100. Anh Vũ Vesora Khang Điền Q9`, `74. Chị Eva Dung Nguyễn` (2 dòng sau user xác nhận xoá dù không có ghi chú)
+  - Gỡ nhãn TẶNG/NỘI BỘ theo yêu cầu rõ ("KO được note là tặng/nội bộ"): `19. Thiên An` · `31. Chị Hồng Nga` · `42. Trang Suki` — LOẠI GÓI để **trống** (không gói cố định nhưng cũng không phải tặng — lý do riêng từng ca đã ghi ở cột M)
+  - `07. Anh Hải Starlake (CT Phúc Thọ)` và `37. Anh Hải Starlake` = **1 người, 2 công trình** (Phúc Thọ mua/HỢP ĐỒNG, Starlake tặng/TẶNG-NỘI BỘ) — user xác nhận, giữ nguyên cả hai, không gộp
+  - Trả lời 2 câu hỏi user hỏi trong ghi chú: `16. Mr. Quang Anh` — file **đọc được** nhưng chỉ có dòng mẫu "4 lần/năm" không đáng tin, số 4 lần hiện tại là user tự điền tay; `11. Phương Anh Homeland` — hợp đồng có "(3 tháng/lần)" không có số năm, số liệu user điền (1 năm/2 lần) hợp lý, giữ nguyên
+  - 🐛 Bug bắt được khi tự verify: `ws.cell(row=.., column=.., value=None)` trong openpyxl **không xoá được cell** — `value=None` bị coi là "không truyền", không phải "xoá về rỗng". Phải gán trực tiếp `cell.value = None`. Sửa xong, verify lại đúng.
 
 ### 📋 Ghi chú user (40 dòng, 2026-07-17) — phân loại để dựng schema
 | Nhóm | Nghĩa | Ví dụ |
@@ -148,7 +165,8 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
 
 - [x] `v_machine_filter` giải mã product_filter (376/379 máy tra được lõi) + `filter_replacement` + `v_core_forecast` (2026-07-15)
 - [x] App: /loi (tab sắp đến hạn / quá hạn có cảnh báo) + nút "Đã thay hôm nay" + nhúng vào trang máy (2026-07-15)
-- [ ] `salt_schedule` + `maintenance_plan/visit` (dữ liệu POE từ Excel "Theo Dõi" sheet Bảo trì / Thay mua muối)
+- [x] **Dựng `maintenance_plan` + `maintenance_visit` + view `v_maintenance_due`** (2026-07-20, migration `20260720060000`) — xem mục riêng bên dưới
+- [ ] `salt_schedule` (dữ liệu muối từ Excel "Theo Dõi" sheet Thay mua muối — nguồn mỏng, 25 dòng không có serial)
 - [ ] `water_profile` (độ cứng, clo dư, TDS, pH — trước/sau lọc) + render báo cáo gửi khách
 - [ ] Reminder worker Zalo ZNS (cron quét lịch đến hạn → nhắn notify_contact)
 - [ ] Mở rộng RPC `activate_warranty` → `activate_and_seed` (kích hoạt BH + sinh lịch lõi/muối/bảo trì)
@@ -173,6 +191,18 @@ Ví dụ POE: `Cô Hồng 0907999270` · `Anh Cảnh Hưng Yên 0913366968` · `
 - [ ] **RỦI RO AN TOÀN — 6 ticket máy để bàn quá nhiệt**: GWT-260004 "máy tự động bốc khói khi không lấy nước", GWT-260011 "lỗi E3, E1, đun nóng liên tục" + 4 ca E3/E7. **5/6 chưa gắn serial** → không biết model nào lỗi, báo hãng sẽ thiếu bằng chứng. 3 ticket còn Open.
 - [ ] **POE main màn hình — 11 ticket / 9 khách / 8 máy** (GTEF-15A01, GTEF-30A01, GTEC-30A01, WH15A), đa số phải thay main → nghi lỗi lô hàng, đáng báo hãng
 - [ ] **CTD50 bình 2L/lỗi E4 — 8 ticket, cả 8 trong 90 ngày qua** (xu hướng tăng), 1 ca xác định "tắc van một chiều"
+
+## Gói bảo trì POE — DB ✅ ĐÃ DỰNG (2026-07-20)
+
+- [x] Migration `maintenance_plan` + `maintenance_visit` + view `v_maintenance_due` (mẫu `v_core_forecast`) — GWT-Masterdata commit `85c5de2`
+- [x] Nạp **78 gói bảo trì** (`migrate/nap_maintenance_plan.py`) từ file Excel chốt cuối, khớp SĐT trích trực tiếp từ hợp đồng (khối "BÊN (A)", loại trừ SĐT+MST công ty GWT)
+  - 21 khớp đủ khách+máy · 8 khớp khách nhưng thiếu máy POE trong `installed_base` · **26 khách hoàn toàn mới** (không có trong DB — khớp phát hiện trước đó về 55 khách POE trong Pancake "đã mua" nhưng thiếu hệ thống) · 23 chưa trích được SĐT
+- [x] Nạp **467 lượt bảo trì** (`migrate/nap_maintenance_visit.py`) từ export Asana thật — 158 khớp `plan_id` (thận trọng: verify 0 section khớp nhầm nhiều plan), 178 đã xong, **21 quá hạn thật**, 19 sắp đến hạn (≤30 ngày)
+- [x] Snapshot + docs GWT-Masterdata cập nhật cùng phiên
+- [ ] **26 khách POE hoàn toàn mới cần user quyết**: có tạo customer + installed_base (không có serial thật) để gắn gói bảo trì không, hay chờ Odoo nhập bổ sung?
+- [ ] **23 khách chưa trích được SĐT** (không có hợp đồng .docx đọc được / mẫu văn bản khác) — cần tra tay hoặc bổ sung hợp đồng
+- [ ] Chưa có app hiển thị `v_maintenance_due` — cần màn hình `/bao-tri` (mẫu `/loi`)
+- [ ] Chưa nối vào lịch kỹ thuật (Phase "app phân bổ lịch" — user chốt lịch bảo trì là 1 trong 3 nguồn việc)
 
 ## Phase 4 — Knowledge base ❌ CHƯA BẮT ĐẦU
 
