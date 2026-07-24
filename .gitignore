@@ -65,3 +65,7 @@ Phiếu theo dõi/GWT_*.xlsx
 /Hệ thống CRM/
 /Phiếu theo dõi/
 /Báo cáo ceo/
+
+# User gom TOÀN BỘ data thô vào 1 thư mục "File gốc/" (2026-07-24) — chứa mọi thứ
+# nhạy cảm ở trên: Excel khách, CRM, hợp đồng, báo cáo CEO. Không bao giờ commit.
+/File gốc/
