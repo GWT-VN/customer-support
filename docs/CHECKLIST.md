@@ -9,11 +9,15 @@
 > User đã chốt: Sales dùng chung `internal_code` với catalog · CSKH mirror catalog từ GWT-Masterdata (đã public read).
 
 - [x] **Phase 0.1** — Introspect toàn bộ schema CSKH từ Postgres sống (10 bảng + 5 view + 2 function + 6 bảng catalog) → sinh file DDL nguồn `supabase-cskh/migrations/00_init_cskh_project_moi.sql` (2026-07-24). Bỏ FK `internal_code→catalog_item`; 6 bảng catalog thành bảng gương; `activate_warranty` thêm phân biệt mirror-lag vs không-áp-dụng-BH. **Chưa áp** (chờ project mới).
-- [ ] **Phase 0.2 (CHẶN, phụ thuộc ngoài)** — chốt với team Sales: tên bảng đơn hàng + cột `internal_code`/khách/ngày mua, để RPC `activate_and_seed` join đúng
-- [ ] **Phase 0.3 (CHẶN)** — user cấp URL + anon key + service_role key của project Supabase mới
-- [ ] **Phase 1** — áp DDL vào project mới + Edge Function mirror 6 bảng catalog (cron, health-check tỷ lệ khớp 376/379)
-- [ ] **Phase 2** — script di trú `migrate/di_tru_sang_project_moi.py` (SOURCE/DEST tách khỏi .env.local) + verify song song
-- [ ] **Phase 3** — cutover app-cskh sang project mới + RPC `activate_and_seed(p_order_id)` + trigger AFTER INSERT trên order Sales
+- [x] **Phase 0.2** — Khám phá project Sales `bwzmqfbcgouhvhoslmmm` (GWT-SalesTracking). **Phát hiện lớn**: Sales chỉ có 1 bảng `sales_order_lines` (589 dòng) = mirror 1 chiều Google Sheet, **CỐ Ý bỏ PII (không SĐT/địa chỉ)**, **không có serial**, xoá-ghi mỗi sync. → **KHÔNG seed tự động được** (thiếu serial + SĐT). User chốt: **chưa tích hợp Sales vội, di trú CSKH trước**.
+- [x] **Phase 1** — Áp DDL vào GWT-SalesTracking qua MCP (2026-07-24). Verify: 16 bảng (10 CSKH + 6 gương) · 5 view · 2 func · 8 check · FK catalog=0 (bỏ đúng). 2 migration: `cskh_init_full_schema` + `cskh_views_rpc_rls`.
+- [x] **Data-contract Sales** (`docs/specs/2026-07-24-cs-data-contract.md`) — Sales SẼ publish 2 bảng cho CS đọc: `customers` (PII, RLS chặn anon, khoá `customer_code`) + `customer_purchases` (máy đã bán/tặng, có `internal_code`). Khách + PII do **Sales sở hữu**; CS giữ ngày lắp/ticket/bảo trì. **Sales chưa implement** (Phase 5, chờ CS chốt design).
+- [x] **Đổi `customers`→`cs_customers`** (user chốt 2026-07-24) tránh đụng bảng Sales sắp publish + thêm cột `customer_code` để map dần. Áp qua MCP (rename + recreate 4 view). Giữ bảng khách nội bộ TẠM (293 Odoo), đối chiếu tăng dần khi Sales publish.
+- [x] **Phase 2 XONG** — `migrate/di_tru_sang_project_moi.py` di trú qua REST (SOURCE Masterdata service_role từ .env.local · DEST từ `migrate/.env.migrate` gitignored). **Verify khớp 100%**: cs_customers 293 · installed_base 465 (99 con) · warranty 374 · tickets 83 · maintenance_plan 78 · maintenance_visit 467 · issue_group 13 · catalog gương 501 dòng · **v_core_forecast 658 khớp Masterdata** · serial mẹ/con thừa hưởng BH đúng (2026-07-24).
+- [ ] **Chốt design phản hồi Sales** — CS đối chiếu qua `customer_code`; điểm Sales cần đảm bảo (customer_code ổn định, bao phủ khách Odoo lịch sử, RLS role CS)
+- [ ] **Edge Function mirror** — hiện mirror 1 lần bằng script; cần cron tự động (health-check tỷ lệ khớp v_machine_filter 376/379)
+- [ ] **Phase 3 cutover** — app-cskh: đổi `.env.local` → SalesTracking + đổi `.from('customers')` → `.from('cs_customers')` (actions.ts, CustomerEditor) + verify từng trang
+- [ ] **Tích hợp Sales (ĐỂ SAU, chờ Sales implement Phase 5)** — đối chiếu `customer_purchases` (máy đã bán mà CS chưa có hồ sơ → cảnh báo), map cs_customers ↔ Sales.customers qua customer_code
 - [ ] **Phase 4** — buffer read-only 10 bảng cũ ở GWT-Masterdata (KHÔNG xoá ngay), theo dõi log, pg_dump, rồi mới DROP
 
 ## Phase 0 — Nền + kích hoạt bảo hành ✅ XONG

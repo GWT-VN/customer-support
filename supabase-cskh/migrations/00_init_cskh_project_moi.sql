@@ -105,21 +105,27 @@ create table if not exists public.product_warranty (
 -- PHẦN B · 10 BẢNG CSKH (di trú nguyên trạng, dữ liệu cá nhân)
 -- ============================================================================
 
-create table if not exists public.customers (
+-- ⚠️ ĐỔI TÊN customers -> cs_customers (2026-07-24): tránh đụng bảng `customers` mà
+-- Sales sắp publish (khách + PII do Sales sở hữu — xem docs/specs/2026-07-24-cs-data-contract.md).
+-- CS giữ bảng khách nội bộ TẠM (293 khách Odoo lịch sử) + cột customer_code để map dần
+-- sang Sales.customers khi họ implement (Phase 5). Đối chiếu tăng dần, không mất link máy↔khách.
+create table if not exists public.cs_customers (
   id uuid primary key default gen_random_uuid(),
   primary_phone text unique,               -- khoá tự nhiên; null được (khách Odoo chưa có SĐT)
   full_name text not null,
   source text, partner_ref text, province text, address text,
   needs_phone boolean not null default false,
   notes text,
+  customer_code text,                       -- map sang Sales.customers.customer_code (null tới khi đối chiếu)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists idx_customers_needs_phone on public.customers(needs_phone) where needs_phone;
+create index if not exists idx_cs_customers_needs_phone on public.cs_customers(needs_phone) where needs_phone;
+create index if not exists idx_cs_customers_code on public.cs_customers(customer_code) where customer_code is not null;
 
 create table if not exists public.customer_contacts (
   id uuid primary key default gen_random_uuid(),
-  customer_id uuid not null references public.customers(id) on delete cascade,
+  customer_id uuid not null references public.cs_customers(id) on delete cascade,
   phone text, contact_name text,
   role text check (role in ('owner','family','helper','manager','other')),
   is_primary boolean not null default false,
@@ -134,7 +140,7 @@ create table if not exists public.installed_base (
   internal_code text,                       -- ⚠️ BỎ FK -> catalog_item (mirror khác project). Giữ text + index.
   source_product_code text,
   model_freetext text,
-  customer_id uuid references public.customers(id),
+  customer_id uuid references public.cs_customers(id),
   parent_serial text references public.installed_base(serial),   -- self-FK bộ lọc tổng mẹ/con
   notify_contact_id uuid references public.customer_contacts(id),
   install_date date, install_address text, channel_source text,
@@ -160,7 +166,7 @@ create table if not exists public.tickets (
   ticket_code text primary key,             -- GWT-YYnnnn giữ nguyên từ Odoo
   serial text references public.installed_base(serial) on update cascade,
   source_serial text,
-  customer_id uuid references public.customers(id),
+  customer_id uuid references public.cs_customers(id),
   source_customer text,
   ticket_type text,                          -- cố ý KHÔNG check (Odoo thêm loại bất kỳ lúc nào)
   state text not null default 'Open' check (state in ('Open','Done','Cancel')),
@@ -209,7 +215,7 @@ create table if not exists public.issue_override (
 
 create table if not exists public.maintenance_plan (
   id uuid primary key default gen_random_uuid(),
-  customer_id uuid references public.customers(id),
+  customer_id uuid references public.cs_customers(id),
   serial text references public.installed_base(serial),
   source_folder text not null,
   source_customer_name text, source_phone text, bo_may text,
@@ -238,7 +244,7 @@ create index if not exists idx_maintenance_visit_due on public.maintenance_visit
 
 -- ── Trigger updated_at ──────────────────────────────────────────────────────
 do $$ declare t text; begin
-  foreach t in array array['customers','installed_base','warranty','tickets','issue_group','maintenance_plan'] loop
+  foreach t in array array['cs_customers','installed_base','warranty','tickets','issue_group','maintenance_plan'] loop
     execute format('drop trigger if exists trg_%s_updated_at on public.%I', t, t);
     execute format('create trigger trg_%s_updated_at before update on public.%I for each row execute function public.set_updated_at()', t, t);
   end loop;
@@ -309,7 +315,7 @@ select ib.serial, ib.internal_code,
   (w.id is null and wp.id is not null) as bh_theo_me
 from public.installed_base ib
 left join public.catalog_item ci on ci."Mã nội bộ" = ib.internal_code
-left join public.customers c on c.id = ib.customer_id
+left join public.cs_customers c on c.id = ib.customer_id
 left join public.warranty w on w.serial = ib.serial
 left join public.warranty wp on wp.serial = ib.parent_serial
 left join public.product_warranty pw on pw.internal_code = ib.internal_code;
@@ -333,8 +339,8 @@ select t.ticket_code, t.state, t.ticket_type, t.description, t.last_note, t.prov
 from public.tickets t
 left join public.installed_base ib on ib.serial = t.serial
 left join public.catalog_item ci on ci."Mã nội bộ" = ib.internal_code
-left join public.customers c on c.id = t.customer_id
-left join public.customers cm on cm.id = ib.customer_id
+left join public.cs_customers c on c.id = t.customer_id
+left join public.cs_customers cm on cm.id = ib.customer_id
 left join public.warranty w on w.serial = t.serial
 left join public.warranty wp on wp.serial = ib.parent_serial;
 
@@ -355,7 +361,7 @@ select ib.serial, ib.internal_code,
 from public.installed_base ib
 join public.v_machine_filter mf on mf.internal_code = ib.internal_code
 left join public.catalog_item ci on ci."Mã nội bộ" = ib.internal_code
-left join public.customers c on c.id = ib.customer_id
+left join public.cs_customers c on c.id = ib.customer_id
 left join lateral (
   select r.replaced_at from public.filter_replacement r
   where r.serial = ib.serial and r.filter_code = mf.filter_code
@@ -379,7 +385,7 @@ select mv.id as visit_id, mv.asana_task_id, mv.lan_thu, mv.due_date, mv.complete
        else 'còn hạn' end as tinh_trang
 from public.maintenance_visit mv
 left join public.maintenance_plan mp on mp.id = mv.plan_id
-left join public.customers c on c.id = mp.customer_id;
+left join public.cs_customers c on c.id = mp.customer_id;
 
 -- ============================================================================
 -- PHẦN D · RPC activate_warranty — cải tiến phân biệt mirror-lag vs không-áp-dụng-BH
@@ -440,7 +446,7 @@ end; $$;
 --     (giống bản gốc — không nhạy cảm; nhưng chỉ service_role/Edge Function GHI).
 -- ============================================================================
 do $$ declare t text; begin
-  foreach t in array array['customers','customer_contacts','installed_base','warranty',
+  foreach t in array array['cs_customers','customer_contacts','installed_base','warranty',
                            'tickets','filter_replacement','issue_group','issue_override',
                            'maintenance_plan','maintenance_visit'] loop
     execute format('alter table public.%I enable row level security', t);
