@@ -40,4 +40,12 @@ CS đã chạy độc lập trong project này với **bảng riêng, tên có t
 
 ## 6. Tóm tắt điều Sales cần làm (Phase 5)
 
-Đúng như mục 5 của contract (sync `DM_KHACH`→`customers` + 4 tab đơn→`customer_purchases` gắn `customer_code` + RLS chặn anon). **CS chỉ cần Sales trả lời 3 câu ở mục 3 trên** rồi bắt tay implement — CS đã sẵn sàng phía mình.
+Đúng như mục 5 của contract (sync `DM_KHACH`→`customers` + 4 tab đơn→`customer_purchases` gắn `customer_code` + RLS chặn anon).
+
+## 7. Sales đã trả lời 3 câu (2026-07-24) — CHỐT
+
+1. **`customer_code` ổn định: ✅ CÓ.** Đọc mã đã cấp trước, giữ nguyên (theo SĐT, hoặc theo Mã đơn cho khách chưa SĐT), có test pin. **Điều kiện: dựng lại `DM_KHACH` trước mỗi lần sync CS.**
+2. **Bao phủ khách lịch sử: ⚠️ KHÔNG đủ.** `DM_KHACH` chỉ gồm khách trong dữ liệu Sales đã import (~200 SĐT duy nhất + 77 đơn không SĐT ≈ 277 dòng), **KHÔNG phải superset** của 293 khách / 465 máy Odoo. → **CS làm đúng dự phòng**: giữ `cs_customers` cho phần lịch sử, chỉ map `customer_code` cho khách trùng qua SĐT. **Hai tập khác nhau, không phải Sales thiếu.**
+3. **RLS: ✅ Đồng ý.** 2 bảng RLS bật + 0 policy → anon chặn hoàn toàn, CS đọc bằng `service_role`. Không tạo role riêng.
+
+→ **Cả 3 chốt khớp thiết kế CS.** Sales có thể bắt tay implement Phase 5. Khi 2 bảng sẵn sàng, CS chạy script đối chiếu `cs_customers` ↔ `Sales.customers` qua SĐT (284/293 khách CS có SĐT → map được phần lớn).
