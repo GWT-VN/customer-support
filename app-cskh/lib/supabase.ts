@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
 
 /**
@@ -44,14 +45,6 @@ export function dataClient() {
   return createClient(URL, key, { auth: { persistSession: false } })
 }
 
-/** Người đăng nhập hợp lệ nhưng KHÔNG có quyền vào hệ thống CSKH. */
-export class LoiKhongCoQuyen extends Error {
-  constructor(public lyDo: 'bi_khoa' | 'ngoai_danh_sach') {
-    super('FORBIDDEN')
-    this.name = 'LoiKhongCoQuyen'
-  }
-}
-
 /** Đọc cs_staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
 export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   const e = chuanHoaEmail(email)
@@ -73,16 +66,23 @@ export async function ghiNhanNhanVienMoi(email: string) {
 }
 
 /**
- * Chặn cổng: chưa đăng nhập HOẶC không có quyền -> throw.
+ * Chặn cổng: chưa đăng nhập HOẶC không có quyền -> đá về /login kèm lý do.
  * Mọi truy vấn dữ liệu phải gọi hàm này trước.
+ *
+ * Vì sao redirect() chứ không throw: ca "đang dùng thì bị thu quyền" xảy ra
+ * giữa lúc render trang. Ném lỗi thì trên production Next giấu sạch thông tin,
+ * người dùng chỉ thấy trang trắng "Application error" và không hiểu vì sao.
+ *
+ * LƯU Ý: redirect() hoạt động bằng cách ném lỗi NEXT_REDIRECT — người gọi
+ * TUYỆT ĐỐI không được bọc requireStaff() trong try/catch, sẽ nuốt mất redirect.
  */
 export async function requireStaff() {
   const { data, error } = await (await authClient()).auth.getUser()
-  if (error || !data.user) throw new Error('UNAUTHENTICATED')
+  if (error || !data.user) redirect('/login')
 
   const email = chuanHoaEmail(data.user.email)
   const kq = await kiemTraVaoCua(email)
-  if (!kq.duocVao) throw new LoiKhongCoQuyen(kq.lyDo)
+  if (!kq.duocVao) redirect(`/login?loi=${kq.lyDo}`)
   if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
 
   return data.user

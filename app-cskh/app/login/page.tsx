@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { xacNhanQuyenVaoCua } from '../auth/actions'
 
 const THONG_BAO_LOI: Record<string, string> = {
@@ -26,7 +26,16 @@ function FormDangNhap() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const loiTuUrl = THONG_BAO_LOI[searchParams.get('loi') ?? ''] ?? null
+  const maLoi = searchParams.get('loi') ?? ''
+  const loiTuUrl = THONG_BAO_LOI[maLoi] ?? null
+
+  // Bị luật vào cửa từ chối thì session cũ phải dọn. Không dọn thì người dùng
+  // vẫn "đang đăng nhập", mỗi lần mở app lại bị đá về đây mà không hiểu vì sao.
+  useEffect(() => {
+    if (maLoi === 'bi_khoa' || maLoi === 'ngoai_danh_sach') {
+      taoClient().auth.signOut()
+    }
+  }, [maLoi])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
