@@ -14,9 +14,9 @@ export default async function TicketsPage({
   const onlyKhan = khan === '1'
   const isMine = mine === '1'
   const me = isMine ? await currentStaff() : null
-  const tickets =
+  const { rows: tickets, tong, soTrang } =
     isMine && !me
-      ? []
+      ? { rows: [], tong: 0, soTrang: 1 }
       : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id)
 
   const tabs = [
@@ -80,7 +80,7 @@ export default async function TicketsPage({
         </div>
 
         <p className="text-sm text-slate-500">
-          {tickets.length} ticket{tickets.length === 50 && ' (giới hạn 50 — gõ cụ thể hơn)'}
+          {tong} ticket{soTrang > 1 && ' (giới hạn 50/trang — gõ cụ thể hơn)'}
         </p>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

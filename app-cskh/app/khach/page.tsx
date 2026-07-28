@@ -3,7 +3,8 @@ import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix } from '@/app/actions'
 
 export default async function ToFixPage() {
-  const list = await listToFix()
+  const { rows: list, tong, trang, soTrang } = await listToFix()
+  // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
 
@@ -16,7 +17,8 @@ export default async function ToFixPage() {
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
             <p className="text-sm text-slate-500 mt-1">
-              {list.length} khách · {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
+              {tong} khách cần dọn{soTrang > 1 && ` (trang ${trang}/${soTrang})`} · trên trang này:{' '}
+              {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
               Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
             </p>
           </div>

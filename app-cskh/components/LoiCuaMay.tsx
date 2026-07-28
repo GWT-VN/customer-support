@@ -4,8 +4,11 @@ import { vnDate } from '@/components/Badge'
 
 /** Lõi của 1 máy: cần thay khi nào + lịch sử đã thay. Nhúng vào trang chi tiết máy. */
 export async function LoiCuaMay({ serial }: { serial: string }) {
-  const [all, history] = await Promise.all([coreForecast('', serial), replacementsOfSerial(serial)])
-  const rows = all.filter((r) => r.serial === serial)
+  const [all, history] = await Promise.all([
+    coreForecast('', serial, { tatPhanTrang: true }),
+    replacementsOfSerial(serial),
+  ])
+  const rows = all.rows.filter((r) => r.serial === serial)
 
   if (rows.length === 0)
     return (

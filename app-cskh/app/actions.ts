@@ -3,9 +3,26 @@
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
+import { antoanChoOr, chuanHoaTuKhoa, sapXepHopLe } from '@/lib/timkiem'
+import { MOI_TRANG, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
 const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
+
+/** Kết quả một trang: dữ liệu + tổng số dòng thật (để tính tổng số trang). */
+export type KetQuaTrang<T> = {
+  rows: T[]
+  tong: number
+  trang: number
+  soTrang: number
+}
+
+/** Tuỳ chọn chung cho các hàm liệt kê có phân trang + sắp xếp. */
+export type TuyChonDanhSach = {
+  trang?: number
+  cot?: string
+  chieu?: string
+}
 
 export type Machine = {
   serial: string
@@ -27,26 +44,43 @@ export type Machine = {
   co_chinh_sach_bh: boolean
 }
 
-/** Tra máy theo serial / tên khách / SĐT. Rỗng -> 50 máy lắp gần nhất. */
-export async function searchMachines(q: string): Promise<Machine[]> {
+/** Tra máy theo serial / tên khách / SĐT / địa chỉ (không dấu). Rỗng -> máy lắp gần nhất. */
+export async function searchMachines(
+  q: string,
+  tuyChon: TuyChonDanhSach = {}
+): Promise<KetQuaTrang<Machine>> {
   await requireStaff()
-  const db = dataClient()
-  let query = db.from('v_installed_base').select('*')
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_MAY, {
+    cot: 'install_date', tang: false,
+  })
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const tu = (trang - 1) * MOI_TRANG
 
-  const term = q.trim()
-  if (term) {
-    // ilike an toàn: escape % và _ để người dùng gõ ký tự đó không thành wildcard
-    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
-    query = query.or(
-      `serial.ilike.%${safe}%,customer_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%`
+  let truyVan = dataClient()
+    .from('v_installed_base')
+    .select('*', { count: 'exact' })
+
+  const kw = antoanChoOr(chuanHoaTuKhoa(q))
+  if (kw) {
+    // ten_kd/dia_chi_kd đã bỏ dấu sẵn trong DB; serial và SĐT vốn không dấu
+    truyVan = truyVan.or(
+      `ten_kd.ilike.%${kw}%,dia_chi_kd.ilike.%${kw}%,` +
+      `serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
     )
   }
 
-  const { data, error } = await query
-    .order('install_date', { ascending: false, nullsFirst: false })
-    .limit(50)
+  const { data, error, count } = await truyVan
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
-  return (data ?? []) as Machine[]
+
+  const tong = count ?? 0
+  return {
+    rows: (data ?? []) as Machine[],
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+  }
 }
 
 export async function getMachine(serial: string): Promise<Machine | null> {
@@ -180,24 +214,47 @@ export type CoreDue = {
  * ⚠️ "QUÁ HẠN" KHÔNG chắc khách cần thay: filter_replacement mới bắt đầu ghi, nên máy cũ
  * nào chưa từng log đều hiện quá hạn dù thực tế GWT đã thay rồi. Dùng làm danh sách XÁC MINH.
  */
-export async function coreForecast(tinhTrang: string, q: string): Promise<CoreDue[]> {
+export async function coreForecast(
+  tinhTrang: string,
+  q: string,
+  tuyChon: TuyChonDanhSach & { tatPhanTrang?: boolean } = {}
+): Promise<KetQuaTrang<CoreDue>> {
   await requireStaff()
-  let query = dataClient().from('v_core_forecast').select('*')
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_LOI, {
+    cot: 'han_som', tang: true,
+  })
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const tu = (trang - 1) * MOI_TRANG
 
-  if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
+  let truyVan = dataClient().from('v_core_forecast').select('*', { count: 'exact' })
+
+  if (tinhTrang) truyVan = truyVan.eq('tinh_trang', tinhTrang)
   const term = q.trim()
   if (term) {
-    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
-    query = query.or(
+    // v_core_forecast KHÔNG có ten_kd/dia_chi_kd (Task 1 chỉ thêm cho v_installed_base
+    // và v_tickets) -> customer_name/product_name vẫn còn dấu trong DB, KHÔNG được bỏ
+    // dấu từ khoá ở đây kẻo mất khớp. Chỉ chặn ký tự phá cú pháp .or().
+    const safe = antoanChoOr(term)
+    truyVan = truyVan.or(
       `serial.ilike.%${safe}%,customer_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%,` +
         `filter_code.ilike.%${safe}%,product_name.ilike.%${safe}%`
     )
   }
-  const { data, error } = await query
-    .order('con_bao_nhieu_ngay', { ascending: true, nullsFirst: false })
-    .limit(100)
+
+  let cauLenh = truyVan.order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+  // LoiCuaMay.tsx cần TOÀN BỘ lõi của 1 máy (không phân trang) rồi tự lọc theo serial.
+  if (!tuyChon.tatPhanTrang) cauLenh = cauLenh.range(tu, tu + MOI_TRANG - 1)
+
+  const { data, error, count } = await cauLenh
   if (error) throw new Error(error.message)
-  return (data ?? []) as CoreDue[]
+
+  const tong = count ?? 0
+  return {
+    rows: (data ?? []) as CoreDue[],
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+  }
 }
 
 export async function coreCounts() {
@@ -363,30 +420,51 @@ export type Ticket = {
 /** Tra ticket theo mã / serial / tên khách / SĐT / nội dung. Rỗng -> 50 ticket mới nhất.
  *  onlyKhan=true -> chỉ ticket đánh dấu Khẩn (khách khó chịu / cần gấp). */
 export async function searchTickets(
-  q: string, state?: string, onlyKhan?: boolean, mineStaffId?: string
-): Promise<Ticket[]> {
+  q: string,
+  state?: string,
+  onlyKhan?: boolean,
+  mineStaffId?: string,
+  tuyChon: TuyChonDanhSach = {}
+): Promise<KetQuaTrang<Ticket>> {
   await requireStaff()
-  let query = dataClient().from('v_tickets').select('*')
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_TICKET, {
+    cot: 'created_at', tang: false,
+  })
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const tu = (trang - 1) * MOI_TRANG
+
+  let truyVan = dataClient().from('v_tickets').select('*', { count: 'exact' })
 
   const term = q.trim()
   if (term) {
-    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
-    query = query.or(
-      `ticket_code.ilike.%${safe}%,source_serial.ilike.%${safe}%,customer_name.ilike.%${safe}%,` +
+    // ticket_code/source_serial/mô tả/loại ticket vẫn còn dấu trong DB (không có cột
+    // bỏ dấu riêng) -> giữ nguyên có dấu, chỉ chặn ký tự phá .or(). Riêng tên khách
+    // đổi sang ten_kd (đã bỏ dấu sẵn, coalesce đúng khuôn customer_name — migration 06).
+    const safe = antoanChoOr(term)
+    const kw = antoanChoOr(chuanHoaTuKhoa(q))
+    truyVan = truyVan.or(
+      `ticket_code.ilike.%${safe}%,source_serial.ilike.%${safe}%,ten_kd.ilike.%${kw}%,` +
         `primary_phone.ilike.%${safe}%,description.ilike.%${safe}%,ticket_type.ilike.%${safe}%`
     )
   }
-  if (state) query = query.eq('state', state)
-  if (onlyKhan) query = query.eq('khan', true)
-  if (mineStaffId) query = query.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
+  if (state) truyVan = truyVan.eq('state', state)
+  if (onlyKhan) truyVan = truyVan.eq('khan', true)
+  if (mineStaffId) truyVan = truyVan.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
 
-  // Khẩn lên đầu, rồi mới nhất trước.
-  const { data, error } = await query
+  // Khẩn lên đầu, rồi theo cột sắp xếp đã kiểm tra.
+  const { data, error, count } = await truyVan
     .order('khan', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(50)
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
-  return (data ?? []) as Ticket[]
+
+  const tong = count ?? 0
+  return {
+    rows: (data ?? []) as Ticket[],
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+  }
 }
 
 /** Ticket của 1 máy — dùng ở trang chi tiết máy. */
@@ -632,7 +710,7 @@ export async function ticketsCsv(
   // Nút export đã ẩn với vai trò cs, nhưng đây mới là rào thật.
   if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
   const mineId = mine ? (await currentStaff())?.id : undefined
-  const rows = await searchTickets(q, state, onlyKhan, mineId)
+  const { rows } = await searchTickets(q, state, onlyKhan, mineId)
   const head = ['Mã', 'Ngày', 'Trạng thái', 'Khẩn', 'Loại', 'Khách', 'SĐT', 'Serial',
     'Máy', 'CS', 'Kỹ thuật', 'Mô tả']
   const esc = (v: unknown) => {
@@ -697,14 +775,24 @@ export async function ticketTypes(): Promise<string[]> {
 }
 
 /** Khách cần dọn: thiếu/lỗi SĐT HOẶC thiếu địa chỉ. Di trú Odoo không lấp được, phải sửa tay. */
-export async function listToFix(): Promise<(Customer & { machines: number })[]> {
+export async function listToFix(
+  tuyChon: TuyChonDanhSach = {}
+): Promise<KetQuaTrang<Customer & { machines: number }>> {
   await requireStaff()
   const db = dataClient()
-  const { data, error } = await db
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_KHACH, {
+    cot: 'full_name', tang: true,
+  })
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const tu = (trang - 1) * MOI_TRANG
+
+  // Điều kiện .or() ở đây CỐ ĐỊNH, không ghép từ khoá người dùng -> không cần antoanChoOr.
+  const { data, error, count } = await db
     .from('cs_customers')
-    .select('*')
+    .select('*', { count: 'exact' })
     .or('needs_phone.eq.true,address.is.null')
-    .order('full_name')
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
   const customers = (data ?? []) as Customer[]
 
@@ -715,12 +803,19 @@ export async function listToFix(): Promise<(Customer & { machines: number })[]> 
     .in('customer_id', customers.map((c) => c.id))
   if (e2) throw new Error(e2.message)
 
-  const count = new Map<string, number>()
+  const dem = new Map<string, number>()
   for (const r of ibs ?? []) {
     const id = (r as { customer_id: string }).customer_id
-    count.set(id, (count.get(id) ?? 0) + 1)
+    dem.set(id, (dem.get(id) ?? 0) + 1)
   }
-  return customers.map((c) => ({ ...c, machines: count.get(c.id) ?? 0 }))
+
+  const tong = count ?? 0
+  return {
+    rows: customers.map((c) => ({ ...c, machines: dem.get(c.id) ?? 0 })),
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { WarrantyBadge, vnDate } from '@/components/Badge'
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = '' } = await searchParams
-  const machines = await searchMachines(q)
+  const { rows: machines, tong, soTrang } = await searchMachines(q)
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -25,8 +25,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         </form>
 
         <p className="text-sm text-slate-500">
-          {q ? `${machines.length} kết quả cho “${q}”` : `${machines.length} máy lắp gần nhất`}
-          {machines.length === 50 && ' (giới hạn 50 — gõ cụ thể hơn để thu hẹp)'}
+          {q ? `${tong} kết quả cho “${q}”` : `${tong} máy lắp gần nhất`}
+          {soTrang > 1 && ' (giới hạn 50/trang — gõ cụ thể hơn để thu hẹp)'}
         </p>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

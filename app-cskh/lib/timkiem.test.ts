@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boDau, chuanHoaTuKhoa, sapXepHopLe } from './timkiem'
+import { antoanChoOr, boDau, chuanHoaTuKhoa, sapXepHopLe } from './timkiem'
 
 describe('boDau', () => {
   it('bỏ dấu tiếng Việt và về chữ thường', () => {
@@ -57,5 +57,23 @@ describe('sapXepHopLe — chốt chặn injection', () => {
   it('chiều chỉ nhận asc/desc, khác đi coi như desc', () => {
     expect(sapXepHopLe('serial', 'lung tung', CHO_PHEP, MAC_DINH))
       .toEqual({ cot: 'serial', tang: false })
+  })
+})
+
+describe('antoanChoOr — chốt chặn phá cú pháp .or() của PostgREST', () => {
+  it('bỏ ký tự phá cú pháp .or() của PostgREST', () => {
+    expect(antoanChoOr('a,b(c)%d')).toBe('a b c d')
+  })
+
+  it('gộp khoảng trắng phát sinh sau khi bỏ ký tự, cắt hai đầu', () => {
+    expect(antoanChoOr('  a,,b((c))  ')).toBe('a b c')
+  })
+
+  it('chuỗi không có ký tự nguy hiểm thì giữ nguyên', () => {
+    expect(antoanChoOr('huong')).toBe('huong')
+  })
+
+  it('chuỗi rỗng vẫn trả về rỗng', () => {
+    expect(antoanChoOr('')).toBe('')
   })
 })

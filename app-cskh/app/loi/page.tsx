@@ -29,7 +29,10 @@ export default async function LoiPage({
 }) {
   const { q = '', tt } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
-  const [rows, counts] = await Promise.all([coreForecast(tinhTrang, q), coreCounts()])
+  const [{ rows, tong, soTrang }, counts] = await Promise.all([
+    coreForecast(tinhTrang, q),
+    coreCounts(),
+  ])
 
   const tabs = [
     { key: SAP, label: `Sắp đến hạn (${counts[SAP] ?? 0})` },
@@ -82,7 +85,7 @@ export default async function LoiPage({
         </form>
 
         <p className="text-sm text-slate-500">
-          {rows.length} dòng (máy × lõi){rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
+          {tong} dòng (máy × lõi){soTrang > 1 && ' — giới hạn 50/trang, gõ cụ thể hơn'}
         </p>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

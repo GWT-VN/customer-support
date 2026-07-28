@@ -35,3 +35,8 @@ export function sapXepHopLe(
   if (!cot || !choPhep.includes(cot)) return macDinh
   return { cot, tang: chieu === 'asc' }
 }
+
+/** PostgREST dùng dấu phẩy và ngoặc làm cú pháp .or() — phải bỏ khỏi từ khoá. */
+export function antoanChoOr(kw: string): string {
+  return kw.replace(/[,()%*]/g, ' ').replace(/\s+/g, ' ').trim()
+}
