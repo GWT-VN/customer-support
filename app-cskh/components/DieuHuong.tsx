@@ -19,21 +19,35 @@ const MUC = [
 ] as const
 
 /**
- * Trang chi tiết cũng phải sáng đúng mục cha: đang ở /ticket/GWT-260035 thì
- * "Ticket" sáng, nhờ vậy luôn nhìn ra đường quay lại danh sách.
+ * Trang chi tiết thuộc mục nào.
+ *
+ * KHÔNG so khớp bằng tiền tố URL được — app này là đồ thị, không phải cây:
+ *  · /may/[serial] chẳng trùng tiền tố mục nào, nhưng máy liệt kê ở trang chủ
+ *  · /khach/[id] trùng tiền tố /khach, nhưng "Khách cần dọn" là danh sách khách
+ *    LỖI DỮ LIỆU, không phải trang cha của mọi khách. Sáng mục đó là nói sai.
+ *
+ * Chi tiết khách cố ý KHÔNG ánh xạ vào đâu: nó vào được từ máy, ticket, lịch
+ * lõi, nhóm lỗi... không có mục cha thật. Thà không sáng gì còn hơn sáng sai.
  */
-function dangO(pathname: string, href: string) {
-  if (href === '/') return pathname === '/'
-  return pathname === href || pathname.startsWith(href + '/')
+const MUC_CHA: ReadonlyArray<readonly [tienTo: string, muc: string]> = [
+  ['/may/', '/'],
+  ['/ticket/', '/ticket'],
+  ['/nhom-loi/', '/nhom-loi'],
+] as const
+
+function mucDangMo(pathname: string): string | null {
+  if (MUC.some((m) => m.href === pathname)) return pathname
+  return MUC_CHA.find(([tienTo]) => pathname.startsWith(tienTo))?.[1] ?? null
 }
 
 export function DieuHuong() {
   const pathname = usePathname()
+  const dangMo = mucDangMo(pathname)
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto">
       {MUC.map(({ href, nhan }) => {
-        const active = dangO(pathname, href)
+        const active = href === dangMo
         return (
           <Link
             key={href}

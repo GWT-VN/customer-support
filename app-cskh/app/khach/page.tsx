@@ -9,7 +9,7 @@ export default async function ToFixPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
-        <Link href="/" className="text-sm text-slate-600 underline">← Tra cứu</Link>
+        <Link href="/" className="text-sm text-slate-600 underline">← Máy đã lắp</Link>
 
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>

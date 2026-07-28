@@ -29,7 +29,7 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
-        <Link href="/" className="text-sm text-slate-600 underline">← Tra cứu</Link>
+        <Link href="/" className="text-sm text-slate-600 underline">← Máy đã lắp</Link>
 
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-slate-900">{m.product_name}</h1>
