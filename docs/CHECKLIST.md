@@ -53,7 +53,10 @@
 
 - [x] **Việc 0 — gộp 2 bảng nhân viên** (migration `gop_cs_staff_vao_staff`). Hai bảng dựng song song cùng ngày và **đã mâu thuẫn**: `ai@gwt.vn` là `admin` bên `staff` nhưng `nhan_vien` bên `cs_staff`; khoá người bên `staff` thì họ vẫn đăng nhập được vì rào đọc bảng kia. Giữ `staff` (có tên người, vai trò đúng nghiệp vụ, đã nối vào ticket), rào đăng nhập trỏ sang. Verify: 5 NV đều có email · RLS bật · 0 policy · trigger `updated_at` · 0 dòng sót
 - [ ] **Xoá `cs_staff`** sau khi chạy ổn định (cố ý giữ làm bản lùi, theo thông lệ repo)
-- [ ] **Phân quyền**: `capQuyen('admin')` ở *server action* (ẩn nút KHÔNG phải phân quyền) · màn `/nhan-vien` cho admin · admin-only: chi phí/vật tư/đổi máy, export CSV, quản lý NV
+- [x] **Phân quyền XONG** (2026-07-29). Luật ở `lib/quyen.ts` dạng hàm thuần + **9 unit test**, tổng 16 test. Chặn ở *server*: `laAdmin()` trong từng Server Action, `chanNeuKhongPhaiAdmin()` cho trang — ẩn nút chỉ là cho gọn mắt. Admin-only: chi phí/vật tư/đổi máy ticket · export CSV · màn `/nhan-vien`. Menu "Nhân viên" chỉ hiện với admin (tách `DieuHuong` thành vỏ server + lõi client nên 9 trang không phải sửa).
+  - **Chống khoá chết hệ thống** — 3 bẫy có test riêng: không tự khoá mình · không tự hạ quyền mình · không hạ/khoá **admin cuối cùng**
+  - Người `@gwt.vn` vào lần đầu tự sinh dòng với vai trò `cs`, **không ai tự thành admin**
+- [ ] Duyệt lại ma trận quyền theo nghiệp vụ thật (user chốt "cứ build vậy đã, chỉnh sau")
 - [ ] **Search**: bật `unaccent` + `pg_trgm` — hiện gõ `huong` KHÔNG ra `Hương` · thêm ô tìm kiếm toàn cục
 - [ ] **Filter**: trang máy (trạng thái BH/tỉnh/model) · ticket (nhóm lỗi/người phụ trách/thời gian) · khách (tỉnh/thiếu SĐT)
 - [ ] **Sort**: bấm tiêu đề cột, lưu trên URL — **phải whitelist tên cột** trước khi đưa vào `.order()`

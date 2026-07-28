@@ -3,6 +3,7 @@ import { DieuHuong } from '@/components/DieuHuong'
 import { searchTickets, currentStaff } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
+import { laAdmin } from '@/lib/supabase'
 
 export default async function TicketsPage({
   searchParams,
@@ -73,7 +74,9 @@ export default async function TicketsPage({
               Việc của tôi
             </Link>
           </div>
-          <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
+          {await laAdmin() && (
+            <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
+          )}
         </div>
 
         <p className="text-sm text-slate-500">

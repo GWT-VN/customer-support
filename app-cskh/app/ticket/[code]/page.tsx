@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
 import { NutQuayLai } from '@/components/NutQuayLai'
+import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
@@ -128,7 +129,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
-          <TicketItems code={t.ticket_code} items={items} />
+          <TicketItems code={t.ticket_code} items={items} choPhepSua={await laAdmin()} />
         </section>
 
         <section className="bg-white rounded-xl border p-5">

@@ -1,7 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { dataClient, requireStaff } from '@/lib/supabase'
+import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
+import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
+
+/** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
+const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
 
 export type Machine = {
   serial: string
@@ -424,6 +428,76 @@ export async function currentStaff(): Promise<Staff | null> {
   return (data as Staff) ?? null
 }
 
+// ── Quản lý nhân viên (chỉ admin) ───────────────────────────────────────────
+
+/** Toàn bộ NV kể cả đã khoá — cho màn /nhan-vien. Khác listStaff() vốn chỉ lấy NV đang hoạt động. */
+export async function listAllStaff(): Promise<(Staff & { hoat_dong: boolean })[]> {
+  await requireStaff()
+  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  const { data, error } = await dataClient()
+    .from('staff').select('id, ten, vai_tro, email, hoat_dong')
+    .order('hoat_dong', { ascending: false }).order('vai_tro').order('ten')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as (Staff & { hoat_dong: boolean })[]
+}
+
+/**
+ * Đổi vai trò hoặc bật/tắt hoạt động của một nhân viên.
+ *
+ * Luật chống khoá chết hệ thống nằm ở lib/quyen.ts (có unit test): không tự
+ * khoá mình, không tự hạ quyền mình, không hạ/khoá admin cuối cùng.
+ */
+export async function suaNhanVien(
+  id: string,
+  patch: { vai_tro?: string; hoat_dong?: boolean }
+) {
+  await requireStaff()
+  const toi = await layNhanVien()
+  if (!toi || !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+
+  if (patch.vai_tro !== undefined && !laVaiTroHopLe(patch.vai_tro)) {
+    return { ok: false as const, error: 'Vai trò không hợp lệ.' }
+  }
+
+  const db = dataClient()
+  const { data: biSua, error: e1 } = await db
+    .from('staff').select('id, vai_tro, hoat_dong').eq('id', id).maybeSingle()
+  if (e1) return { ok: false as const, error: e1.message }
+  if (!biSua) return { ok: false as const, error: 'Không tìm thấy nhân viên.' }
+
+  const { count, error: e2 } = await db
+    .from('staff').select('id', { count: 'exact', head: true })
+    .eq('vai_tro', 'admin').eq('hoat_dong', true)
+  if (e2) return { ok: false as const, error: e2.message }
+
+  const kt = kiemTraSuaNhanVien({
+    idNguoiSua: toi.id,
+    idBiSua: id,
+    vaiTroMoi: patch.vai_tro as VaiTro | undefined,
+    hoatDongMoi: patch.hoat_dong,
+    vaiTroHienTai: (biSua as { vai_tro: string }).vai_tro,
+    soAdminDangHoatDong: count ?? 0,
+  })
+  if (!kt.ok) return { ok: false as const, error: kt.lyDo }
+
+  const { error } = await db.from('staff').update(patch).eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/nhan-vien')
+  return { ok: true as const }
+}
+
+/** Sửa tên hiển thị — người vào lần đầu chỉ có tên tạm lấy từ email. */
+export async function doiTenNhanVien(id: string, ten: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const t = ten.trim()
+  if (!t) return { ok: false as const, error: 'Tên không được để trống.' }
+  const { error } = await dataClient().from('staff').update({ ten: t }).eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/nhan-vien')
+  return { ok: true as const }
+}
+
 // ── Chi phí / vật tư / đổi máy của ticket (Đợt 2) ───────────────────────────
 export type TicketMuc = {
   id: string
@@ -450,6 +524,7 @@ export async function addTicketItem(code: string, input: {
   serial_cu?: string; serial_moi?: string
 }) {
   const user = await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   if (!['thu_phi', 'vat_tu', 'doi_may'].includes(input.loai)) {
     return { ok: false as const, error: 'Loại mục không hợp lệ.' }
   }
@@ -470,6 +545,7 @@ export async function addTicketItem(code: string, input: {
 
 export async function deleteTicketItem(id: string, code: string) {
   await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('ticket_muc').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(`/ticket/${code}`)
@@ -480,6 +556,9 @@ export async function deleteTicketItem(id: string, code: string) {
 export async function ticketsCsv(
   q: string, state?: string, onlyKhan?: boolean, mine?: boolean
 ): Promise<string> {
+  await requireStaff()
+  // Nút export đã ẩn với vai trò cs, nhưng đây mới là rào thật.
+  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
   const mineId = mine ? (await currentStaff())?.id : undefined
   const rows = await searchTickets(q, state, onlyKhan, mineId)
   const head = ['Mã', 'Ngày', 'Trạng thái', 'Khẩn', 'Loại', 'Khách', 'SĐT', 'Serial',

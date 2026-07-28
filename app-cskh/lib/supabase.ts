@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
+import { laQuyenAdmin } from './quyen'
 
 /**
  * Hai client TÁCH BIỆT — đừng trộn lẫn:
@@ -104,3 +105,38 @@ export const requireStaff = cache(async () => {
 
   return user
 })
+
+export type NhanVien = {
+  id: string
+  ten: string
+  vai_tro: string
+  email: string | null
+  hoat_dong: boolean
+}
+
+/** Hồ sơ nhân viên của người đang đăng nhập. Cache theo request. */
+export const layNhanVien = cache(async (): Promise<NhanVien | null> => {
+  const user = await requireStaff()
+  const { data, error } = await dataClient()
+    .from('staff')
+    .select('id, ten, vai_tro, email, hoat_dong')
+    .eq('email', chuanHoaEmail(user.email))
+    .maybeSingle()
+  if (error) throw error
+  return (data as NhanVien) ?? null
+})
+
+/** Dùng cho cả chặn ở server LẪN ẩn nút trên giao diện. */
+export async function laAdmin(): Promise<boolean> {
+  return laQuyenAdmin((await layNhanVien())?.vai_tro)
+}
+
+/**
+ * Chặn TRANG chỉ dành cho admin.
+ *
+ * Ẩn nút trên giao diện KHÔNG phải phân quyền — ai biết đường dẫn vẫn mở được.
+ * Rào thật nằm ở đây và ở từng Server Action nhạy cảm.
+ */
+export async function chanNeuKhongPhaiAdmin() {
+  if (!(await laAdmin())) redirect('/?loi=khong_du_quyen')
+}

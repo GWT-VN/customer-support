@@ -15,7 +15,13 @@ function tien(n: number | null) {
   return n.toLocaleString('vi-VN') + ' đ'
 }
 
-export function TicketItems({ code, items }: { code: string; items: TicketMuc[] }) {
+/**
+ * `choPhepSua` chỉ để ẩn nút cho gọn mắt — KHÔNG phải phân quyền.
+ * Rào thật nằm trong addTicketItem()/deleteTicketItem() ở server.
+ */
+export function TicketItems(
+  { code, items, choPhepSua }: { code: string; items: TicketMuc[]; choPhepSua: boolean }
+) {
   const [loai, setLoai] = useState('thu_phi')
   const [moTa, setMoTa] = useState('')
   const [soTien, setSoTien] = useState('')
@@ -74,14 +80,24 @@ export function TicketItems({ code, items }: { code: string; items: TicketMuc[] 
                     </p>
                   )}
                 </div>
-                <button onClick={() => del(it.id)}
-                  className="text-xs text-slate-400 hover:text-red-600 flex-none">Xoá</button>
+                {choPhepSua && (
+                  <button onClick={() => del(it.id)}
+                    className="text-xs text-slate-400 hover:text-red-600 flex-none">Xoá</button>
+                )}
               </li>
             )
           })}
         </ul>
       )}
 
+      {!choPhepSua && (
+        <p className="text-sm text-slate-400">
+          {items.length === 0 && 'Chưa có mục nào. '}
+          Chỉ quản trị mới ghi được chi phí, vật tư, đổi máy.
+        </p>
+      )}
+
+      {choPhepSua && (
       <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
         <div className="flex gap-2 flex-wrap">
           {Object.entries(LOAI).map(([k, v]) => (
@@ -127,6 +143,7 @@ export function TicketItems({ code, items }: { code: string; items: TicketMuc[] 
           {err && <span className="text-sm text-red-600">{err}</span>}
         </div>
       </div>
+      )}
     </div>
   )
 }
