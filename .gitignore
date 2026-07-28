@@ -73,3 +73,6 @@ Phiếu theo dõi/GWT_*.xlsx
 # "File md/" (2026-07-24) — bản .md của CRM Pancake (tên/SĐT khách), Báo cáo CEO,
 # ticket lỗi, chi phí dịch vụ. PII nặng. Không bao giờ commit.
 /File md/
+
+# CodeGraph — index cục bộ, sinh lại bằng `codegraph init`. Không commit.
+.codegraph/
