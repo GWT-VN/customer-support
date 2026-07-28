@@ -4,6 +4,7 @@ import { getCustomer, ticketsOfCustomer, machinesOfCustomer } from '@/app/action
 import { CustomerEditor } from '@/components/CustomerEditor'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
+import { NutQuayLai } from '@/components/NutQuayLai'
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -14,7 +15,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
-        <Link href="/" className="text-sm text-slate-600 underline">← Máy đã lắp</Link>
+        <NutQuayLai macDinh="/" />
         <h1 className="text-xl font-semibold text-slate-900">{customer.full_name}</h1>
         <CustomerEditor customer={customer} contacts={contacts} />
 
