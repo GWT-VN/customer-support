@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
-import { searchTickets, currentStaff } from '@/app/actions'
+import { searchTickets, currentStaff, type KetQuaTrang, type Ticket } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
 import { laAdmin } from '@/lib/supabase'
@@ -14,10 +14,13 @@ export default async function TicketsPage({
   const onlyKhan = khan === '1'
   const isMine = mine === '1'
   const me = isMine ? await currentStaff() : null
-  const { rows: tickets, tong, soTrang } =
+  // Gõ nguyên hình dạng KetQuaTrang<Ticket> (kể cả `trang`) cho nhánh rỗng — thiếu field
+  // không lộ lỗi build ngay bây giờ (chưa ai đọc `trang`) nhưng Task 4 destructure vào là vỡ.
+  const ketQua: KetQuaTrang<Ticket> =
     isMine && !me
-      ? { rows: [], tong: 0, soTrang: 1 }
+      ? { rows: [], tong: 0, trang: 1, soTrang: 1 }
       : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id)
+  const { rows: tickets, tong, soTrang } = ketQua
 
   const tabs = [
     { key: '', label: 'Tất cả' },

@@ -25,7 +25,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         </form>
 
         <p className="text-sm text-slate-500">
-          {q ? `${tong} kết quả cho “${q}”` : `${tong} máy lắp gần nhất`}
+          {q
+            ? `Hiện ${machines.length} trên ${tong} kết quả cho “${q}”`
+            : `Hiện ${machines.length} trên ${tong} máy đã lắp gần nhất`}
           {soTrang > 1 && ' (giới hạn 50/trang — gõ cụ thể hơn để thu hẹp)'}
         </p>
 

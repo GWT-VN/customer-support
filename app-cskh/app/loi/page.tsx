@@ -85,7 +85,7 @@ export default async function LoiPage({
         </form>
 
         <p className="text-sm text-slate-500">
-          {tong} dòng (máy × lõi){soTrang > 1 && ' — giới hạn 50/trang, gõ cụ thể hơn'}
+          {tong} dòng (máy × lõi){soTrang > 1 && ' — giới hạn 100/trang, gõ cụ thể hơn'}
         </p>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

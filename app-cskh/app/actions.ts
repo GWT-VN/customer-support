@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
 import { antoanChoOr, chuanHoaTuKhoa, sapXepHopLe } from '@/lib/timkiem'
-import { MOI_TRANG, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from '@/lib/danhSach'
+import { MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
 const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
@@ -62,15 +62,22 @@ export async function searchMachines(
 
   const kw = antoanChoOr(chuanHoaTuKhoa(q))
   if (kw) {
-    // ten_kd/dia_chi_kd đã bỏ dấu sẵn trong DB; serial và SĐT vốn không dấu
+    // KHÔNG đưa dia_chi_kd vào đây: "Phường" bỏ dấu thành "phuong", chứa chuỗi con
+    // "huong" -> gõ "huong" tìm KHÁCH lại ngập kết quả nhiễu vì trúng ĐỊA CHỈ (đo
+    // trên DB thật: 296/472 dòng khớp, 257 dòng trong đó khớp CHỈ vì địa chỉ có chữ
+    // "Phường"/"phường", không phải tên). Tìm theo địa chỉ để dành cho bộ lọc riêng ở
+    // Task 5 — đừng thêm dia_chi_kd lại vào đây, ten_kd đã đủ cho ô tìm chung.
     truyVan = truyVan.or(
-      `ten_kd.ilike.%${kw}%,dia_chi_kd.ilike.%${kw}%,` +
-      `serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
+      `ten_kd.ilike.%${kw}%,serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
     )
   }
 
+  // serial là khoá chính của v_installed_base -> khoá phụ đủ để .range() không
+  // nhảy/lặp dòng giữa các trang khi cột sắp xếp chính có nhiều dòng bằng nhau
+  // (vd install_date trùng nhau tới 10 dòng — Postgres không tự đảm bảo thứ tự đó).
   const { data, error, count } = await truyVan
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .order('serial', { ascending: true })
     .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
 
@@ -224,7 +231,7 @@ export async function coreForecast(
     cot: 'han_som', tang: true,
   })
   const trang = Math.max(1, tuyChon.trang ?? 1)
-  const tu = (trang - 1) * MOI_TRANG
+  const tu = (trang - 1) * MOI_TRANG_LOI
 
   let truyVan = dataClient().from('v_core_forecast').select('*', { count: 'exact' })
 
@@ -241,9 +248,14 @@ export async function coreForecast(
     )
   }
 
-  let cauLenh = truyVan.order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+  // Một máy có NHIỀU lõi -> khoá phụ chỉ mình serial chưa đủ để định danh 1 dòng,
+  // phải thêm filter_code -> (serial, filter_code) mới duy nhất, .range() mới ổn định.
+  let cauLenh = truyVan
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .order('serial', { ascending: true })
+    .order('filter_code', { ascending: true })
   // LoiCuaMay.tsx cần TOÀN BỘ lõi của 1 máy (không phân trang) rồi tự lọc theo serial.
-  if (!tuyChon.tatPhanTrang) cauLenh = cauLenh.range(tu, tu + MOI_TRANG - 1)
+  if (!tuyChon.tatPhanTrang) cauLenh = cauLenh.range(tu, tu + MOI_TRANG_LOI - 1)
 
   const { data, error, count } = await cauLenh
   if (error) throw new Error(error.message)
@@ -253,7 +265,7 @@ export async function coreForecast(
     rows: (data ?? []) as CoreDue[],
     tong,
     trang,
-    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG_LOI)),
   }
 }
 
@@ -451,10 +463,12 @@ export async function searchTickets(
   if (onlyKhan) truyVan = truyVan.eq('khan', true)
   if (mineStaffId) truyVan = truyVan.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
 
-  // Khẩn lên đầu, rồi theo cột sắp xếp đã kiểm tra.
+  // Khẩn lên đầu, rồi theo cột sắp xếp đã kiểm tra, rồi ticket_code (khoá chính,
+  // duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
   const { data, error, count } = await truyVan
     .order('khan', { ascending: false })
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .order('ticket_code', { ascending: true })
     .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
 
@@ -787,11 +801,13 @@ export async function listToFix(
   const tu = (trang - 1) * MOI_TRANG
 
   // Điều kiện .or() ở đây CỐ ĐỊNH, không ghép từ khoá người dùng -> không cần antoanChoOr.
+  // id (khoá chính, duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
   const { data, error, count } = await db
     .from('cs_customers')
     .select('*', { count: 'exact' })
     .or('needs_phone.eq.true,address.is.null')
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .order('id', { ascending: true })
     .range(tu, tu + MOI_TRANG - 1)
   if (error) throw new Error(error.message)
   const customers = (data ?? []) as Customer[]
