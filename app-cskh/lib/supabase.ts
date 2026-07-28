@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
 
 /**
  * Hai client TÁCH BIỆT — đừng trộn lẫn:
@@ -43,9 +44,46 @@ export function dataClient() {
   return createClient(URL, key, { auth: { persistSession: false } })
 }
 
-/** Chặn cổng: chưa đăng nhập -> throw. Mọi truy vấn dữ liệu phải gọi hàm này trước. */
+/** Người đăng nhập hợp lệ nhưng KHÔNG có quyền vào hệ thống CSKH. */
+export class LoiKhongCoQuyen extends Error {
+  constructor(public lyDo: 'bi_khoa' | 'ngoai_danh_sach') {
+    super('FORBIDDEN')
+    this.name = 'LoiKhongCoQuyen'
+  }
+}
+
+/** Đọc cs_staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
+export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
+  const e = chuanHoaEmail(email)
+  const { data, error } = await dataClient()
+    .from('cs_staff')
+    .select('hoat_dong')
+    .eq('email', e)
+    .maybeSingle()
+  if (error) throw error
+  return xetLuatVaoCua(e, data ?? null)
+}
+
+/** Ghi nhận người vào lần đầu theo luật domain. KHÔNG đụng dòng đã có. */
+export async function ghiNhanNhanVienMoi(email: string) {
+  const { error } = await dataClient()
+    .from('cs_staff')
+    .upsert({ email: chuanHoaEmail(email) }, { onConflict: 'email', ignoreDuplicates: true })
+  if (error) throw error
+}
+
+/**
+ * Chặn cổng: chưa đăng nhập HOẶC không có quyền -> throw.
+ * Mọi truy vấn dữ liệu phải gọi hàm này trước.
+ */
 export async function requireStaff() {
   const { data, error } = await (await authClient()).auth.getUser()
   if (error || !data.user) throw new Error('UNAUTHENTICATED')
+
+  const email = chuanHoaEmail(data.user.email)
+  const kq = await kiemTraVaoCua(email)
+  if (!kq.duocVao) throw new LoiKhongCoQuyen(kq.lyDo)
+  if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
+
   return data.user
 }
