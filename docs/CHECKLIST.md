@@ -19,9 +19,31 @@
 - [ ] **Gộp 4 khách trùng SĐT** (chờ user xác nhận): Nguyễn Thu Hương · Nguyễn Trung Hiếu · anh đức=Nguyễn Hoài Đức · Đờn=Đoàn Văn Hậu — mỗi ca 2 bản ghi 1 người, gộp A→B
 - [ ] **3 máy tồn kho khách không SĐT** (gán tay): Ngọc Gấm · Clean Water Solution · 1 ẩn danh (ticket còn trỏ serial chưa vào hệ thống)
 - [ ] **Edge Function mirror** — hiện mirror 1 lần bằng script; cần cron tự động (health-check tỷ lệ khớp v_machine_filter 376/379)
-- [ ] **Phase 3 cutover** — app-cskh: đổi `.env.local` → SalesTracking + đổi `.from('customers')` → `.from('cs_customers')` (actions.ts, CustomerEditor) + verify từng trang
+- [x] **Phase 3 cutover** — app-cskh: đổi `.env.local` → SalesTracking + đổi `.from('customers')` → `.from('cs_customers')` (actions.ts, CustomerEditor) — xong ở commit `619e975`; `.env.example` còn trỏ project cũ, đã sửa 2026-07-28
 - [ ] **Tích hợp Sales (ĐỂ SAU, chờ Sales implement Phase 5)** — đối chiếu `customer_purchases` (máy đã bán mà CS chưa có hồ sơ → cảnh báo), map cs_customers ↔ Sales.customers qua customer_code
 - [ ] **Phase 4** — buffer read-only 10 bảng cũ ở GWT-Masterdata (KHÔNG xoá ngay), theo dõi log, pg_dump, rồi mới DROP
+
+## 🔐 Đăng nhập Google + deploy Vercel ⏳ CODE XONG, CHỜ CẤU HÌNH (2026-07-28)
+
+> Spec: [specs/2026-07-28-dang-nhap-google-va-deploy-vercel.md](specs/2026-07-28-dang-nhap-google-va-deploy-vercel.md) ·
+> Plan: [plans/2026-07-28-dang-nhap-google-vercel.md](plans/2026-07-28-dang-nhap-google-vercel.md) ·
+> Hướng dẫn cấu hình: [huong-dan-cau-hinh-google-vercel.md](huong-dan-cau-hinh-google-vercel.md)
+>
+> Lý do: chỉ `bella@gwt.vn` đăng nhập được, người mới nhận việc không có đường vào. Bật Google
+> OAuth trần thì **bất kỳ tài khoản Google nào** cũng đọc được PII của 293 khách (vì
+> `requireStaff()` chỉ hỏi "có ai đăng nhập không", không hỏi "là ai") ⇒ luật vào cửa là bắt buộc.
+
+- [x] Bảng `cs_staff` — allowlist kiêm blocklist, RLS bật 0 policy, nạp sẵn 2 email đang dùng (migration `cs_staff`, verify 2 dòng/RLS/0 policy/trigger)
+- [x] Luật vào cửa `lib/auth.ts` dạng **hàm thuần** + 7 unit test (`npm test`) — ca then chốt: `hoat_dong=false` thắng luật domain
+- [x] `requireStaff()` áp luật; chữ ký giữ nguyên nên 13 chỗ gọi trong `actions.ts` không phải sửa
+- [x] Route `/auth/callback` + mở ngoại lệ `/auth` trong `proxy.ts` — **vá luôn lỗi link đặt lại mật khẩu / magic link quay về màn đăng nhập**
+- [x] Nút Google trên `/login`, giữ nguyên đường mật khẩu, cả hai cùng một điểm chặn
+- [x] Sửa `.env.example` đang trỏ nhầm project cũ GWT-Masterdata
+- [ ] **User tự làm**: Google Cloud OAuth client · Supabase bật provider + Redirect URLs · Vercel import repo (Root Directory `app-cskh`) + Deployment Protection
+- [ ] Kiểm 6 ca nghiệm thu sau khi cấu hình xong (ca 2 và ca 4 quan trọng nhất)
+- [ ] **Giai đoạn 2 — UI phân quyền**: đọc `vai_tro`, màn hình quản lý nhân viên, luật ai xem được gì
+- [ ] **RLS least-privilege** thay `service_role` (user chốt "làm ngay sau") — gộp với mục "DB role least-privilege" ở phần nợ kỹ thuật
+- [ ] **Tính năng phụ**: xem nhiều dữ liệu hơn, bộ lọc (user nêu 2026-07-28, chưa bàn chi tiết)
 
 ## Phase 0 — Nền + kích hoạt bảo hành ✅ XONG
 

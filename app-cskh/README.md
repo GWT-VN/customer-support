@@ -13,7 +13,7 @@ npm run dev                    # http://localhost:3000
 
 ### 1. Điền `SUPABASE_SERVICE_ROLE_KEY`
 
-Supabase Dashboard → project **GWT-Masterdata** → Project Settings → API →
+Supabase Dashboard → project **GWT-SalesTracking** → Project Settings → API →
 mục **service_role** (secret) → copy → dán vào `.env.local`.
 
 > 🔒 Key này **toàn quyền, bỏ qua RLS**. `.env.local` đã bị gitignore — đừng commit, đừng gửi qua chat/Slack.
@@ -27,6 +27,34 @@ Không tắt thì bất kỳ ai cũng tự tạo tài khoản và vào xem SĐT/
 ### 3. Tạo tài khoản nhân viên
 
 Dashboard → Authentication → Users → **Add user** → email + mật khẩu → gửi cho nhân viên.
+
+## Ai được vào — bảng `cs_staff`
+
+Có hai đường đăng nhập: **email + mật khẩu** và **Google**. Cả hai đều đi qua **cùng một** luật
+vào cửa ở `requireStaff()`, vì chặn một đường mà để hở đường kia thì rào vô nghĩa.
+
+Luật xét theo đúng thứ tự này:
+
+| # | Tình huống | Kết quả |
+|---|---|---|
+| 1 | Có dòng trong `cs_staff`, `hoat_dong = false` | **Từ chối** — kể cả email `@gwt.vn` |
+| 2 | Có dòng trong `cs_staff`, `hoat_dong = true` | Cho vào — kể cả email ngoài domain |
+| 3 | Chưa có dòng, email kết thúc `@gwt.vn` | Cho vào + tự ghi một dòng mới |
+| 4 | Còn lại | Từ chối |
+
+Bảng vừa là **danh sách cho phép** vừa là **danh sách cấm**. Khoá người nghỉ việc:
+
+```sql
+update public.cs_staff set hoat_dong = false where email = 'nguoi-nghi@gwt.vn';
+```
+
+Có hiệu lực ngay lần truy cập kế tiếp. Luật 1 đứng trước luật 3 chính là để việc này chạy được
+kể cả với email trong domain công ty.
+
+Luật nằm ở `lib/auth.ts` dưới dạng **hàm thuần**, có 7 unit test (`npm test`). Cột `vai_tro`
+hiện chỉ ghi chứ chưa ai đọc — chừa cho giai đoạn 2 (UI phân quyền).
+
+Cấu hình Google OAuth và deploy: xem [../docs/huong-dan-cau-hinh-google-vercel.md](../docs/huong-dan-cau-hinh-google-vercel.md).
 
 ## Vì sao thiết kế như vậy
 
@@ -69,13 +97,11 @@ Hai lớp bảo vệ:
 
 ## Deploy (Vercel)
 
-```bash
-npx vercel                     # lần đầu: link project
-npx vercel env add SUPABASE_SERVICE_ROLE_KEY production
-npx vercel env add NEXT_PUBLIC_SUPABASE_URL production
-npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
-npx vercel --prod
-```
+Auto-deploy từ GitHub: nhánh `main` → production, các nhánh khác → preview (có Deployment
+Protection). Không deploy tay bằng `npx vercel` nữa.
+
+Cấu hình lần đầu — **Root Directory phải đặt là `app-cskh`**, xem
+[../docs/huong-dan-cau-hinh-google-vercel.md](../docs/huong-dan-cau-hinh-google-vercel.md) bước 3.
 
 ## Ghi chú dữ liệu
 
