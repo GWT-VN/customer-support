@@ -1,32 +1,69 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { xacNhanQuyenVaoCua } from '../auth/actions'
 
-export default function Login() {
+const THONG_BAO_LOI: Record<string, string> = {
+  bi_khoa: 'Tài khoản của bạn đã bị khoá quyền vào hệ thống CSKH. Liên hệ quản trị.',
+  ngoai_danh_sach: 'Tài khoản này chưa được cấp quyền vào hệ thống CSKH. Liên hệ quản trị.',
+  google: 'Đăng nhập Google không thành công. Thử lại hoặc dùng email + mật khẩu.',
+}
+
+function taoClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
+function FormDangNhap() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const loiTuUrl = THONG_BAO_LOI[searchParams.get('loi') ?? ''] ?? null
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    const { error } = await taoClient().auth.signInWithPassword({ email, password })
     if (error) {
       setErr('Email hoặc mật khẩu không đúng.')
       setBusy(false)
       return
     }
+
+    // Xác thực xong chưa đủ — còn phải qua luật vào cửa, giống hệt đường Google
+    const quyen = await xacNhanQuyenVaoCua()
+    if (!quyen.ok) {
+      setErr(THONG_BAO_LOI[quyen.lyDo])
+      setBusy(false)
+      return
+    }
+
     router.push('/')
     router.refresh()
+  }
+
+  async function dangNhapGoogle() {
+    setBusy(true)
+    setErr(null)
+    const { error } = await taoClient().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (error) {
+      setErr(THONG_BAO_LOI.google)
+      setBusy(false)
+    }
+    // Thành công thì trình duyệt tự chuyển sang Google, không cần làm gì thêm
   }
 
   return (
@@ -55,7 +92,9 @@ export default function Login() {
           />
         </label>
 
-        {err && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
+        {(err ?? loiTuUrl) && (
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err ?? loiTuUrl}</p>
+        )}
 
         <button
           type="submit" disabled={busy}
@@ -64,10 +103,32 @@ export default function Login() {
           {busy ? 'Đang vào…' : 'Đăng nhập'}
         </button>
 
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="text-xs text-slate-400">hoặc</span>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        <button
+          type="button" onClick={dangNhapGoogle} disabled={busy}
+          className="w-full rounded-lg border py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Đăng nhập bằng Google
+        </button>
+
         <p className="text-xs text-slate-400">
           Chưa có tài khoản? Liên hệ quản trị — tài khoản do quản trị tạo trên Supabase.
         </p>
       </form>
     </main>
+  )
+}
+
+export default function Login() {
+  // useSearchParams buộc phải nằm trong Suspense, không thì next build lỗi
+  return (
+    <Suspense>
+      <FormDangNhap />
+    </Suspense>
   )
 }
