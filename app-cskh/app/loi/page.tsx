@@ -105,14 +105,14 @@ export default async function LoiPage({
                 <tr key={`${r.serial}-${r.filter_code}`} className="hover:bg-slate-50 align-top">
                   <td className="px-4 py-3">
                     {r.customer_id ? (
-                      <Link href={`/khach/${r.customer_id}`} className="text-slate-900 underline">{r.customer_name}</Link>
+                      <Link href={`/khach/${r.customer_id}`} prefetch={false} className="text-slate-900 underline">{r.customer_name}</Link>
                     ) : <span className="text-slate-400">—</span>}
                     <div className="font-mono text-xs text-slate-500">
                       {r.primary_phone ?? <span className="text-amber-600">thiếu SĐT</span>}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/may/${encodeURIComponent(r.serial)}`} className="text-slate-900 underline">
+                    <Link href={`/may/${encodeURIComponent(r.serial)}`} prefetch={false} className="text-slate-900 underline">
                       {r.product_name}
                     </Link>
                     <div className="font-mono text-[10px] text-slate-400">{r.serial}</div>

@@ -86,7 +86,7 @@ export default async function NhomLoiDetail({
               {tickets.map((t) => (
                 <tr key={t.ticket_code} className="hover:bg-slate-50 align-top">
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <Link href={`/ticket/${t.ticket_code}`} className="font-mono text-xs text-slate-900 underline">
+                    <Link href={`/ticket/${t.ticket_code}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
                       {t.ticket_code}
                     </Link>
                     <div className="mt-1"><NguonBadge nguon={t.nguon} /></div>
@@ -96,7 +96,7 @@ export default async function NhomLoiDetail({
                   <td className="px-4 py-3">
                     {t.serial ? (
                       <>
-                        <Link href={`/may/${encodeURIComponent(t.serial)}`} className="text-slate-900 underline">
+                        <Link href={`/may/${encodeURIComponent(t.serial)}`} prefetch={false} className="text-slate-900 underline">
                           {t.product_name ?? t.internal_code}
                         </Link>
                         <div className="font-mono text-[10px] text-slate-400">{t.serial}</div>
@@ -107,7 +107,7 @@ export default async function NhomLoiDetail({
                   </td>
                   <td className="px-4 py-3">
                     {t.customer_id ? (
-                      <Link href={`/khach/${t.customer_id}`} className="text-slate-900 underline">{t.customer_name}</Link>
+                      <Link href={`/khach/${t.customer_id}`} prefetch={false} className="text-slate-900 underline">{t.customer_name}</Link>
                     ) : <span className="text-slate-400">—</span>}
                     <div className="font-mono text-xs text-slate-500">{t.primary_phone ?? ''}</div>
                   </td>

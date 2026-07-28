@@ -40,7 +40,7 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
           <h2 className="font-medium text-slate-900 mb-3">Khách hàng</h2>
           {m.customer_id ? (
             <p className="text-sm">
-              <Link href={`/khach/${m.customer_id}`} className="text-slate-900 underline font-medium">
+              <Link href={`/khach/${m.customer_id}`} prefetch={false} className="text-slate-900 underline font-medium">
                 {m.customer_name}
               </Link>
               <span className="text-slate-500"> · </span>

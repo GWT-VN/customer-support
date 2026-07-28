@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { cache } from 'react'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
 
 /**
@@ -45,6 +46,19 @@ export function dataClient() {
   return createClient(URL, key, { auth: { persistSession: false } })
 }
 
+/**
+ * "Ai đang đăng nhập?" — getUser() gọi MẠNG tới Supabase, và database đang ở
+ * Singapore trong khi hàm chạy ở region của Vercel, nên mỗi lượt rất đắt.
+ *
+ * cache() của React gộp mọi lần gọi trong CÙNG một request thành một lượt duy
+ * nhất. Trước đây một trang gọi tới 3 lần (thanh tài khoản, requireStaff, và
+ * mỗi Server Action). proxy.ts chạy runtime riêng nên không gộp được vào đây.
+ */
+export const layNguoiDung = cache(async () => {
+  const { data, error } = await (await authClient()).auth.getUser()
+  return error ? null : data.user
+})
+
 /** Đọc cs_staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
 export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   const e = chuanHoaEmail(email)
@@ -76,14 +90,14 @@ export async function ghiNhanNhanVienMoi(email: string) {
  * LƯU Ý: redirect() hoạt động bằng cách ném lỗi NEXT_REDIRECT — người gọi
  * TUYỆT ĐỐI không được bọc requireStaff() trong try/catch, sẽ nuốt mất redirect.
  */
-export async function requireStaff() {
-  const { data, error } = await (await authClient()).auth.getUser()
-  if (error || !data.user) redirect('/login')
+export const requireStaff = cache(async () => {
+  const user = await layNguoiDung()
+  if (!user) redirect('/login')
 
-  const email = chuanHoaEmail(data.user.email)
+  const email = chuanHoaEmail(user.email)
   const kq = await kiemTraVaoCua(email)
   if (!kq.duocVao) redirect(`/login?loi=${kq.lyDo}`)
   if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
 
-  return data.user
-}
+  return user
+})

@@ -57,14 +57,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
               {machines.map((m) => (
                 <tr key={m.serial} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <Link href={`/may/${encodeURIComponent(m.serial)}`} className="font-mono text-xs text-slate-900 underline">
+                    <Link href={`/may/${encodeURIComponent(m.serial)}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
                       {m.serial}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-slate-700">{m.product_name ?? '—'}</td>
                   <td className="px-4 py-3">
                     {m.customer_id ? (
-                      <Link href={`/khach/${m.customer_id}`} className="text-slate-900 underline">{m.customer_name}</Link>
+                      <Link href={`/khach/${m.customer_id}`} prefetch={false} className="text-slate-900 underline">{m.customer_name}</Link>
                     ) : <span className="text-slate-400">—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-700">

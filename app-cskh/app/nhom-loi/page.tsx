@@ -79,7 +79,7 @@ export default async function NhomLoiPage({
               {rows.map((r) => (
                 <tr key={r.code} className={`hover:bg-slate-50 align-top ${r.muc_do === 'an_toan' ? 'bg-red-50/50' : ''}`}>
                   <td className="px-4 py-3">
-                    <Link href={`/nhom-loi/${r.code}`} className="text-slate-900 underline font-medium">
+                    <Link href={`/nhom-loi/${r.code}`} prefetch={false} className="text-slate-900 underline font-medium">
                       {r.ten}
                     </Link>
                     {r.bao_hang && <span className="ml-2 inline-block"><BaoHangBadge /></span>}

@@ -1,18 +1,21 @@
-import { authClient } from '@/lib/supabase'
+import { layNguoiDung } from '@/lib/supabase'
 import { dangXuat } from '@/app/auth/actions'
 
 /**
  * Thanh trên cùng: email đang đăng nhập + nút Đăng xuất.
  * Chưa đăng nhập (vd trang /login) thì không hiện gì.
+ *
+ * Dùng layNguoiDung() (có cache) chứ KHÔNG tự gọi getUser() — nếu không thì
+ * mỗi trang tốn thêm một lượt gọi mạng tới Supabase chỉ để hiện cái email.
  */
 export async function ThanhTaiKhoan() {
-  const { data } = await (await authClient()).auth.getUser()
-  if (!data.user) return null
+  const user = await layNguoiDung()
+  if (!user) return null
 
   return (
     <div className="bg-white border-b">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-end gap-3 text-sm">
-        <span className="text-slate-500">{data.user.email}</span>
+        <span className="text-slate-500">{user.email}</span>
         <form action={dangXuat}>
           <button
             type="submit"

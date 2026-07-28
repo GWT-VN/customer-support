@@ -33,7 +33,7 @@ export default async function ToFixPage() {
               {list.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 align-top">
                   <td className="px-4 py-3">
-                    <Link href={`/khach/${c.id}`} className="text-slate-900 underline font-medium">
+                    <Link href={`/khach/${c.id}`} prefetch={false} className="text-slate-900 underline font-medium">
                       {c.full_name}
                     </Link>
                     {c.notes && <p className="text-xs text-amber-700 mt-0.5 max-w-md">{c.notes}</p>}

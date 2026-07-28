@@ -82,7 +82,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
               <dt className="text-slate-500">Khách</dt>
               <dd className="text-right">
                 {t.customer_id ? (
-                  <Link href={`/khach/${t.customer_id}`} className="text-slate-900 underline font-medium">
+                  <Link href={`/khach/${t.customer_id}`} prefetch={false} className="text-slate-900 underline font-medium">
                     {t.customer_name}
                   </Link>
                 ) : <span className="text-slate-700">{t.customer_name ?? '—'}</span>}
@@ -93,7 +93,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
               <dt className="text-slate-500">Máy</dt>
               <dd className="text-right">
                 {t.serial ? (
-                  <Link href={`/may/${encodeURIComponent(t.serial)}`} className="text-slate-900 underline">
+                  <Link href={`/may/${encodeURIComponent(t.serial)}`} prefetch={false} className="text-slate-900 underline">
                     {t.product_name}
                   </Link>
                 ) : <span className="text-slate-400">—</span>}
