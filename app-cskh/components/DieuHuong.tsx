@@ -54,7 +54,7 @@ export function DieuHuong() {
             href={href}
             aria-current={active ? 'page' : undefined}
             className={
-              'whitespace-nowrap text-sm underline transition-colors ' +
+              'whitespace-nowrap text-sm transition-colors ' +
               (active
                 ? 'text-slate-900 font-semibold'
                 : 'text-slate-400 hover:text-slate-900')
