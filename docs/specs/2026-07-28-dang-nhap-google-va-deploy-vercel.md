@@ -6,8 +6,9 @@
 ## 1. Bối cảnh & vấn đề
 
 App `app-cskh` hiện chỉ đăng nhập bằng email + mật khẩu, tài khoản do quản trị tạo tay trên
-Supabase Dashboard. **Thực tế hiện nay chỉ có duy nhất tài khoản của chị Trang đăng nhập được**,
-người mới nhận việc không có đường vào. App cũng chưa deploy ở đâu — chỉ chạy `localhost`.
+Supabase Dashboard. Thực tế có **2 tài khoản, đều `@gwt.vn`**: `bella@gwt.vn` (đang dùng) và
+`ai@gwt.vn` (đã tạo, chưa đăng nhập lần nào — người mới nhận việc chỉ cần đặt lại mật khẩu).
+App cũng chưa deploy ở đâu — chỉ chạy `localhost`.
 
 Cần: (a) thêm đăng nhập Google để nhân viên dùng luôn tài khoản công ty, (b) auto-deploy lên
 Vercel từ GitHub để mọi người truy cập được mà không phải dựng máy.
@@ -144,7 +145,6 @@ môi trường đó đăng nhập lỗi mà không rõ nguyên nhân:
 
 ## 8. Điều kiện nghiệm thu
 
-- [ ] **CHẶN DEPLOY PRODUCTION** cho tới khi nạp xong `cs_staff` — xem mục 9
 - [ ] Đăng nhập Google bằng email `@gwt.vn` → vào được, `cs_staff` tự có dòng mới
 - [ ] Đăng nhập Google bằng Gmail cá nhân → bị từ chối kèm thông báo, không tạo session
 - [ ] Đăng nhập mật khẩu bằng tài khoản có trong `cs_staff` → vào được như cũ
@@ -153,12 +153,13 @@ môi trường đó đăng nhập lỗi mà không rõ nguyên nhân:
 
 ## 9. Rủi ro
 
-**Khoá nhầm người đang làm việc** — *rủi ro lớn nhất.* Hiện chỉ chị Trang đăng nhập được, và
-**chưa biết email tài khoản đó có phải `@gwt.vn` hay không**. Nếu không phải, bật rào là chị ấy mất
-đường vào giữa lúc đang làm dở tính năng.
+**Khoá nhầm người đang làm việc** — ✅ **đã gỡ (2026-07-28).** Kiểm tra Dashboard → Authentication
+→ Users: chỉ có **2 tài khoản, cả hai đều `@gwt.vn`** — `ai@gwt.vn` (chưa đăng nhập lần nào) và
+`bella@gwt.vn` (đã đăng nhập, tài khoản đang dùng). Luật 3 phủ hết cả hai ⇒ **không ai mất đường
+vào khi bật rào**, không còn việc chặn deploy production.
 
-⇒ Bước **nạp `cs_staff` với các email đang dùng** (`hoat_dong = true`) là **việc chặn**, phải xong
-trước khi deploy production. Danh sách email lấy từ Dashboard → Authentication → Users.
+Vẫn nạp sẵn 2 email vào `cs_staff` (`hoat_dong = true`) như bước dọn đường cho giai đoạn 2 — nhưng
+là việc *nên làm*, không phải việc *chặn*.
 
 **Preview deployment cầm `service_role`** — mỗi URL preview là một cửa vào đầy đủ dữ liệu khách.
 Đã xử lý bằng Deployment Protection, nhưng phải verify bật thật sau khi tạo project.
