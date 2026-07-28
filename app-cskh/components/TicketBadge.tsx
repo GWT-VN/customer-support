@@ -11,6 +11,16 @@ export function StateBadge({ state }: { state: string }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${s.cls}`}>{s.label}</span>
 }
 
+/** Ticket ưu tiên cao (khách khó chịu / cần xử lý gấp). */
+export function KhanBadge({ khan }: { khan: boolean | null | undefined }) {
+  if (!khan) return null
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs bg-red-600 text-white whitespace-nowrap font-medium">
+      🔴 Khẩn
+    </span>
+  )
+}
+
 /** Ticket trỏ tới serial không có trong installed_base — lỗi dữ liệu Odoo, cần nêu rõ. */
 export function MayThieuBadge({ t }: { t: Ticket }) {
   if (!t.may_khong_trong_he_thong) return null

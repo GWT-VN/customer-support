@@ -7,9 +7,9 @@ export function WarrantyBadge({ m }: { m: Machine }) {
   if (!m.co_chinh_sach_bh)
     return <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800" title="Máy chưa có số năm bảo hành trong product_warranty">Không rõ hạn</span>
   if (m.con_han_may)
-    return <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800">Còn hạn máy</span>
+    return <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800">Còn BH máy</span>
   if (m.con_han_loi)
-    return <span className="px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-800">Hết hạn máy · còn lõi</span>
+    return <span className="px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-800">Hết BH máy · còn BH linh kiện</span>
   return <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">Hết bảo hành</span>
 }
 

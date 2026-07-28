@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Ticket } from '@/app/actions'
-import { StateBadge, vnDateTime } from '@/components/TicketBadge'
+import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 
 /** Danh sách ticket rút gọn — nhúng vào trang máy / trang khách. */
 export function TicketList({ tickets, empty }: { tickets: Ticket[]; empty: string }) {
@@ -19,7 +19,10 @@ export function TicketList({ tickets, empty }: { tickets: Ticket[]; empty: strin
               <p className="text-xs text-slate-500 line-clamp-2">{t.description}</p>
             )}
           </div>
-          <StateBadge state={t.state} />
+          <div className="flex items-center gap-1.5 flex-none">
+            <KhanBadge khan={t.khan} />
+            <StateBadge state={t.state} />
+          </div>
         </li>
       ))}
     </ul>

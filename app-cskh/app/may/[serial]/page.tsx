@@ -20,8 +20,8 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
     ['Ngày lắp', vnDate(m.install_date)],
     ['Trạng thái máy', m.status],
     ['Bắt đầu BH', vnDate(m.warranty_start)],
-    ['Hết hạn máy', vnDate(m.warranty_full_end)],
-    ['Hết hạn lõi', vnDate(m.warranty_core_end)],
+    ['Hết BH máy', vnDate(m.warranty_full_end)],
+    ['Hết BH linh kiện', vnDate(m.warranty_core_end)],
   ]
 
   return (

@@ -13,13 +13,16 @@ const STATES = [
 export function TicketEditor({
   code,
   state,
+  khan,
   lastNote,
 }: {
   code: string
   state: string
+  khan: boolean
   lastNote: string | null
 }) {
   const [st, setSt] = useState(state)
+  const [kh, setKh] = useState(khan)
   const [note, setNote] = useState(lastNote ?? '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -28,7 +31,7 @@ export function TicketEditor({
 
   async function save() {
     setBusy(true); setErr(null); setMsg(null)
-    const r = await updateTicket(code, { state: st, last_note: note })
+    const r = await updateTicket(code, { state: st, khan: kh, last_note: note })
     setBusy(false)
     if (!r.ok) setErr(r.error)
     else { setMsg('Đã lưu.'); router.refresh() }
@@ -52,8 +55,22 @@ export function TicketEditor({
         </div>
       </div>
 
+      <div>
+        <span className="text-sm text-slate-700">Ưu tiên</span>
+        <div className="mt-1">
+          <button
+            onClick={() => setKh(!kh)}
+            className={`px-3 py-1.5 rounded-lg text-sm border ${
+              kh ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600'
+            }`}
+          >
+            {kh ? '🔴 Khẩn (bấm để bỏ)' : 'Đánh dấu Khẩn'}
+          </button>
+        </div>
+      </div>
+
       <label className="block">
-        <span className="text-sm text-slate-700">Ghi chú xử lý</span>
+        <span className="text-sm text-slate-700">Tóm tắt xử lý (hiện tại)</span>
         <textarea
           value={note} onChange={(e) => setNote(e.target.value)} rows={5}
           placeholder="Kỹ thuật đã làm gì, nguyên nhân, kết quả…"

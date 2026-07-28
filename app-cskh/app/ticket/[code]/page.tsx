@@ -1,15 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket } from '@/app/actions'
-import { StateBadge, vnDateTime } from '@/components/TicketBadge'
+import { getTicket, groupsOfTicket, listTicketNotes } from '@/app/actions'
+import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
+import { TicketNotes } from '@/components/TicketNotes'
 import { vnDate } from '@/components/Badge'
 
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom] = await Promise.all([getTicket(ma), groupsOfTicket(ma)])
+  const [t, nhom, notes] = await Promise.all([getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma)])
   if (!t) notFound()
 
   return (
@@ -19,6 +20,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
 
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-xl font-semibold text-slate-900 font-mono">{t.ticket_code}</h1>
+          <KhanBadge khan={t.khan} />
           <StateBadge state={t.state} />
           <span className="text-sm text-slate-500">{vnDateTime(t.created_at)}</span>
         </div>
@@ -103,7 +105,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
                 <dt className="text-slate-500">Bảo hành</dt>
                 <dd className="text-right text-slate-900">
                   {t.warranty_activated
-                    ? <>máy đến {vnDate(t.warranty_full_end)} {t.con_han_may ? '✅ còn hạn' : '🔴 hết hạn'}</>
+                    ? <>BH máy đến {vnDate(t.warranty_full_end)} {t.con_han_may ? '✅ còn hạn' : '🔴 hết hạn'}</>
                     : 'chưa kích hoạt'}
                 </dd>
               </div>
@@ -112,8 +114,13 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         </section>
 
         <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Nhật ký trao đổi</h2>
+          <TicketNotes code={t.ticket_code} notes={notes} />
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Xử lý</h2>
-          <TicketEditor code={t.ticket_code} state={t.state} lastNote={t.last_note} />
+          <TicketEditor code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note} />
         </section>
       </div>
     </main>

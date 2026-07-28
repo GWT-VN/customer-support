@@ -263,6 +263,7 @@ export type Ticket = {
   ticket_type: string | null
   description: string | null
   last_note: string | null
+  khan: boolean
   province: string | null
   created_at: string
   serial: string | null
@@ -279,8 +280,9 @@ export type Ticket = {
   con_han_loi: boolean | null
 }
 
-/** Tra ticket theo mã / serial / tên khách / SĐT / nội dung. Rỗng -> 50 ticket mới nhất. */
-export async function searchTickets(q: string, state?: string): Promise<Ticket[]> {
+/** Tra ticket theo mã / serial / tên khách / SĐT / nội dung. Rỗng -> 50 ticket mới nhất.
+ *  onlyKhan=true -> chỉ ticket đánh dấu Khẩn (khách khó chịu / cần gấp). */
+export async function searchTickets(q: string, state?: string, onlyKhan?: boolean): Promise<Ticket[]> {
   await requireStaff()
   let query = dataClient().from('v_tickets').select('*')
 
@@ -293,8 +295,13 @@ export async function searchTickets(q: string, state?: string): Promise<Ticket[]
     )
   }
   if (state) query = query.eq('state', state)
+  if (onlyKhan) query = query.eq('khan', true)
 
-  const { data, error } = await query.order('created_at', { ascending: false }).limit(50)
+  // Khẩn lên đầu, rồi mới nhất trước.
+  const { data, error } = await query
+    .order('khan', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(50)
   if (error) throw new Error(error.message)
   return (data ?? []) as Ticket[]
 }
@@ -327,8 +334,11 @@ export async function getTicket(code: string): Promise<Ticket | null> {
   return (data as Ticket) ?? null
 }
 
-/** Đổi trạng thái + ghi chú xử lý. */
-export async function updateTicket(code: string, patch: { state?: string; last_note?: string }) {
+/** Đổi trạng thái / cờ Khẩn / ghi chú tóm tắt. */
+export async function updateTicket(
+  code: string,
+  patch: { state?: string; last_note?: string; khan?: boolean }
+) {
   await requireStaff()
   if (patch.state && !['Open', 'Done', 'Cancel'].includes(patch.state)) {
     return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
@@ -338,6 +348,48 @@ export async function updateTicket(code: string, patch: { state?: string; last_n
   revalidatePath('/ticket')
   revalidatePath(`/ticket/${code}`)
   return { ok: true as const }
+}
+
+// ── Nhật ký ghi chú ticket (Đợt 1) ──────────────────────────────────────────
+export type TicketNote = {
+  id: string
+  noi_dung: string
+  tac_gia: string | null
+  created_at: string
+}
+
+/** Các ghi chú của 1 ticket, mới nhất trước. */
+export async function listTicketNotes(code: string): Promise<TicketNote[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('ticket_note').select('id, noi_dung, tac_gia, created_at')
+    .eq('ticket_code', code)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TicketNote[]
+}
+
+/** Thêm 1 dòng nhật ký. Người ghi = email đăng nhập. */
+export async function addTicketNote(code: string, noiDung: string) {
+  const user = await requireStaff()
+  const text = noiDung.trim()
+  if (!text) return { ok: false as const, error: 'Nhập nội dung ghi chú.' }
+  const { error } = await dataClient()
+    .from('ticket_note')
+    .insert({ ticket_code: code, noi_dung: text, tac_gia: user.email ?? null })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+/** Máy 1 khách đã lắp — dùng ở trang khách. */
+export async function machinesOfCustomer(customerId: string): Promise<Machine[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_installed_base').select('*').eq('customer_id', customerId)
+    .order('install_date', { ascending: false, nullsFirst: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Machine[]
 }
 
 /** Tạo ticket mới. Mã tự sinh GWT-YYnnnn theo năm hiện tại. */

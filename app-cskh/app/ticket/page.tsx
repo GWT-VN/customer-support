@@ -1,14 +1,15 @@
 import Link from 'next/link'
 import { searchTickets } from '@/app/actions'
-import { StateBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
+import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; state?: string }>
+  searchParams: Promise<{ q?: string; state?: string; khan?: string }>
 }) {
-  const { q = '', state = '' } = await searchParams
-  const tickets = await searchTickets(q, state || undefined)
+  const { q = '', state = '', khan = '' } = await searchParams
+  const onlyKhan = khan === '1'
+  const tickets = await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan)
 
   const tabs = [
     { key: '', label: 'Tất cả' },
@@ -39,18 +40,26 @@ export default async function TicketsPage({
           <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
         </form>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {tabs.map((t) => (
             <Link
               key={t.key}
               href={`/ticket?${new URLSearchParams({ ...(q && { q }), ...(t.key && { state: t.key }) })}`}
               className={`px-3 py-1.5 rounded-lg text-sm border ${
-                state === t.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
+                !onlyKhan && state === t.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
               }`}
             >
               {t.label}
             </Link>
           ))}
+          <Link
+            href={`/ticket?${new URLSearchParams({ ...(q && { q }), khan: '1' })}`}
+            className={`px-3 py-1.5 rounded-lg text-sm border ${
+              onlyKhan ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200'
+            }`}
+          >
+            🔴 Khẩn
+          </Link>
         </div>
 
         <p className="text-sm text-slate-500">
@@ -98,7 +107,12 @@ export default async function TicketsPage({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3"><StateBadge state={t.state} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <KhanBadge khan={t.khan} />
+                      <StateBadge state={t.state} />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {tickets.length === 0 && (
