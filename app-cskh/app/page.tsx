@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DieuHuong } from '@/components/DieuHuong'
 import { searchMachines } from './actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 
@@ -11,6 +12,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Máy đã lắp</h1>
+          <DieuHuong />
         </header>
 
         <form className="flex gap-2">

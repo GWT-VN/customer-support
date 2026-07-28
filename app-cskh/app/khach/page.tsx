@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix } from '@/app/actions'
 
 export default async function ToFixPage() {
@@ -11,12 +12,15 @@ export default async function ToFixPage() {
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         <Link href="/" className="text-sm text-slate-600 underline">← Máy đã lắp</Link>
 
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {list.length} khách · {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
-            Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {list.length} khách · {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
+              Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
+            </p>
+          </div>
+          <DieuHuong />
         </div>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DieuHuong } from '@/components/DieuHuong'
 import { searchTickets, currentStaff } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
@@ -29,6 +30,7 @@ export default async function TicketsPage({
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Ticket CSKH</h1>
+          <DieuHuong />
         </header>
 
         <form className="flex gap-2">
