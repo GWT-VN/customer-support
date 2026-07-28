@@ -69,3 +69,7 @@ Phiếu theo dõi/GWT_*.xlsx
 # User gom TOÀN BỘ data thô vào 1 thư mục "File gốc/" (2026-07-24) — chứa mọi thứ
 # nhạy cảm ở trên: Excel khách, CRM, hợp đồng, báo cáo CEO. Không bao giờ commit.
 /File gốc/
+
+# "File md/" (2026-07-24) — bản .md của CRM Pancake (tên/SĐT khách), Báo cáo CEO,
+# ticket lỗi, chi phí dịch vụ. PII nặng. Không bao giờ commit.
+/File md/

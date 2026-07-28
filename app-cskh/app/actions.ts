@@ -93,7 +93,7 @@ export async function getCustomer(id: string) {
   await requireStaff()
   const db = dataClient()
   const [{ data: c, error: e1 }, { data: contacts, error: e2 }] = await Promise.all([
-    db.from('customers').select('*').eq('id', id).maybeSingle(),
+    db.from('cs_customers').select('*').eq('id', id).maybeSingle(),
     db.from('customer_contacts').select('*').eq('customer_id', id).order('is_primary', { ascending: false }),
   ])
   if (e1) throw new Error(e1.message)
@@ -111,7 +111,7 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
   }
   // Sửa được SĐT hợp lệ -> hạ cờ needs_phone + xoá ghi chú lỗi
   const { error } = await dataClient()
-    .from('customers')
+    .from('cs_customers')
     .update(
       allowed.primary_phone && /^0\d{9,10}$/.test(allowed.primary_phone)
         ? { ...allowed, needs_phone: false, notes: null }
@@ -394,7 +394,7 @@ export async function listToFix(): Promise<(Customer & { machines: number })[]> 
   await requireStaff()
   const db = dataClient()
   const { data, error } = await db
-    .from('customers')
+    .from('cs_customers')
     .select('*')
     .or('needs_phone.eq.true,address.is.null')
     .order('full_name')
