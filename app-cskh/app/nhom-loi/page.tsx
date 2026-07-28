@@ -19,11 +19,6 @@ export default async function NhomLoiPage({
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Nhóm lỗi</h1>
-          <div className="flex gap-4">
-            <Link href="/ticket" className="text-sm text-slate-600 hover:text-slate-900 underline">Ticket</Link>
-            <Link href="/loi" className="text-sm text-slate-600 hover:text-slate-900 underline">Lịch thay lõi</Link>
-            <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 underline">Tra máy</Link>
-          </div>
         </header>
 
         {anToan.length > 0 && (

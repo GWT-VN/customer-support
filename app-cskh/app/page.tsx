@@ -11,20 +11,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Máy đã lắp</h1>
-          <div className="flex gap-4">
-            <Link href="/loi" className="text-sm text-slate-600 hover:text-slate-900 underline">
-              Lịch thay lõi
-            </Link>
-            <Link href="/ticket" className="text-sm text-slate-600 hover:text-slate-900 underline">
-              Ticket
-            </Link>
-            <Link href="/nhom-loi" className="text-sm text-slate-600 hover:text-slate-900 underline">
-              Nhóm lỗi
-            </Link>
-            <Link href="/khach" className="text-sm text-slate-600 hover:text-slate-900 underline">
-              Khách cần dọn dữ liệu
-            </Link>
-          </div>
         </header>
 
         <form className="flex gap-2">
