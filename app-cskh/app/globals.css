@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind 4 đổi màu viền mặc định từ gray-200 (như Tailwind 3) sang
+ * currentColor — nghĩa là `border` trơn sẽ lấy MÀU CHỮ. Chữ trong app là
+ * slate-900 nên mọi khung viền thành đen đậm, nhìn rất gắt.
+ *
+ * Trả về xám nhạt cho toàn app. Có 59 chỗ viết `border` trơn; sửa ở đây một
+ * lần thay vì đi vá từng chỗ rồi vẫn sót. Chỗ nào cần màu khác thì cứ ghi rõ
+ * `border-slate-300`, `border-red-200`… như bình thường, sẽ đè lên luật này.
+ */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-slate-200, currentColor);
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

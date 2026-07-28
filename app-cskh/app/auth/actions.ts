@@ -1,7 +1,14 @@
 'use server'
 
+import { redirect } from 'next/navigation'
 import { authClient, ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/supabase'
 import { chuanHoaEmail } from '@/lib/auth'
+
+/** Thoát khỏi app: xoá session Supabase rồi về trang đăng nhập. */
+export async function dangXuat() {
+  await (await authClient()).auth.signOut()
+  redirect('/login')
+}
 
 /**
  * Gọi ngay sau khi đăng nhập MẬT KHẨU thành công.

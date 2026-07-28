@@ -66,7 +66,13 @@ function FormDangNhap() {
     setErr(null)
     const { error } = await taoClient().auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Buộc Google hỏi chọn tài khoản mỗi lần. Không có dòng này thì sau khi
+        // Đăng xuất, bấm Google là vào thẳng bằng tài khoản cũ (phiên Google của
+        // trình duyệt vẫn còn) — máy dùng chung sẽ vào nhầm người.
+        queryParams: { prompt: 'select_account' },
+      },
     })
     if (error) {
       setErr(THONG_BAO_LOI.google)
