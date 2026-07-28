@@ -1,16 +1,19 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
 import { TicketNotes } from '@/components/TicketNotes'
+import { TicketItems } from '@/components/TicketItems'
 import { vnDate } from '@/components/Badge'
 
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes] = await Promise.all([getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma)])
+  const [t, nhom, notes, staff, items] = await Promise.all([
+    getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma),
+  ])
   if (!t) notFound()
 
   return (
@@ -119,8 +122,16 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         </section>
 
         <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
+          <TicketItems code={t.ticket_code} items={items} />
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Xử lý</h2>
-          <TicketEditor code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note} />
+          <TicketEditor
+            code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note}
+            staff={staff} csId={t.cs_phu_trach} ktId={t.ky_thuat}
+          />
         </section>
       </div>
     </main>

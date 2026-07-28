@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateTicket } from '@/app/actions'
+import { updateTicket, type Staff } from '@/app/actions'
 
 const STATES = [
   { key: 'Open', label: 'Đang mở' },
@@ -15,15 +15,23 @@ export function TicketEditor({
   state,
   khan,
   lastNote,
+  staff,
+  csId,
+  ktId,
 }: {
   code: string
   state: string
   khan: boolean
   lastNote: string | null
+  staff: Staff[]
+  csId: string | null
+  ktId: string | null
 }) {
   const [st, setSt] = useState(state)
   const [kh, setKh] = useState(khan)
   const [note, setNote] = useState(lastNote ?? '')
+  const [cs, setCs] = useState(csId ?? '')
+  const [kt, setKt] = useState(ktId ?? '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -31,7 +39,10 @@ export function TicketEditor({
 
   async function save() {
     setBusy(true); setErr(null); setMsg(null)
-    const r = await updateTicket(code, { state: st, khan: kh, last_note: note })
+    const r = await updateTicket(code, {
+      state: st, khan: kh, last_note: note,
+      cs_phu_trach: cs || null, ky_thuat: kt || null,
+    })
     setBusy(false)
     if (!r.ok) setErr(r.error)
     else { setMsg('Đã lưu.'); router.refresh() }
@@ -67,6 +78,25 @@ export function TicketEditor({
             {kh ? '🔴 Khẩn (bấm để bỏ)' : 'Đánh dấu Khẩn'}
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="text-sm text-slate-700">CS phụ trách</span>
+          <select value={cs} onChange={(e) => setCs(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900 bg-white">
+            <option value="">— Chưa gán —</option>
+            {staff.map((s) => <option key={s.id} value={s.id}>{s.ten}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm text-slate-700">Kỹ thuật phụ trách</span>
+          <select value={kt} onChange={(e) => setKt(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900 bg-white">
+            <option value="">— Chưa gán —</option>
+            {staff.map((s) => <option key={s.id} value={s.id}>{s.ten}</option>)}
+          </select>
+        </label>
       </div>
 
       <label className="block">

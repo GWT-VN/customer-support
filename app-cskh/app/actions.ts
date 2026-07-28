@@ -278,11 +278,17 @@ export type Ticket = {
   warranty_full_end: string | null
   con_han_may: boolean | null
   con_han_loi: boolean | null
+  cs_phu_trach: string | null
+  ky_thuat: string | null
+  cs_ten: string | null
+  ky_thuat_ten: string | null
 }
 
 /** Tra ticket theo mã / serial / tên khách / SĐT / nội dung. Rỗng -> 50 ticket mới nhất.
  *  onlyKhan=true -> chỉ ticket đánh dấu Khẩn (khách khó chịu / cần gấp). */
-export async function searchTickets(q: string, state?: string, onlyKhan?: boolean): Promise<Ticket[]> {
+export async function searchTickets(
+  q: string, state?: string, onlyKhan?: boolean, mineStaffId?: string
+): Promise<Ticket[]> {
   await requireStaff()
   let query = dataClient().from('v_tickets').select('*')
 
@@ -296,6 +302,7 @@ export async function searchTickets(q: string, state?: string, onlyKhan?: boolea
   }
   if (state) query = query.eq('state', state)
   if (onlyKhan) query = query.eq('khan', true)
+  if (mineStaffId) query = query.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
 
   // Khẩn lên đầu, rồi mới nhất trước.
   const { data, error } = await query
@@ -334,10 +341,13 @@ export async function getTicket(code: string): Promise<Ticket | null> {
   return (data as Ticket) ?? null
 }
 
-/** Đổi trạng thái / cờ Khẩn / ghi chú tóm tắt. */
+/** Đổi trạng thái / cờ Khẩn / ghi chú tóm tắt / người phụ trách. */
 export async function updateTicket(
   code: string,
-  patch: { state?: string; last_note?: string; khan?: boolean }
+  patch: {
+    state?: string; last_note?: string; khan?: boolean
+    cs_phu_trach?: string | null; ky_thuat?: string | null
+  }
 ) {
   await requireStaff()
   if (patch.state && !['Open', 'Done', 'Cancel'].includes(patch.state)) {
@@ -390,6 +400,100 @@ export async function machinesOfCustomer(customerId: string): Promise<Machine[]>
     .order('install_date', { ascending: false, nullsFirst: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as Machine[]
+}
+
+// ── Nhân viên phụ trách (Đợt 2) ─────────────────────────────────────────────
+export type Staff = { id: string; ten: string; vai_tro: string; email: string | null }
+
+/** Danh sách NV đang hoạt động — để chọn người phụ trách. */
+export async function listStaff(): Promise<Staff[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('staff').select('id, ten, vai_tro, email').eq('hoat_dong', true).order('ten')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Staff[]
+}
+
+/** NV ứng với người đang đăng nhập (khớp email) — cho lọc "việc của tôi". */
+export async function currentStaff(): Promise<Staff | null> {
+  const user = await requireStaff()
+  if (!user.email) return null
+  const { data, error } = await dataClient()
+    .from('staff').select('id, ten, vai_tro, email').eq('email', user.email).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as Staff) ?? null
+}
+
+// ── Chi phí / vật tư / đổi máy của ticket (Đợt 2) ───────────────────────────
+export type TicketMuc = {
+  id: string
+  loai: 'thu_phi' | 'vat_tu' | 'doi_may'
+  mo_ta: string | null
+  so_tien: number | null
+  tinh_phi: boolean
+  serial_cu: string | null
+  serial_moi: string | null
+  tac_gia: string | null
+  created_at: string
+}
+
+export async function listTicketItems(code: string): Promise<TicketMuc[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('ticket_muc').select('*').eq('ticket_code', code).order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TicketMuc[]
+}
+
+export async function addTicketItem(code: string, input: {
+  loai: string; mo_ta?: string; so_tien?: number | null; tinh_phi?: boolean
+  serial_cu?: string; serial_moi?: string
+}) {
+  const user = await requireStaff()
+  if (!['thu_phi', 'vat_tu', 'doi_may'].includes(input.loai)) {
+    return { ok: false as const, error: 'Loại mục không hợp lệ.' }
+  }
+  const { error } = await dataClient().from('ticket_muc').insert({
+    ticket_code: code,
+    loai: input.loai,
+    mo_ta: input.mo_ta?.trim() || null,
+    so_tien: input.so_tien ?? null,
+    tinh_phi: input.tinh_phi ?? false,
+    serial_cu: input.serial_cu?.trim() || null,
+    serial_moi: input.serial_moi?.trim() || null,
+    tac_gia: user.email ?? null,
+  })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+export async function deleteTicketItem(id: string, code: string) {
+  await requireStaff()
+  const { error } = await dataClient().from('ticket_muc').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+/** Xuất CSV danh sách ticket đang lọc (Excel mở trực tiếp). */
+export async function ticketsCsv(
+  q: string, state?: string, onlyKhan?: boolean, mine?: boolean
+): Promise<string> {
+  const mineId = mine ? (await currentStaff())?.id : undefined
+  const rows = await searchTickets(q, state, onlyKhan, mineId)
+  const head = ['Mã', 'Ngày', 'Trạng thái', 'Khẩn', 'Loại', 'Khách', 'SĐT', 'Serial',
+    'Máy', 'CS', 'Kỹ thuật', 'Mô tả']
+  const esc = (v: unknown) => {
+    const s = v === null || v === undefined ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = rows.map((t) => [
+    t.ticket_code, (t.created_at ?? '').slice(0, 10), t.state, t.khan ? 'Khẩn' : '',
+    t.ticket_type, t.customer_name, t.primary_phone, t.serial ?? t.source_serial,
+    t.product_name, t.cs_ten, t.ky_thuat_ten, t.description,
+  ].map(esc).join(','))
+  return '﻿' + [head.join(','), ...lines].join('\n')  // BOM để Excel đọc đúng UTF-8
 }
 
 /** Tạo ticket mới. Mã tự sinh GWT-YYnnnn theo năm hiện tại. */

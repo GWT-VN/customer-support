@@ -1,15 +1,21 @@
 import Link from 'next/link'
-import { searchTickets } from '@/app/actions'
+import { searchTickets, currentStaff } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
+import { ExportButton } from '@/components/ExportButton'
 
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; state?: string; khan?: string }>
+  searchParams: Promise<{ q?: string; state?: string; khan?: string; mine?: string }>
 }) {
-  const { q = '', state = '', khan = '' } = await searchParams
+  const { q = '', state = '', khan = '', mine = '' } = await searchParams
   const onlyKhan = khan === '1'
-  const tickets = await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan)
+  const isMine = mine === '1'
+  const me = isMine ? await currentStaff() : null
+  const tickets =
+    isMine && !me
+      ? []
+      : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id)
 
   const tabs = [
     { key: '', label: 'Tất cả' },
@@ -40,26 +46,37 @@ export default async function TicketsPage({
           <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
         </form>
 
-        <div className="flex gap-2 flex-wrap">
-          {tabs.map((t) => (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
+            {tabs.map((t) => (
+              <Link
+                key={t.key}
+                href={`/ticket?${new URLSearchParams({ ...(q && { q }), ...(t.key && { state: t.key }) })}`}
+                className={`px-3 py-1.5 rounded-lg text-sm border ${
+                  !onlyKhan && !isMine && state === t.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
+                }`}
+              >
+                {t.label}
+              </Link>
+            ))}
             <Link
-              key={t.key}
-              href={`/ticket?${new URLSearchParams({ ...(q && { q }), ...(t.key && { state: t.key }) })}`}
+              href={`/ticket?${new URLSearchParams({ ...(q && { q }), khan: '1' })}`}
               className={`px-3 py-1.5 rounded-lg text-sm border ${
-                !onlyKhan && state === t.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
+                onlyKhan ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200'
               }`}
             >
-              {t.label}
+              🔴 Khẩn
             </Link>
-          ))}
-          <Link
-            href={`/ticket?${new URLSearchParams({ ...(q && { q }), khan: '1' })}`}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${
-              onlyKhan ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200'
-            }`}
-          >
-            🔴 Khẩn
-          </Link>
+            <Link
+              href={`/ticket?${new URLSearchParams({ ...(q && { q }), mine: '1' })}`}
+              className={`px-3 py-1.5 rounded-lg text-sm border ${
+                isMine ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
+              }`}
+            >
+              Việc của tôi
+            </Link>
+          </div>
+          <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
         </div>
 
         <p className="text-sm text-slate-500">
@@ -75,6 +92,7 @@ export default async function TicketsPage({
                 <th className="text-left px-4 py-3 font-medium">Loại</th>
                 <th className="text-left px-4 py-3 font-medium">Khách</th>
                 <th className="text-left px-4 py-3 font-medium">Máy</th>
+                <th className="text-left px-4 py-3 font-medium">Phụ trách</th>
                 <th className="text-left px-4 py-3 font-medium">Trạng thái</th>
               </tr>
             </thead>
@@ -107,6 +125,14 @@ export default async function TicketsPage({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {t.cs_ten || t.ky_thuat_ten ? (
+                      <>
+                        {t.cs_ten && <div>CS: {t.cs_ten}</div>}
+                        {t.ky_thuat_ten && <div>KT: {t.ky_thuat_ten}</div>}
+                      </>
+                    ) : <span className="text-slate-300">—</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <KhanBadge khan={t.khan} />
@@ -116,7 +142,7 @@ export default async function TicketsPage({
                 </tr>
               ))}
               {tickets.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Không tìm thấy ticket nào.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Không tìm thấy ticket nào.</td></tr>
               )}
             </tbody>
           </table>
