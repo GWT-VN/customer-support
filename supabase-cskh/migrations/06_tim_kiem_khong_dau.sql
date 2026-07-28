@@ -132,8 +132,13 @@ select
   scs.ten as cs_ten,
   skt.ten as ky_thuat_ten,
   -- MOI: cot bo dau de tim kiem khong dau; ticket co 2 duong toi cs_customers
-  -- (c qua t.customer_id, cm qua ib.customer_id) nen coalesce nhu customer_name
-  coalesce(c.ten_kd, cm.ten_kd) as ten_kd,
+  -- (c qua t.customer_id, cm qua ib.customer_id) nen coalesce nhu customer_name.
+  -- ten_kd them fallback thu 3 tu t.source_customer (khach chua dang ky trong
+  -- cs_customers, may_khong_trong_he_thong=true) de khop DUNG voi 3 fallback
+  -- cua customer_name goc — thieu fallback nay thi 8/83 ticket bien mat khoi
+  -- ket qua tim kiem du ten van hien tren man hinh qua customer_name.
+  -- dia_chi_kd GIU 2 fallback: tickets khong co nguon dia chi tu-do tuong duong.
+  coalesce(c.ten_kd, cm.ten_kd, public.khong_dau(t.source_customer)) as ten_kd,
   coalesce(c.dia_chi_kd, cm.dia_chi_kd) as dia_chi_kd
 from tickets t
   left join installed_base ib on ib.serial = t.serial
