@@ -26,7 +26,11 @@ export async function proxy(request: NextRequest) {
   // getUser() (không phải getSession) — buộc verify token với Supabase, không tin cookie suông.
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  // /auth = vòng OAuth quay về, lúc đó CHƯA có session nên bắt buộc phải cho qua
+  const DUONG_CONG_KHAI = ['/login', '/auth']
+  const congKhai = DUONG_CONG_KHAI.some((p) => request.nextUrl.pathname.startsWith(p))
+
+  if (!user && !congKhai) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
