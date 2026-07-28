@@ -39,11 +39,27 @@
 - [x] Route `/auth/callback` + mở ngoại lệ `/auth` trong `proxy.ts` — **vá luôn lỗi link đặt lại mật khẩu / magic link quay về màn đăng nhập**
 - [x] Nút Google trên `/login`, giữ nguyên đường mật khẩu, cả hai cùng một điểm chặn
 - [x] Sửa `.env.example` đang trỏ nhầm project cũ GWT-Masterdata
-- [ ] **User tự làm**: Google Cloud OAuth client · Supabase bật provider + Redirect URLs · Vercel import repo (Root Directory `app-cskh`) + Deployment Protection
-- [ ] Kiểm 6 ca nghiệm thu sau khi cấu hình xong (ca 2 và ca 4 quan trọng nhất)
-- [ ] **Giai đoạn 2 — UI phân quyền**: đọc `vai_tro`, màn hình quản lý nhân viên, luật ai xem được gì
+- [x] **User đã cấu hình xong**: Google Cloud OAuth client (consent screen **Internal** → Google tự chặn tài khoản ngoài `gwt.vn`) · Supabase provider + 4 Redirect URL · Vercel import repo
+- [x] **Deploy production**: https://customer-support-three-puce.vercel.app — auto-deploy từ `main`, framework `nextjs`, type `LAMBDAS`
+- [x] Nghiệm thu ca 1 (Google `@gwt.vn` vào được) · ca 2 (Gmail cá nhân bị chặn, `Error 403: org_internal`) · ca 4 (`hoat_dong=false` chặn được, chứng minh luật 1 thắng luật 3)
+- [ ] Còn ca 3 (mật khẩu `bella@`), ca 5 (bật lại vào được), ca 6 (email `@gwt.vn` thứ ba tự sinh dòng)
+- [ ] Deployment Protection: **không tìm thấy trên gói Hobby**. Chấp nhận — lớp chặn chính vẫn là luật vào cửa, preview cũng chỉ hiện trang login
+- [x] Nút Đăng xuất + `prompt: 'select_account'` buộc Google hỏi chọn tài khoản (máy dùng chung)
+- [x] **Perf**: region `sin1` (DB ở Singapore, hàm từng chạy ở `iad1`) · tắt prefetch 17 link danh sách · `cache()` gộp lượt xác thực
+
+## 🔧 Giai đoạn 2 — phân quyền / search / filter / sort ⏳ ĐANG LÀM (2026-07-28)
+
+> User duyệt 2026-07-28: ma trận quyền "cứ build vậy đã, chỉnh sau" · làm **từng phần một, test local trước**.
+
+- [x] **Việc 0 — gộp 2 bảng nhân viên** (migration `gop_cs_staff_vao_staff`). Hai bảng dựng song song cùng ngày và **đã mâu thuẫn**: `ai@gwt.vn` là `admin` bên `staff` nhưng `nhan_vien` bên `cs_staff`; khoá người bên `staff` thì họ vẫn đăng nhập được vì rào đọc bảng kia. Giữ `staff` (có tên người, vai trò đúng nghiệp vụ, đã nối vào ticket), rào đăng nhập trỏ sang. Verify: 5 NV đều có email · RLS bật · 0 policy · trigger `updated_at` · 0 dòng sót
+- [ ] **Xoá `cs_staff`** sau khi chạy ổn định (cố ý giữ làm bản lùi, theo thông lệ repo)
+- [ ] **Phân quyền**: `capQuyen('admin')` ở *server action* (ẩn nút KHÔNG phải phân quyền) · màn `/nhan-vien` cho admin · admin-only: chi phí/vật tư/đổi máy, export CSV, quản lý NV
+- [ ] **Search**: bật `unaccent` + `pg_trgm` — hiện gõ `huong` KHÔNG ra `Hương` · thêm ô tìm kiếm toàn cục
+- [ ] **Filter**: trang máy (trạng thái BH/tỉnh/model) · ticket (nhóm lỗi/người phụ trách/thời gian) · khách (tỉnh/thiếu SĐT)
+- [ ] **Sort**: bấm tiêu đề cột, lưu trên URL — **phải whitelist tên cột** trước khi đưa vào `.order()`
+- [ ] **Phân trang**: các trang đang cắt cứng 50 dòng mà không báo → lọc ra 80 kết quả chỉ thấy 50 và tưởng là hết
+- [ ] `loading.tsx` + hover prefetch (user duyệt, chưa làm) — trang động chỉ prefetch được khi có `loading.js`
 - [ ] **RLS least-privilege** thay `service_role` (user chốt "làm ngay sau") — gộp với mục "DB role least-privilege" ở phần nợ kỹ thuật
-- [ ] **Tính năng phụ**: xem nhiều dữ liệu hơn, bộ lọc (user nêu 2026-07-28, chưa bàn chi tiết)
 
 ## Phase 0 — Nền + kích hoạt bảo hành ✅ XONG
 

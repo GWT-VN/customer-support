@@ -9,11 +9,11 @@
 
 export const DOMAIN_CONG_TY = '@gwt.vn'
 
-/** Dòng tương ứng trong cs_staff, hoặc null nếu chưa có ai ghi */
+/** Dòng tương ứng trong staff, hoặc null nếu chưa có ai ghi */
 export type DongStaff = { hoat_dong: boolean } | null
 
 export type KetQuaVaoCua =
-  | { duocVao: true; nguon: 'cs_staff' | 'domain' }
+  | { duocVao: true; nguon: 'staff' | 'domain' }
   | { duocVao: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' }
 
 export function chuanHoaEmail(email: string | null | undefined): string {
@@ -28,7 +28,7 @@ export function xetLuatVaoCua(email: string, dong: DongStaff): KetQuaVaoCua {
   // đó chính là cơ chế khoá người nghỉ việc.
   if (dong) {
     return dong.hoat_dong
-      ? { duocVao: true, nguon: 'cs_staff' }
+      ? { duocVao: true, nguon: 'staff' }
       : { duocVao: false, lyDo: 'bi_khoa' }
   }
 

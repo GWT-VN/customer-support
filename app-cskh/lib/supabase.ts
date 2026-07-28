@@ -59,11 +59,11 @@ export const layNguoiDung = cache(async () => {
   return error ? null : data.user
 })
 
-/** Đọc cs_staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
+/** Đọc staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
 export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   const e = chuanHoaEmail(email)
   const { data, error } = await dataClient()
-    .from('cs_staff')
+    .from('staff')
     .select('hoat_dong')
     .eq('email', e)
     .maybeSingle()
@@ -73,9 +73,12 @@ export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
 
 /** Ghi nhận người vào lần đầu theo luật domain. KHÔNG đụng dòng đã có. */
 export async function ghiNhanNhanVienMoi(email: string) {
+  const e = chuanHoaEmail(email)
   const { error } = await dataClient()
-    .from('cs_staff')
-    .upsert({ email: chuanHoaEmail(email) }, { onConflict: 'email', ignoreDuplicates: true })
+    .from('staff')
+    // ten NOT NULL -> tạm lấy phần trước @, admin sửa lại ở màn quản lý nhân viên.
+    // vai_tro để DB tự điền mặc định 'cs' — người mới không tự thành admin.
+    .upsert({ email: e, ten: e.split('@')[0] }, { onConflict: 'email', ignoreDuplicates: true })
   if (error) throw error
 }
 

@@ -12,7 +12,7 @@ describe('xetLuatVaoCua', () => {
 
   it('luật 2: email ngoài domain nhưng có trong bảng và đang bật thì được vào', () => {
     expect(xetLuatVaoCua('freelancer@gmail.com', { hoat_dong: true }))
-      .toEqual({ duocVao: true, nguon: 'cs_staff' })
+      .toEqual({ duocVao: true, nguon: 'staff' })
   })
 
   it('luật 1 THẮNG luật 3: @gwt.vn nhưng hoat_dong=false thì bị từ chối', () => {
