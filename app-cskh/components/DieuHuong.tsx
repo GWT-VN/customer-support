@@ -45,7 +45,7 @@ export function DieuHuong() {
   const dangMo = mucDangMo(pathname)
 
   return (
-    <nav className="flex items-center gap-1 overflow-x-auto">
+    <nav className="flex items-center gap-4 overflow-x-auto">
       {MUC.map(({ href, nhan }) => {
         const active = href === dangMo
         return (
@@ -54,10 +54,10 @@ export function DieuHuong() {
             href={href}
             aria-current={active ? 'page' : undefined}
             className={
-              'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ' +
+              'whitespace-nowrap text-sm underline transition-colors ' +
               (active
-                ? 'bg-slate-900 text-white font-medium'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900')
+                ? 'text-slate-900 font-semibold'
+                : 'text-slate-400 hover:text-slate-900')
             }
           >
             {nhan}
