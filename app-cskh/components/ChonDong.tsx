@@ -41,6 +41,8 @@ type BoiCanh = {
   /** Xoá SẠCH, kể cả dòng đã chọn ở trang khác. Khác doiTatCa(false) vốn chỉ đụng trang này. */
   xoaHet: () => void
   chonToanBo: (() => void) | null
+  /** Đã bấm "chọn tất cả" xong rồi -> không mời bấm lại nữa. */
+  daLayToanBo: boolean
 }
 
 const Ctx = createContext<BoiCanh | null>(null)
@@ -76,6 +78,7 @@ export function KhungChon({
   children: ReactNode
 }) {
   const [daChon, setDaChon] = useState<Set<string>>(() => new Set())
+  const [daLayToanBo, setDaLayToanBo] = useState(false)
   const [loi, setLoi] = useState<string | null>(null)
   const [dangLay, batDau] = useTransition()
 
@@ -90,6 +93,7 @@ export function KhungChon({
   if (chuKy !== chuKyCu) {
     setChuKyCu(chuKy)
     setDaChon(new Set())
+    setDaLayToanBo(false)
     setLoi(null)
   }
 
@@ -118,6 +122,7 @@ export function KhungChon({
 
   function xoaHet() {
     setDaChon(new Set())
+    setDaLayToanBo(false)
     setLoi(null)
   }
 
@@ -128,6 +133,7 @@ export function KhungChon({
           try {
             const tatCa = await layTatCaKhoa(thamSo)
             setDaChon(new Set(tatCa))
+            setDaLayToanBo(true)
           } catch {
             setLoi('Không lấy được toàn bộ danh sách. Thử lại.')
           }
@@ -137,7 +143,10 @@ export function KhungChon({
 
   return (
     <Ctx.Provider
-      value={{ bat, daChon, khoaTrang, tong, dangLay, loi, doiMot, doiTatCa, xoaHet, chonToanBo }}
+      value={{
+        bat, daChon, khoaTrang, tong, dangLay, loi,
+        doiMot, doiTatCa, xoaHet, chonToanBo, daLayToanBo,
+      }}
     >
       <div className="space-y-4">{children}</div>
     </Ctx.Provider>
@@ -237,7 +246,11 @@ export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; child
   // Lựa chọn vượt khỏi trang đang xem -> BẮT BUỘC nói ra, xem quyết định 2 ở đầu file.
   const vuotTrang = soDong > soTrenTrang
   const conNua = c.tong > c.khoaTrang.length
-  const moiChonToanBo = hetTrang && conNua && soDong < c.tong && c.chonToanBo
+  const moiChonToanBo = hetTrang && conNua && soDong < c.tong && c.chonToanBo && !c.daLayToanBo
+  // Đã lấy toàn bộ mà vẫn thiếu -> chạm trần TOI_DA_CHON. PHẢI nói ra: im lặng ở
+  // đây nghĩa là người dùng tin mình đang thao tác trên cả 5.000 dòng trong khi
+  // thực tế chỉ có 2.000.
+  const chamTran = c.daLayToanBo && soDong < c.tong
 
   return (
     <div className="flex items-center gap-x-3 gap-y-1 flex-wrap rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm text-white">
@@ -245,6 +258,12 @@ export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; child
         Đã chọn <strong>{soDong}</strong> {nhan}
         {vuotTrang && <span className="text-slate-300"> (gồm cả dòng ở trang khác)</span>}
       </span>
+
+      {chamTran && (
+        <span className="text-amber-300">
+          Chỉ chọn được tối đa {soDong} mỗi lượt — thu hẹp bộ lọc rồi làm nhiều đợt.
+        </span>
+      )}
 
       {moiChonToanBo && (
         <button

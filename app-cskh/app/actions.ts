@@ -731,7 +731,7 @@ export type SerialPending = {
  * rồi lệch nhau (xem chú thích ở TuyChonDanhSach.moiTrang).
  * Không export nên không bị luật "'use server' chỉ export async function" đụng tới.
  */
-async function truyVanSerial(q: string, limit: number) {
+async function truyVanSerial(q: string, limit: number, tu = 0) {
   await requireStaff()
   let query = dataClient()
     .from('serial_registry')
@@ -744,7 +744,7 @@ async function truyVanSerial(q: string, limit: number) {
         `ma_quoc_te.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%`
     )
   }
-  const { data, error, count } = await query.order('serial').limit(limit)
+  const { data, error, count } = await query.order('serial').range(tu, tu + limit - 1)
   if (error) throw new Error(error.message)
   return { rows: (data ?? []) as SerialRow[], tong: count ?? 0 }
 }
@@ -1404,12 +1404,38 @@ export async function timGop(q: string): Promise<KetQuaTimGop> {
 
 type ThamSoLoc = Record<string, string | undefined>
 
+/**
+ * ⚠️ PostgREST/Supabase chặn cứng 1000 dòng MỖI REQUEST (db-max-rows). Đặt
+ * .limit(2000) không báo lỗi — nó lặng lẽ trả về 1000. Đã dính đúng bẫy này:
+ * bấm "chọn tất cả 1891 serial" ra 1000, giao diện không hề biết là bị cắt.
+ *
+ * Nên phải lấy theo LÔ 1000 rồi ghép, và dừng khi đủ `tong` hoặc chạm trần
+ * TOI_DA_CHON. Bên gọi so số khoá nhận được với `tong` để biết có bị cắt không —
+ * nếu bị thì PHẢI nói ra chứ không im lặng.
+ */
+const MOI_LO = 1000
+
+async function gomKhoa<T>(
+  layLo: (trang: number, moiTrang: number) => Promise<{ rows: T[]; tong: number }>,
+  khoaCua: (r: T) => string
+): Promise<string[]> {
+  const ra: string[] = []
+  for (let trang = 1; ra.length < TOI_DA_CHON; trang++) {
+    const { rows, tong } = await layLo(trang, MOI_LO)
+    for (const r of rows) ra.push(khoaCua(r))
+    // Hết dòng, hoặc lô cuối trả về non-đầy -> không còn gì để lấy.
+    if (ra.length >= tong || rows.length < MOI_LO) break
+  }
+  return ra.slice(0, TOI_DA_CHON)
+}
+
 export async function khoaTatCaMay(t: ThamSoLoc): Promise<string[]> {
-  const { rows } = await searchMachines(t.q ?? '', {
-    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
-    maSanPham: t.sp, tinhTrangBH: t.bh,
-  })
-  return rows.map((r) => r.serial)
+  return gomKhoa(
+    (trang, moiTrang) => searchMachines(t.q ?? '', {
+      trang, moiTrang, cot: t.cot, chieu: t.chieu, maSanPham: t.sp, tinhTrangBH: t.bh,
+    }),
+    (r) => r.serial
+  )
 }
 
 export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
@@ -1419,39 +1445,46 @@ export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
   // luôn ticket của người khác trong khi màn hình chỉ hiện việc của mình.
   const me = isMine ? await currentStaff() : null
   if (isMine && !me) return []
-  const { rows } = await searchTickets(
-    t.q ?? '',
-    onlyKhan ? undefined : t.state || undefined,
-    onlyKhan,
-    me?.id,
-    { trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined }
+  return gomKhoa(
+    (trang, moiTrang) => searchTickets(
+      t.q ?? '',
+      onlyKhan ? undefined : t.state || undefined,
+      onlyKhan,
+      me?.id,
+      { trang, moiTrang, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined }
+    ),
+    (r) => r.ticket_code
   )
-  return rows.map((r) => r.ticket_code)
 }
 
 export async function khoaTatCaLoi(t: ThamSoLoc): Promise<string[]> {
-  const { rows } = await coreForecast(t.tt ?? '', t.q ?? '', {
-    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
-  })
-  // Khoá ghép: một máy có nhiều lõi nên riêng serial không định danh được 1 dòng.
-  return rows.map((r) => `${r.serial}-${r.filter_code}`)
+  return gomKhoa(
+    (trang, moiTrang) => coreForecast(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    // Khoá ghép: một máy có nhiều lõi nên riêng serial không định danh được 1 dòng.
+    (r) => `${r.serial}-${r.filter_code}`
+  )
 }
 
 export async function khoaTatCaKhach(t: ThamSoLoc): Promise<string[]> {
-  const { rows } = await listToFix(t.q ?? '', {
-    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
-  })
-  return rows.map((r) => r.id)
+  return gomKhoa(
+    (trang, moiTrang) => listToFix(t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    (r) => r.id
+  )
 }
 
 export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
+  // maintenanceDue dùng .limit() chứ không .range() nên không phân lô được.
+  // Bảng này mới 467 dòng, dưới trần 1000 nên một lượt là đủ — nếu ngày nào đó
+  // vượt 1000 thì phải đổi sang .range() như các hàm kia, không được để im.
   const { rows } = await maintenanceDue(t.tt ?? '', t.q ?? '', {
-    moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
+    moiTrang: MOI_LO, cot: t.cot, chieu: t.chieu,
   })
   return rows.map((r) => r.visit_id)
 }
 
 export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
-  const rows = await searchSerials(t.q ?? '', TOI_DA_CHON)
-  return rows.map((r) => r.serial)
+  return gomKhoa(
+    async (trang, moiTrang) => truyVanSerial(t.q ?? '', moiTrang, (trang - 1) * moiTrang),
+    (r) => r.serial
+  )
 }
