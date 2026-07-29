@@ -16,6 +16,7 @@ const MUC = [
   { href: '/loi', nhan: 'Lịch thay lõi' },
   { href: '/bao-tri', nhan: 'Lịch bảo trì' },
   { href: '/nhom-loi', nhan: 'Nhóm lỗi' },
+  { href: '/serial', nhan: 'Kho serial' },
   { href: '/khach', nhan: 'Khách cần dọn' },
 ] as const
 

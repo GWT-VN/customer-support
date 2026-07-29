@@ -97,6 +97,7 @@ function NoteEdit({ code, note, onXong }: { code: string; note: TicketNote; onXo
     else { onXong(); router.refresh() }
   }
   async function xoa() {
+    if (!window.confirm('Xoá ghi chú này?')) return
     setBusy(true); setErr(null)
     const r = await deleteTicketNote(note.id, code)
     setBusy(false)

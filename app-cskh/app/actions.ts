@@ -698,6 +698,107 @@ export async function machinesOfCustomer(customerId: string): Promise<Machine[]>
   return (data ?? []) as Machine[]
 }
 
+// ── Hệ serial: kho serial + hàng chờ duyệt ──────────────────────────────────
+export type SerialRow = {
+  serial: string; code: string | null; model: string | null
+  internal_code: string | null; ma_quoc_te: string | null; ten_noi_bo: string | null; po: string | null
+}
+export type SerialPending = {
+  id: string; serial: string; internal_code: string | null; model: string | null
+  ma_quoc_te: string | null; ten_noi_bo: string | null; ghi_chu: string | null
+  nguoi_tao: string | null; trang_thai: string; ly_do_tu_choi: string | null; created_at: string
+}
+
+/** Tra serial trong kho (serial_registry). Dùng cho ô chọn serial + trang /serial. */
+export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]> {
+  await requireStaff()
+  let query = dataClient()
+    .from('serial_registry')
+    .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po')
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `serial.ilike.%${safe}%,internal_code.ilike.%${safe}%,model.ilike.%${safe}%,` +
+        `ma_quoc_te.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%`
+    )
+  }
+  const { data, error } = await query.order('serial').limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as SerialRow[]
+}
+
+export async function listSerialPending(trangThai = 'cho_duyet'): Promise<SerialPending[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('serial_pending')
+    .select('id, serial, internal_code, model, ma_quoc_te, ten_noi_bo, ghi_chu, nguoi_tao, trang_thai, ly_do_tu_choi, created_at')
+    .eq('trang_thai', trangThai)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as SerialPending[]
+}
+
+/** NV tạo serial mới -> hàng chờ duyệt (không đẩy thẳng lên kho). */
+export async function createSerialPending(input: {
+  serial: string; internal_code?: string; model?: string; ma_quoc_te?: string
+  ten_noi_bo?: string; code?: string; ghi_chu?: string
+}) {
+  const user = await requireStaff()
+  const serial = input.serial?.trim()
+  if (!serial) return { ok: false as const, error: 'Nhập serial.' }
+  const db = dataClient()
+  // đã có trong kho?
+  const { data: co } = await db.from('serial_registry').select('serial').eq('serial', serial).maybeSingle()
+  if (co) return { ok: false as const, error: 'Serial này đã có trong kho — chọn từ danh sách.' }
+  const { data: cho } = await db.from('serial_pending').select('id').eq('serial', serial).eq('trang_thai', 'cho_duyet').maybeSingle()
+  if (cho) return { ok: false as const, error: 'Serial này đang chờ duyệt.' }
+  const { error } = await db.from('serial_pending').insert({
+    serial,
+    code: input.code?.trim() || null,
+    model: input.model?.trim() || null,
+    internal_code: input.internal_code?.trim() || null,
+    ma_quoc_te: input.ma_quoc_te?.trim() || null,
+    ten_noi_bo: input.ten_noi_bo?.trim() || null,
+    ghi_chu: input.ghi_chu?.trim() || null,
+    nguoi_tao: user.email ?? null,
+  })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/serial')
+  return { ok: true as const }
+}
+
+/** Duyệt serial pending (CHỈ ADMIN) — đẩy lên serial_registry qua RPC nguyên tử. */
+export async function approveSerial(id: string) {
+  const user = await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().rpc('duyet_serial_pending', { p_id: id, p_admin: user.email ?? '' })
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/serial')
+  return { ok: true as const }
+}
+
+/** Từ chối serial pending (CHỈ ADMIN). */
+export async function rejectSerial(id: string, lyDo?: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('serial_pending')
+    .update({ trang_thai: 'tu_choi', ly_do_tu_choi: lyDo?.trim() || null }).eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/serial')
+  return { ok: true as const }
+}
+
+/** Xoá hẳn 1 serial pending (CHỈ ADMIN — theo quy tắc xoá cần quyền cao). */
+export async function deleteSerialPending(id: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('serial_pending').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/serial')
+  return { ok: true as const }
+}
+
 // ── Nhân viên phụ trách (Đợt 2) ─────────────────────────────────────────────
 export type Staff = { id: string; ten: string; vai_tro: string; email: string | null }
 

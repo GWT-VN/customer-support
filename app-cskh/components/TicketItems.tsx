@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addTicketItem, deleteTicketItem, type TicketMuc, type CatalogItem } from '@/app/actions'
+import { SerialPicker } from '@/components/SerialPicker'
 
 function tien(n: number | null) {
   if (n === null || n === undefined) return null
@@ -71,6 +72,7 @@ export function TicketItems(
   }
 
   async function del(id: string) {
+    if (!window.confirm('Xoá mục này?')) return
     await deleteTicketItem(id, code)
     router.refresh()
   }
@@ -189,12 +191,8 @@ export function TicketItems(
           ) : (
             <>
               <div className="flex gap-2 flex-wrap">
-                <input value={serialCu} onChange={(e) => setSerialCu(e.target.value)}
-                  placeholder="Serial máy CŨ (thu hồi)"
-                  className="rounded-lg border px-3 py-2 text-slate-900 font-mono text-sm flex-1 min-w-52" />
-                <input value={serialMoi} onChange={(e) => setSerialMoi(e.target.value)}
-                  placeholder="Serial máy MỚI (đổi cho khách)"
-                  className="rounded-lg border px-3 py-2 text-slate-900 font-mono text-sm flex-1 min-w-52" />
+                <SerialPicker value={serialCu} onChange={setSerialCu} placeholder="Serial máy CŨ (thu hồi)" />
+                <SerialPicker value={serialMoi} onChange={setSerialMoi} placeholder="Serial máy MỚI (đổi cho khách)" />
               </div>
               <input value={moTa} onChange={(e) => setMoTa(e.target.value)}
                 placeholder="Ghi chú (tuỳ chọn)"

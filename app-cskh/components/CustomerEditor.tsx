@@ -98,7 +98,10 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
                   {!ct.zalo_ok && <span className="ml-1 text-xs text-slate-400">(không Zalo)</span>}
                 </span>
                 <button
-                  onClick={async () => { await deleteContact(ct.id, c.id); router.refresh() }}
+                  onClick={async () => {
+                    if (!window.confirm('Xoá liên hệ này của khách?')) return
+                    await deleteContact(ct.id, c.id); router.refresh()
+                  }}
                   className="text-xs text-red-600 hover:underline">Xoá</button>
               </li>
             ))}
