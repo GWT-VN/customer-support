@@ -215,6 +215,78 @@ export async function coreCounts() {
   return out
 }
 
+// ── Lịch bảo trì đến hạn (v_maintenance_due) ────────────────────────────────
+export type MaintenanceDue = {
+  visit_id: string
+  lan_thu: number | null
+  tong_lan: number | null
+  due_date: string | null
+  completed_at: string | null
+  loai_goi: string | null
+  bo_may: string | null
+  section: string | null
+  customer_name: string | null
+  primary_phone: string | null
+  chua_khop_khach: boolean | null
+  tinh_trang: string
+}
+
+export async function maintenanceDue(tinhTrang: string, q: string): Promise<MaintenanceDue[]> {
+  await requireStaff()
+  let query = dataClient().from('v_maintenance_due').select('*')
+
+  if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `customer_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%,` +
+        `section.ilike.%${safe}%,bo_may.ilike.%${safe}%`
+    )
+  }
+  const { data, error } = await query
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(100)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as MaintenanceDue[]
+}
+
+export async function maintenanceCounts() {
+  await requireStaff()
+  const db = dataClient()
+  const keys = ['QUÁ HẠN', 'sắp đến hạn (≤30 ngày)', 'còn hạn']
+  const out: Record<string, number> = {}
+  await Promise.all(
+    keys.map(async (k) => {
+      const { count } = await db
+        .from('v_maintenance_due').select('*', { count: 'exact', head: true }).eq('tinh_trang', k)
+      out[k] = count ?? 0
+    })
+  )
+  return out
+}
+
+/** Đánh dấu 1 lượt bảo trì đã làm (ghi completed_at). */
+export async function markMaintenanceDone(visitId: string, date: string) {
+  await requireStaff()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false as const, error: 'Ngày không hợp lệ.' }
+  const { error } = await dataClient()
+    .from('maintenance_visit').update({ completed_at: date }).eq('id', visitId)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/bao-tri')
+  return { ok: true as const }
+}
+
+/** Bỏ đánh dấu (ghi nhầm). */
+export async function unmarkMaintenanceDone(visitId: string) {
+  await requireStaff()
+  const { error } = await dataClient()
+    .from('maintenance_visit').update({ completed_at: null }).eq('id', visitId)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/bao-tri')
+  return { ok: true as const }
+}
+
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
 export async function replacementsOfSerial(serial: string) {
   await requireStaff()
