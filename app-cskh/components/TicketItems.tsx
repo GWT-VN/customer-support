@@ -20,6 +20,8 @@ export function TicketItems(
 ) {
   const [loai, setLoai] = useState<'hang_muc' | 'doi_may'>('hang_muc')
   const [catalogCode, setCatalogCode] = useState('')
+  const [catQuery, setCatQuery] = useState('')
+  const [openSug, setOpenSug] = useState(false)
   const [soLuong, setSoLuong] = useState('1')
   const [moTa, setMoTa] = useState('')
   const [soTien, setSoTien] = useState('')
@@ -33,8 +35,21 @@ export function TicketItems(
   const tenTheoCode = useMemo(
     () => new Map(catalog.map((c) => [c.code, c.ten ?? c.code])), [catalog])
 
+  const khongDau = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd')
+  const goiY = useMemo(() => {
+    const q = khongDau(catQuery.trim())
+    if (!q) return catalog.slice(0, 12)
+    return catalog.filter((c) =>
+      khongDau(c.code).includes(q) || khongDau(c.ten ?? '').includes(q)).slice(0, 12)
+  }, [catQuery, catalog])
+
+  function chon(c: CatalogItem) {
+    setCatalogCode(c.code); setCatQuery(`${c.ten ?? c.code} · ${c.code}`); setOpenSug(false)
+  }
+
   function reset() {
-    setCatalogCode(''); setSoLuong('1'); setMoTa(''); setSoTien('')
+    setCatalogCode(''); setCatQuery(''); setSoLuong('1'); setMoTa(''); setSoTien('')
     setTinhPhi(true); setSerialCu(''); setSerialMoi('')
   }
 
@@ -128,15 +143,31 @@ export function TicketItems(
 
           {loai === 'hang_muc' ? (
             <>
-              <select value={catalogCode} onChange={(e) => setCatalogCode(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-slate-900 bg-white">
-                <option value="">— Chọn hạng mục (bắt buộc) —</option>
-                {catalog.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {(c.ten ?? c.code)}{c.danh_muc === 'Services' ? ' · DV' : ''} · {c.code}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  value={catQuery}
+                  onChange={(e) => { setCatQuery(e.target.value); setCatalogCode(''); setOpenSug(true) }}
+                  onFocus={() => setOpenSug(true)}
+                  onBlur={() => setTimeout(() => setOpenSug(false), 150)}
+                  placeholder="Gõ mã hoặc tên hạng mục (bắt buộc)…"
+                  className={`w-full rounded-lg border px-3 py-2 text-slate-900 bg-white ${
+                    catalogCode ? 'border-emerald-400' : ''}`}
+                />
+                {openSug && goiY.length > 0 && (
+                  <ul className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-lg border bg-white shadow-lg">
+                    {goiY.map((c) => (
+                      <li key={c.code}>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chon(c)}
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100">
+                          <span className="text-slate-900">{c.ten ?? c.code}</span>
+                          {c.danh_muc === 'Services' && <span className="text-xs text-amber-600"> · DV</span>}
+                          <span className="font-mono text-xs text-slate-400"> · {c.code}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <div className="flex gap-2 flex-wrap items-center">
                 <label className="text-sm text-slate-700 flex items-center gap-1">
                   SL

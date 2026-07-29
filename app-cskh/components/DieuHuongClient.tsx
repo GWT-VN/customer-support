@@ -19,7 +19,10 @@ const MUC = [
   { href: '/khach', nhan: 'Khách cần dọn' },
 ] as const
 
-const MUC_ADMIN = { href: '/nhan-vien', nhan: 'Nhân viên' } as const
+const MUC_ADMIN = [
+  { href: '/doanh-so', nhan: 'Doanh số' },
+  { href: '/nhan-vien', nhan: 'Nhân viên' },
+] as const
 
 /**
  * Trang chi tiết thuộc mục nào.
@@ -45,7 +48,7 @@ function mucDangMo(pathname: string, muc: readonly { href: string }[]): string |
 
 export function DieuHuongClient({ laAdmin }: { laAdmin: boolean }) {
   const pathname = usePathname()
-  const muc = laAdmin ? [...MUC, MUC_ADMIN] : MUC
+  const muc = laAdmin ? [...MUC, ...MUC_ADMIN] : MUC
   const dangMo = mucDangMo(pathname, muc)
 
   // KHÔNG dùng overflow-x-auto: trang khung hẹp (vd /khach max-w-4xl có đoạn mô tả dài

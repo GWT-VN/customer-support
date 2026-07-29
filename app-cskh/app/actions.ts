@@ -599,17 +599,56 @@ export async function listTicketNotes(code: string): Promise<TicketNote[]> {
   return (data ?? []) as TicketNote[]
 }
 
-/** Thêm 1 dòng nhật ký. Người ghi = email đăng nhập. */
-export async function addTicketNote(code: string, noiDung: string) {
+/** Thêm 1 dòng nhật ký. Người ghi = email đăng nhập. `khi` (ISO) trống -> giờ hiện tại. */
+export async function addTicketNote(code: string, noiDung: string, khi?: string) {
   const user = await requireStaff()
   const text = noiDung.trim()
   if (!text) return { ok: false as const, error: 'Nhập nội dung ghi chú.' }
-  const { error } = await dataClient()
-    .from('ticket_note')
-    .insert({ ticket_code: code, noi_dung: text, tac_gia: user.email ?? null })
+  const row: Record<string, unknown> = { ticket_code: code, noi_dung: text, tac_gia: user.email ?? null }
+  if (khi && khi.trim()) row.created_at = new Date(khi).toISOString()
+  const { error } = await dataClient().from('ticket_note').insert(row)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(`/ticket/${code}`)
   return { ok: true as const }
+}
+
+/** Sửa nội dung / thời gian 1 ghi chú. */
+export async function updateTicketNote(id: string, code: string, patch: { noi_dung?: string; khi?: string }) {
+  await requireStaff()
+  const upd: Record<string, unknown> = {}
+  if (patch.noi_dung !== undefined) {
+    const t = patch.noi_dung.trim()
+    if (!t) return { ok: false as const, error: 'Nội dung không được để trống.' }
+    upd.noi_dung = t
+  }
+  if (patch.khi && patch.khi.trim()) upd.created_at = new Date(patch.khi).toISOString()
+  if (!Object.keys(upd).length) return { ok: true as const }
+  const { error } = await dataClient().from('ticket_note').update(upd).eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+/** Xoá 1 ghi chú. */
+export async function deleteTicketNote(id: string, code: string) {
+  await requireStaff()
+  const { error } = await dataClient().from('ticket_note').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath(`/ticket/${code}`)
+  return { ok: true as const }
+}
+
+/** Doanh số CSKH (chỉ hạng mục có thu phí) — theo tháng × mã nội bộ. */
+export type DoanhSo = {
+  thang: string; catalog_code: string | null; ten_hang_muc: string | null
+  danh_muc: string | null; so_luot: number; tong_so_luong: number | null; tong_tien: number | null
+}
+export async function doanhSoCskh(): Promise<DoanhSo[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_doanh_so_cskh').select('*').order('thang', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DoanhSo[]
 }
 
 /** Máy 1 khách đã lắp — dùng ở trang khách. */
