@@ -60,16 +60,37 @@ export const layNguoiDung = cache(async () => {
   return error ? null : data.user
 })
 
+export type NhanVien = {
+  id: string
+  ten: string
+  vai_tro: string
+  email: string | null
+  hoat_dong: boolean
+}
+
+/**
+ * MỘT lượt đọc bảng staff cho mỗi request, dùng chung cho cả luật vào cửa lẫn
+ * phân quyền.
+ *
+ * Trước đây kiemTraVaoCua() và layNhanVien() hỏi cùng bảng này hai lần riêng
+ * biệt — mà database ở Singapore nên mỗi lượt tốn 50-80ms từ máy lập trình.
+ * cache() gộp lại còn một lượt.
+ */
+const layDongStaff = cache(async (email: string): Promise<NhanVien | null> => {
+  const { data, error } = await dataClient()
+    .from('staff')
+    .select('id, ten, vai_tro, email, hoat_dong')
+    .eq('email', chuanHoaEmail(email))
+    .maybeSingle()
+  if (error) throw error
+  return (data as NhanVien) ?? null
+})
+
 /** Đọc staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
 export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   const e = chuanHoaEmail(email)
-  const { data, error } = await dataClient()
-    .from('staff')
-    .select('hoat_dong')
-    .eq('email', e)
-    .maybeSingle()
-  if (error) throw error
-  return xetLuatVaoCua(e, data ?? null)
+  const dong = await layDongStaff(e)
+  return xetLuatVaoCua(e, dong ? { hoat_dong: dong.hoat_dong } : null)
 }
 
 /** Ghi nhận người vào lần đầu theo luật domain. KHÔNG đụng dòng đã có. */
@@ -106,24 +127,15 @@ export const requireStaff = cache(async () => {
   return user
 })
 
-export type NhanVien = {
-  id: string
-  ten: string
-  vai_tro: string
-  email: string | null
-  hoat_dong: boolean
-}
-
-/** Hồ sơ nhân viên của người đang đăng nhập. Cache theo request. */
+/**
+ * Hồ sơ nhân viên của người đang đăng nhập.
+ *
+ * Dùng lại layDongStaff() nên KHÔNG tốn thêm lượt gọi database: requireStaff()
+ * đã đọc đúng dòng đó rồi, cache() trả lại kết quả cũ.
+ */
 export const layNhanVien = cache(async (): Promise<NhanVien | null> => {
   const user = await requireStaff()
-  const { data, error } = await dataClient()
-    .from('staff')
-    .select('id, ten, vai_tro, email, hoat_dong')
-    .eq('email', chuanHoaEmail(user.email))
-    .maybeSingle()
-  if (error) throw error
-  return (data as NhanVien) ?? null
+  return layDongStaff(chuanHoaEmail(user.email))
 })
 
 /** Dùng cho cả chặn ở server LẪN ẩn nút trên giao diện. */
