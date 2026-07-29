@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ChipSapXep } from './ChipSapXep'
 
 /**
  * Thanh trạng thái "đang lọc": chip điều kiện đang bật + số dòng đang thấy
@@ -22,6 +23,7 @@ export function ThanhDangLoc({
   hienThi,
   tong,
   nhan = 'kết quả',
+  sapXep,
 }: {
   // `href`: link BỎ RIÊNG điều kiện này (giữ mọi điều kiện khác) — cho phép
   // gỡ từng bộ lọc một khi trang có NHIỀU điều kiện cùng lúc (q + sp + bh…).
@@ -31,6 +33,9 @@ export function ThanhDangLoc({
   hienThi: number
   tong: number
   nhan?: string
+  // Cột/chiều MÁY CHỦ đã chốt (KetQuaTrang.sapXep), không phải giá trị trên URL —
+  // xem chú thích trong ChipSapXep. Trang không sắp xếp được thì bỏ trống.
+  sapXep?: { cot: string; tang: boolean; ghiChu?: string }
 }) {
   const pathname = usePathname()
   const dangLoc = dieuKien.length > 0
@@ -68,6 +73,7 @@ export function ThanhDangLoc({
           </span>
         ))}
         <span className="text-slate-500">{dong}</span>
+        {sapXep && <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} ghiChu={sapXep.ghiChu} />}
       </div>
       {dangLoc && (
         <Link href={pathname} className="text-slate-600 underline hover:text-slate-900 flex-none">

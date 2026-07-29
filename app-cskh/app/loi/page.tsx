@@ -35,7 +35,7 @@ export default async function LoiPage({
   const { q = '', tt, trang: trangRaw, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows, tong, soTrang }, counts] = await Promise.all([
+  const [{ rows, tong, soTrang, sapXep }, counts] = await Promise.all([
     coreForecast(tinhTrang, q, { trang, cot, chieu }),
     coreCounts(),
   ])
@@ -89,6 +89,7 @@ export default async function LoiPage({
           hienThi={rows.length}
           tong={tong}
           nhan="dòng (máy × lõi)"
+          sapXep={sapXep}
         />
 
         <div className="bg-white rounded-xl border overflow-x-auto">

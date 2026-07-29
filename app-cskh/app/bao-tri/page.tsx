@@ -5,6 +5,8 @@ import { OTimKiem } from '@/components/OTimKiem'
 import { maintenanceDue, maintenanceCounts } from '@/app/actions'
 import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
 import { vnDate } from '@/components/Badge'
+import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { ChipSapXep } from '@/components/ChipSapXep'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -23,11 +25,14 @@ function TinhTrangBadge({ tt }: { tt: string }) {
 export default async function BaoTriPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; cot?: string; chieu?: string }>
 }) {
-  const { q = '', tt } = await searchParams
+  const { q = '', tt, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [rows, counts] = await Promise.all([maintenanceDue(tinhTrang, q), maintenanceCounts()])
+  const [{ rows, sapXep }, counts] = await Promise.all([
+    maintenanceDue(tinhTrang, q, { cot, chieu }),
+    maintenanceCounts(),
+  ])
 
   const tabs = [
     { key: SAP, label: `Sắp đến hạn (${counts[SAP] ?? 0})` },
@@ -55,7 +60,15 @@ export default async function BaoTriPage({
             return (
               <Link
                 key={t.key}
-                href={`/bao-tri?${new URLSearchParams({ ...(q && { q }), tt: t.key === 'all' ? '' : t.key })}`}
+                // Giữ cột/chiều đang sắp khi đổi tab — đổi tab là đổi BỘ LỌC, không
+                // phải lý do để vứt thứ tự người dùng vừa chọn (TieuDeCotSapXep cũng
+                // giữ ngược lại như vậy).
+                href={`/bao-tri?${new URLSearchParams({
+                  ...(q && { q }),
+                  tt: t.key === 'all' ? '' : t.key,
+                  ...(cot && { cot }),
+                  ...(chieu && { chieu }),
+                })}`}
                 className={`px-3 py-1.5 rounded-lg text-sm border ${
                   active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
                 }`}
@@ -71,21 +84,28 @@ export default async function BaoTriPage({
           — số lần còn lại tự trừ. Dòng “chưa khớp khách” là lịch từ Asana chưa gắn được vào hồ sơ khách.
         </p>
 
-        <p className="text-sm text-slate-500">
-          {rows.length} lượt{rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
-        </p>
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <span className="text-slate-500">
+            {rows.length} lượt{rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
+          </span>
+          <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} />
+        </div>
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Khách / công trình</th>
-                <th className="text-left px-4 py-3 font-medium">Bộ máy · gói</th>
-                <th className="text-left px-4 py-3 font-medium">Lần</th>
-                <th className="text-left px-4 py-3 font-medium">Đến hạn</th>
-                <th className="text-left px-4 py-3 font-medium">Ghi</th>
-              </tr>
-            </thead>
+            <Suspense>
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  {/* Cột hiện tên khách + tên công trình; sắp theo customer_name vì
+                      đó là cột trong whitelist COT_BAO_TRI. */}
+                  <TieuDeCotSapXep cot="customer_name" nhan="Khách / công trình" chieuMacDinh="asc" />
+                  <th className="text-left px-4 py-3 font-medium">Bộ máy · gói</th>
+                  <th className="text-left px-4 py-3 font-medium">Lần</th>
+                  <TieuDeCotSapXep cot="due_date" nhan="Đến hạn" chieuMacDinh="asc" dangMacDinh />
+                  <th className="text-left px-4 py-3 font-medium">Ghi</th>
+                </tr>
+              </thead>
+            </Suspense>
             <tbody className="divide-y">
               {rows.map((r) => (
                 <tr key={r.visit_id} className="hover:bg-slate-50 align-top">

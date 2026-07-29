@@ -14,7 +14,7 @@ export default async function ToFixPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const { rows: list, tong, soTrang } = await listToFix(q, { trang, cot, chieu })
+  const { rows: list, tong, soTrang, sapXep } = await listToFix(q, { trang, cot, chieu })
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
@@ -38,6 +38,7 @@ export default async function ToFixPage({
           hienThi={list.length}
           tong={tong}
           nhan="khách cần dọn"
+          sapXep={sapXep}
         />
 
         <p className="text-sm text-slate-500">

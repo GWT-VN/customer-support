@@ -17,7 +17,7 @@ export default async function Home({
 }) {
   const { q = '', trang: trangRaw, cot, chieu, sp, bh } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: machines, tong, soTrang }, models] = await Promise.all([
+  const [{ rows: machines, tong, soTrang, sapXep }, models] = await Promise.all([
     searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh }),
     machineModels(),
   ])
@@ -75,6 +75,7 @@ export default async function Home({
           hienThi={machines.length}
           tong={tong}
           nhan="máy"
+          sapXep={sapXep}
         />
 
         <div className="bg-white rounded-xl border overflow-x-auto">
@@ -87,7 +88,10 @@ export default async function Home({
                   <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
                   <th className="text-left px-4 py-3 font-medium">SĐT</th>
                   <TieuDeCotSapXep cot="install_date" nhan="Lắp" chieuMacDinh="desc" dangMacDinh />
-                  <th className="text-left px-4 py-3 font-medium">Bảo hành</th>
+                  {/* Sắp theo warranty_full_end (ngày hết BH máy) — tăng dần = sắp hết hạn
+                      lên đầu, đúng thứ tự cần gọi khách. Máy chưa kích hoạt BH có
+                      full_end null nên rơi xuống cuối (nullsFirst: false). */}
+                  <TieuDeCotSapXep cot="warranty_full_end" nhan="Bảo hành" chieuMacDinh="asc" />
                 </tr>
               </thead>
             </Suspense>

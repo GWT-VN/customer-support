@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
-import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe } from '@/lib/timkiem'
+import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, type SapXep } from '@/lib/timkiem'
 import {
-  MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH,
+  MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, type TinhTrangBH,
 } from '@/lib/danhSach'
 
@@ -18,6 +18,15 @@ export type KetQuaTrang<T> = {
   tong: number
   trang: number
   soTrang: number
+  /**
+   * Cột/chiều máy chủ THỰC SỰ đã dùng, tức kết quả của sapXepHopLe() SAU khi
+   * lọc whitelist — không phải giá trị thô trên URL.
+   *
+   * Trang phải hiện đúng cái này (ChipSapXep), không được tự đọc lại ?cot= :
+   * gõ tay ?cot=mat_khau thì bảng sắp theo mặc định, mà chip đọc URL sẽ khoe
+   * "mat_khau" — nói sai điều đang xảy ra là mất lòng tin nặng hơn không nói.
+   */
+  sapXep: SapXep
 }
 
 /** Tuỳ chọn chung cho các hàm liệt kê có phân trang + sắp xếp. */
@@ -121,6 +130,7 @@ export async function searchMachines(
     tong,
     trang,
     soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    sapXep: sx,
   }
 }
 
@@ -319,6 +329,7 @@ export async function coreForecast(
     tong,
     trang,
     soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG_LOI)),
+    sapXep: sx,
   }
 }
 
@@ -353,8 +364,18 @@ export type MaintenanceDue = {
   tinh_trang: string
 }
 
-export async function maintenanceDue(tinhTrang: string, q: string): Promise<MaintenanceDue[]> {
+export async function maintenanceDue(
+  tinhTrang: string,
+  q: string,
+  tuyChon: TuyChonDanhSach = {}
+): Promise<{ rows: MaintenanceDue[]; sapXep: SapXep }> {
   await requireStaff()
+  // Trang này KHÔNG phân trang (giới hạn 100 dòng) nên không cần `trang`, nhưng
+  // vẫn cần whitelist cột y như các trang kia — ?cot= trên URL là dữ liệu người
+  // dùng, đưa thẳng vào .order() là lỗ hổng dù trang có phân trang hay không.
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_BAO_TRI, {
+    cot: 'due_date', tang: true,
+  })
   let query = dataClient().from('v_maintenance_due').select('*')
 
   if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
@@ -371,11 +392,14 @@ export async function maintenanceDue(tinhTrang: string, q: string): Promise<Main
         `primary_phone.ilike.%${kw}%,bo_may_kd.ilike.%${kw}%`
     )
   }
+  // visit_id là khoá chính -> khoá phụ đủ để 100 dòng lấy ra luôn cùng một thứ tự
+  // giữa hai lần tải (due_date trùng nhau rất nhiều: cả cụm cùng đến hạn một ngày).
   const { data, error } = await query
-    .order('due_date', { ascending: true, nullsFirst: false })
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
+    .order('visit_id', { ascending: true })
     .limit(100)
   if (error) throw new Error(error.message)
-  return (data ?? []) as MaintenanceDue[]
+  return { rows: (data ?? []) as MaintenanceDue[], sapXep: sx }
 }
 
 export async function maintenanceCounts() {
@@ -542,6 +566,7 @@ export async function searchTickets(
     tong,
     trang,
     soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    sapXep: sx,
   }
 }
 
@@ -974,6 +999,7 @@ export async function listToFix(
     tong,
     trang,
     soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    sapXep: sx,
   }
 }
 

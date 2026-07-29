@@ -10,6 +10,7 @@ import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 import { BoLocChon } from '@/components/BoLocChon'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 export default async function TicketsPage({
   searchParams,
@@ -26,15 +27,21 @@ export default async function TicketsPage({
   const me = isMine ? await currentStaff() : null
   // Gõ nguyên hình dạng KetQuaTrang<Ticket> (kể cả `trang`) cho nhánh rỗng — thiếu field
   // không lộ lỗi build ngay bây giờ (chưa ai đọc `trang`) nhưng Task 4 destructure vào là vỡ.
-  const [ketQua, loaiList] = await Promise.all([
+  const [ketQua, loaiList, admin] = await Promise.all([
     (isMine && !me
-      ? Promise.resolve<KetQuaTrang<Ticket>>({ rows: [], tong: 0, trang: 1, soTrang: 1 })
+      ? Promise.resolve<KetQuaTrang<Ticket>>({
+          rows: [], tong: 0, trang: 1, soTrang: 1,
+          // Phải khớp mặc định của searchTickets, nếu không nhánh rỗng sẽ khoe
+          // sai cột đang sắp ở ChipSapXep.
+          sapXep: { cot: 'created_at', tang: false },
+        })
       : searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, {
           trang, cot, chieu, loaiTicket: loai || undefined,
         })),
     ticketTypes(),
+    laAdmin(),
   ])
-  const { rows: tickets, tong, soTrang } = ketQua
+  const { rows: tickets, tong, soTrang, sapXep } = ketQua
 
   const tabs = [
     { key: '', label: 'Tất cả' },
@@ -106,7 +113,7 @@ export default async function TicketsPage({
               <BoLocChon param="loai" nhan="Loại lỗi" tuyChon={loaiList.map((l) => ({ giaTri: l, nhan: l }))} />
             </Suspense>
           </div>
-          {await laAdmin() && (
+          {admin && (
             <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
           )}
         </div>
@@ -119,13 +126,21 @@ export default async function TicketsPage({
           hienThi={tickets.length}
           tong={tong}
           nhan="ticket"
+          // Câu lệnh luôn .order('khan') TRƯỚC cột người dùng chọn -> phải nói ra,
+          // không thì bấm "Ngày" thấy ticket cũ nằm trên ticket mới lại tưởng hỏng.
+          sapXep={{ ...sapXep, ghiChu: 'Khẩn luôn lên đầu' }}
         />
 
+        {/* Chỉ CHỌN dòng, chưa có hành động — chỗ cắm hành động ở children của
+            <ThanhDaChon>, xem hướng dẫn trong components/ChonDong.tsx. */}
+        <KhungChon khoaTrang={tickets.map((t) => t.ticket_code)} bat={admin}>
+        <ThanhDaChon nhan="ticket" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
             <Suspense>
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <OChonTatCa nhan="ticket" />
                   <TieuDeCotSapXep cot="ticket_code" nhan="Mã" chieuMacDinh="asc" />
                   <TieuDeCotSapXep cot="created_at" nhan="Ngày" chieuMacDinh="desc" dangMacDinh />
                   <th className="text-left px-4 py-3 font-medium">Loại</th>
@@ -139,6 +154,7 @@ export default async function TicketsPage({
             <tbody className="divide-y">
               {tickets.map((t) => (
                 <tr key={t.ticket_code} className="hover:bg-slate-50 align-top">
+                  <OChonDong khoa={t.ticket_code} moTa={`ticket ${t.ticket_code}`} />
                   <td className="px-4 py-3">
                     <Link href={`/ticket/${t.ticket_code}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
                       {t.ticket_code}
@@ -182,11 +198,16 @@ export default async function TicketsPage({
                 </tr>
               ))}
               {tickets.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Không tìm thấy ticket nào.</td></tr>
+                <tr>
+                  <td colSpan={admin ? 8 : 7} className="px-4 py-10 text-center text-slate-400">
+                    Không tìm thấy ticket nào.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
+        </KhungChon>
 
         <Suspense>
           <PhanTrang trang={trang} soTrang={soTrang} />

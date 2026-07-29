@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { NGHIA_SAP_XEP, TEN_COT } from '@/lib/danhSach'
 
 /**
  * `<th>` bấm được để đổi cột sắp xếp — CHỈ dùng cho cột nằm trong whitelist
@@ -49,11 +50,27 @@ export function TieuDeCotSapXep({
   params.set('chieu', chieuKeTiep)
   params.delete('trang')
 
+  // Cột ĐANG sắp phải nhìn ra ngay: trước đây chỉ đổi màu mỗi mũi tên nhỏ xíu,
+  // liếc qua cả hàng tiêu đề không biết đang sắp theo cột nào. Nay cả nhãn đậm
+  // + đen + nền trắng nổi khỏi nền xám của <thead>.
+  const nghia = NGHIA_SAP_XEP[cot]
+  const moTaKeTiep = nghia
+    ? `Sắp theo ${(TEN_COT[cot] ?? nhan).toLowerCase()}: ${nghia[chieuKeTiep]}`
+    : `Sắp theo ${nhan}`
+
   return (
-    <th className="text-left px-4 py-3 font-medium">
+    <th
+      className={`text-left px-4 py-3 font-medium ${
+        dangChonCotNay ? 'bg-white text-slate-900' : ''
+      }`}
+      aria-sort={dangChonCotNay ? (chieuHienTai === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
       <Link
         href={`${pathname}?${params.toString()}`}
-        className="inline-flex items-center gap-1 hover:text-slate-900"
+        title={moTaKeTiep}
+        className={`inline-flex items-center gap-1 hover:text-slate-900 ${
+          dangChonCotNay ? 'font-semibold text-slate-900' : ''
+        }`}
       >
         {nhan}
         <span className={dangChonCotNay ? 'text-slate-900' : 'text-slate-300'}>
