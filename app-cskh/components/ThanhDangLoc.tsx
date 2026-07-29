@@ -43,13 +43,14 @@ export function ThanhDangLoc({
           // Đệm hai bên phải CÂN MẮT. Trước đây px-2 dùng chung cho cả chip, còn dấu ×
           // là chữ trơn nằm trong luồng văn bản -> bên phải chỉ còn đúng 8px tính từ
           // nét chữ tới viền, nhìn như dính vào viền trong khi bên trái thoáng hơn hẳn.
-          // Nay × là ô vuông 16px có tâm riêng: lề phải bóp còn pr-1, cộng khoảng trống
-          // trong ô thành ~9px tới nét chữ — cân với pl-2.5 (10px) bên trái. Chip không
-          // có nút gỡ thì không cần bù, giữ px-2.5 đối xứng.
+          // Nay × là ô vuông 16px có tâm riêng. Nét chữ × chỉ chiếm giữa ô, chừa sẵn
+          // 4.5px mỗi bên, nên lề phải chỉ cần pr-1.5 (6px) là ra 10.5px từ nét chữ tới
+          // viền — khớp pl-2.5 (10px) bên trái. Đã đo trên bản chạy thật bằng Range:
+          // trái 10 / phải 10.5 / trên 4 / dưới 4. Chip không có nút gỡ giữ px-2.5.
           <span
             key={d.nhan}
             className={`inline-flex items-center gap-1 py-1 rounded-full bg-slate-100 text-slate-700 text-xs ${
-              d.href ? 'pl-2.5 pr-1' : 'px-2.5'
+              d.href ? 'pl-2.5 pr-1.5' : 'px-2.5'
             }`}
           >
             <span>
