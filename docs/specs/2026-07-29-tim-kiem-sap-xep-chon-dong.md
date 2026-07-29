@@ -22,6 +22,11 @@
 | `82811c6` | Chọn **tất cả khớp bộ lọc**, không chỉ 50 dòng đang xem |
 | `c097034` | Sửa lỗi Supabase cắt còn 1000 dòng mà không báo |
 | `145b1f9` | `/serial` + `/bao-tri` thêm phân trang — mọi dòng chọn được đều xem tới được |
+| `0230b46` | Tách thành gói dùng lại được ở [`app-cskh/bang/`](../../app-cskh/bang/README.md) |
+
+Toàn bộ phần chung đã tách vào **[`app-cskh/bang/`](../../app-cskh/bang/README.md)** — chép
+nguyên thư mục sang project khác là dùng được, chỉ cần sửa `giaoDien.ts` để đổi giao diện.
+App này trỏ thẳng vào đó, **không có bản sao** nên không bao giờ lệch.
 
 **Không đụng dữ liệu nghiệp vụ.** Migration 07 chỉ thêm cột sinh sẵn + index (xem §6).
 69 test đơn vị, `tsc` + `lint` + `next build` sạch.
