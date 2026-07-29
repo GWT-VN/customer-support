@@ -21,6 +21,7 @@
 | `ee25812` | Chọn dòng cho **tất cả** trang danh sách + tài liệu này |
 | `82811c6` | Chọn **tất cả khớp bộ lọc**, không chỉ 50 dòng đang xem |
 | `c097034` | Sửa lỗi Supabase cắt còn 1000 dòng mà không báo |
+| `145b1f9` | `/serial` + `/bao-tri` thêm phân trang — mọi dòng chọn được đều xem tới được |
 
 **Không đụng dữ liệu nghiệp vụ.** Migration 07 chỉ thêm cột sinh sẵn + index (xem §6).
 69 test đơn vị, `tsc` + `lint` + `next build` sạch.
@@ -131,7 +132,7 @@ dòng giữa các trang khi cột chính có nhiều dòng bằng nhau.
 | `/nhom-loi`, `/doanh-so`, `/nhan-vien` | *không sắp được* | cố định | — |
 
 `/loi` là trang duy nhất mặc định **tăng dần**, vì việc gấp nhất là cái quá hạn lâu nhất.
-Trang này 100 dòng/trang, các trang khác 50.
+Trang này 100 dòng/trang, các trang khác 50. Cả 6 trang danh sách đều có nút chuyển trang.
 
 ### 3.3 Hai điều dễ hiểu nhầm ở `/ticket`
 
@@ -215,6 +216,11 @@ Ba điều đáng chú ý về an toàn:
    dòng nữa đang được chọn.
 3. **Nút "Bỏ chọn" xoá SẠCH** (`xoaHet`), không phải `doiTatCa(false)` vốn chỉ đụng trang
    hiện tại — nếu không, sau khi chọn 472 rồi bỏ chọn sẽ còn sót 422 dòng ngoài tầm mắt.
+
+**Nguyên tắc:** chỉ được mời chọn thứ người dùng **lật tới xem được**. `/serial` từng hiện 50
+dòng đầu trên 1.891 mà không có nút chuyển trang — 1.841 dòng vĩnh viễn không xem tới được,
+vậy mà vẫn mời "chọn tất cả 1891". `/bao-tri` đúng bệnh (100 trên 467). Sửa gốc là **thêm
+phân trang** cho hai trang đó, không phải bỏ nút chọn. Nay cả 6 trang đều phân trang đầy đủ.
 
 Cách lấy khoá: 6 hàm `khoaTatCa*` gọi lại **đúng hàm liệt kê của trang đó** rồi rút khoá.
 KHÔNG viết truy vấn lọc riêng — chép bộ lọc làm hai bản thì sớm muộn lệch, lúc đó màn hình
