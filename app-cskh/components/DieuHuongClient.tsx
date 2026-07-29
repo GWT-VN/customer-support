@@ -48,8 +48,11 @@ export function DieuHuongClient({ laAdmin }: { laAdmin: boolean }) {
   const muc = laAdmin ? [...MUC, MUC_ADMIN] : MUC
   const dangMo = mucDangMo(pathname, muc)
 
+  // KHÔNG dùng overflow-x-auto: trang khung hẹp (vd /khach max-w-4xl có đoạn mô tả dài
+  // bên trái) sẽ ép menu co lại, biến thành vùng cuộn và CẮT CỤT nhãn — "Khách cần dọn"
+  // chỉ còn hiện "Khác". Cho xuống dòng và cấm co lại thay vì cuộn.
   return (
-    <nav className="flex items-center gap-4 overflow-x-auto">
+    <nav className="flex items-center justify-end gap-x-4 gap-y-1 flex-wrap shrink-0">
       {muc.map(({ href, nhan }) => {
         const active = href === dangMo
         return (
