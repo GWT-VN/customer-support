@@ -799,6 +799,90 @@ export async function deleteSerialPending(id: string) {
   return { ok: true as const }
 }
 
+// ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────
+export type KhachTom = { id: string; full_name: string; primary_phone: string | null; trang_thai: string }
+
+/** Tìm khách (cho ô chọn khách khi đăng ký BH / tạo ticket). */
+export async function searchCustomers(q: string, limit = 20): Promise<KhachTom[]> {
+  await requireStaff()
+  let query = dataClient().from('cs_customers').select('id, full_name, primary_phone, trang_thai')
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(`full_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%`)
+  }
+  const { data, error } = await query.order('full_name').limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as KhachTom[]
+}
+
+/** Tạo khách mới TỪ CS -> trạng thái chờ admin duyệt (khách đại lý/Shopee đăng ký sau). */
+export async function taoKhachChoDuyet(input: {
+  full_name: string; primary_phone?: string; address?: string; province?: string
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  await requireStaff()
+  const ten = input.full_name?.trim()
+  if (!ten) return { ok: false, error: 'Nhập tên khách.' }
+  const sdt = input.primary_phone?.trim() || null
+  const { data, error } = await dataClient().from('cs_customers').insert({
+    full_name: ten, primary_phone: sdt,
+    address: input.address?.trim() || null, province: input.province?.trim() || null,
+    source: 'CSKH đăng ký', trang_thai: 'cho_duyet', needs_phone: !sdt,
+  }).select('id').single()
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/khach')
+  return { ok: true, id: (data as { id: string }).id }
+}
+
+/** Đăng ký bảo hành: gắn máy (serial) cho khách + kích hoạt BH. */
+export async function dangKyBaoHanh(input: {
+  serial: string; customer_id: string; install_date: string; install_address?: string
+}) {
+  await requireStaff()
+  const serial = input.serial?.trim()
+  if (!serial) return { ok: false as const, error: 'Chọn serial.' }
+  if (!input.customer_id) return { ok: false as const, error: 'Chọn khách.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false as const, error: 'Ngày lắp không hợp lệ.' }
+  const db = dataClient()
+  const { data: sr } = await db.from('serial_registry')
+    .select('internal_code, model').eq('serial', serial).maybeSingle()
+  const { error: e1 } = await db.from('installed_base').upsert({
+    serial,
+    internal_code: (sr as { internal_code: string | null } | null)?.internal_code ?? null,
+    model_freetext: (sr as { model: string | null } | null)?.model ?? null,
+    customer_id: input.customer_id,
+    install_date: input.install_date,
+    install_address: input.install_address?.trim() || null,
+    channel_source: 'CSKH đăng ký', status: 'active',
+  }, { onConflict: 'serial' })
+  if (e1) return { ok: false as const, error: e1.message }
+  const { error: e2 } = await db.rpc('activate_warranty', { p_serial: serial, p_start: input.install_date })
+  if (e2) return { ok: false as const, error: e2.message }
+  revalidatePath('/')
+  revalidatePath(`/may/${encodeURIComponent(serial)}`)
+  return { ok: true as const }
+}
+
+/** Khách đang chờ duyệt (admin xem/duyệt). */
+export async function listKhachChoDuyet(): Promise<KhachTom[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('cs_customers').select('id, full_name, primary_phone, trang_thai')
+    .eq('trang_thai', 'cho_duyet').order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as KhachTom[]
+}
+
+/** Duyệt khách chờ (CHỈ ADMIN). */
+export async function duyetKhach(id: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('cs_customers').update({ trang_thai: 'da_duyet' }).eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/khach')
+  return { ok: true as const }
+}
+
 // ── Nhân viên phụ trách (Đợt 2) ─────────────────────────────────────────────
 export type Staff = { id: string; ten: string; vai_tro: string; email: string | null }
 
