@@ -8,6 +8,8 @@ import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { laAdmin } from '@/lib/supabase'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -35,9 +37,10 @@ export default async function LoiPage({
   const { q = '', tt, trang: trangRaw, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows, tong, soTrang, sapXep }, counts] = await Promise.all([
+  const [{ rows, tong, soTrang, sapXep }, counts, admin] = await Promise.all([
     coreForecast(tinhTrang, q, { trang, cot, chieu }),
     coreCounts(),
+    laAdmin(),
   ])
 
   const tabs = [
@@ -92,11 +95,17 @@ export default async function LoiPage({
           sapXep={sapXep}
         />
 
+        {/* Khoá dòng phải là (serial, filter_code): một máy có NHIỀU lõi nên riêng
+            serial KHÔNG định danh được một dòng — trùng khoá là tick một ô sáng
+            nhiều ô. Đúng cặp khoá đang dùng cho React key và cho khoá phụ phân trang. */}
+        <KhungChon khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)} bat={admin}>
+        <ThanhDaChon nhan="dòng lõi" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
             <Suspense>
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <OChonTatCa nhan="dòng lõi" />
                   <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
                   {/* Cột hiện product_name + serial — sắp theo serial vì đó là cột trong whitelist. */}
                   <TieuDeCotSapXep cot="serial" nhan="Máy" chieuMacDinh="asc" />
@@ -111,6 +120,7 @@ export default async function LoiPage({
             <tbody className="divide-y">
               {rows.map((r) => (
                 <tr key={`${r.serial}-${r.filter_code}`} className="hover:bg-slate-50 align-top">
+                  <OChonDong khoa={`${r.serial}-${r.filter_code}`} moTa={`lõi ${r.filter_code} của máy ${r.serial}`} />
                   <td className="px-4 py-3">
                     {r.customer_id ? (
                       <Link href={`/khach/${r.customer_id}`} prefetch={false} className="text-slate-900 underline">{r.customer_name}</Link>
@@ -146,11 +156,16 @@ export default async function LoiPage({
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Không có dòng nào.</td></tr>
+                <tr>
+                  <td colSpan={admin ? 8 : 7} className="px-4 py-10 text-center text-slate-400">
+                    Không có dòng nào.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
+        </KhungChon>
 
         <Suspense>
           <PhanTrang trang={trang} soTrang={soTrang} />

@@ -7,6 +7,8 @@ import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
 import { vnDate } from '@/components/Badge'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 import { ChipSapXep } from '@/components/ChipSapXep'
+import { laAdmin } from '@/lib/supabase'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -29,9 +31,10 @@ export default async function BaoTriPage({
 }) {
   const { q = '', tt, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, sapXep }, counts] = await Promise.all([
+  const [{ rows, sapXep }, counts, admin] = await Promise.all([
     maintenanceDue(tinhTrang, q, { cot, chieu }),
     maintenanceCounts(),
+    laAdmin(),
   ])
 
   const tabs = [
@@ -93,11 +96,14 @@ export default async function BaoTriPage({
           </Suspense>
         </div>
 
+        <KhungChon khoaTrang={rows.map((r) => r.visit_id)} bat={admin}>
+        <ThanhDaChon nhan="lượt bảo trì" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
             <Suspense>
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <OChonTatCa nhan="lượt bảo trì" />
                   {/* Cột hiện tên khách + tên công trình; sắp theo customer_name vì
                       đó là cột trong whitelist COT_BAO_TRI. */}
                   <TieuDeCotSapXep cot="customer_name" nhan="Khách / công trình" chieuMacDinh="asc" />
@@ -111,6 +117,7 @@ export default async function BaoTriPage({
             <tbody className="divide-y">
               {rows.map((r) => (
                 <tr key={r.visit_id} className="hover:bg-slate-50 align-top">
+                  <OChonDong khoa={r.visit_id} moTa={`lượt bảo trì của ${r.customer_name ?? r.section ?? 'khách chưa khớp'}`} />
                   <td className="px-4 py-3">
                     <div className="text-slate-900">{r.customer_name ?? r.section ?? '—'}</div>
                     {r.primary_phone && <div className="font-mono text-xs text-slate-500">{r.primary_phone}</div>}
@@ -138,11 +145,16 @@ export default async function BaoTriPage({
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Không có lượt nào.</td></tr>
+                <tr>
+                  <td colSpan={admin ? 6 : 5} className="px-4 py-10 text-center text-slate-400">
+                    Không có lượt nào.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
+        </KhungChon>
       </div>
     </main>
   )

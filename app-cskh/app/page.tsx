@@ -9,6 +9,8 @@ import { PhanTrang } from '@/components/PhanTrang'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 import { BoLocChon } from '@/components/BoLocChon'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, type TinhTrangBH } from '@/lib/danhSach'
+import { laAdmin } from '@/lib/supabase'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 export default async function Home({
   searchParams,
@@ -17,9 +19,10 @@ export default async function Home({
 }) {
   const { q = '', trang: trangRaw, cot, chieu, sp, bh } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: machines, tong, soTrang, sapXep }, models] = await Promise.all([
+  const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([
     searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh }),
     machineModels(),
+    laAdmin(),
   ])
 
   const tenSanPham = models.find((m) => m.internal_code === sp)?.product_name ?? sp
@@ -84,11 +87,14 @@ export default async function Home({
           sapXep={sapXep}
         />
 
+        <KhungChon khoaTrang={machines.map((m) => m.serial)} bat={admin}>
+        <ThanhDaChon nhan="máy" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
             <Suspense>
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
+                  <OChonTatCa nhan="máy" />
                   <TieuDeCotSapXep cot="serial" nhan="Serial" chieuMacDinh="asc" />
                   <TieuDeCotSapXep cot="product_name" nhan="Máy" chieuMacDinh="asc" />
                   <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
@@ -104,6 +110,7 @@ export default async function Home({
             <tbody className="divide-y">
               {machines.map((m) => (
                 <tr key={m.serial} className="hover:bg-slate-50">
+                  <OChonDong khoa={m.serial} moTa={`máy ${m.serial}`} />
                   <td className="px-4 py-3">
                     <Link href={`/may/${encodeURIComponent(m.serial)}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
                       {m.serial}
@@ -123,11 +130,16 @@ export default async function Home({
                 </tr>
               ))}
               {machines.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Không tìm thấy máy nào.</td></tr>
+                <tr>
+                  <td colSpan={admin ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
+                    Không tìm thấy máy nào.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
+        </KhungChon>
 
         <Suspense>
           <PhanTrang trang={trang} soTrang={soTrang} />

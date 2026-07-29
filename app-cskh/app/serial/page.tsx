@@ -4,6 +4,7 @@ import { laAdmin } from '@/lib/supabase'
 import { searchSerials, listSerialPending } from '@/app/actions'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 export default async function SerialPage({
   searchParams,
@@ -51,10 +52,13 @@ export default async function SerialPage({
               <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
             </form>
             <p className="text-sm text-slate-500">{rows.length} serial{rows.length === 50 && ' (giới hạn 50 — gõ cụ thể hơn)'}</p>
+            <KhungChon khoaTrang={rows.map((s) => s.serial)} bat={admin}>
+            <ThanhDaChon nhan="serial" />
             <div className="bg-white rounded-xl border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
+                    <OChonTatCa nhan="serial" />
                     <th className="text-left px-4 py-3 font-medium">Serial</th>
                     <th className="text-left px-4 py-3 font-medium">Mã nội bộ</th>
                     <th className="text-left px-4 py-3 font-medium">Model</th>
@@ -65,6 +69,7 @@ export default async function SerialPage({
                 <tbody className="divide-y">
                   {rows.map((s) => (
                     <tr key={s.serial} className="hover:bg-slate-50">
+                      <OChonDong khoa={s.serial} moTa={`serial ${s.serial}`} />
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-900">{s.serial}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.internal_code ?? '—'}</td>
                       <td className="px-4 py-2.5 text-slate-700">{s.model ?? '—'}</td>
@@ -73,11 +78,16 @@ export default async function SerialPage({
                     </tr>
                   ))}
                   {rows.length === 0 && (
-                    <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Không tìm thấy serial nào.</td></tr>
+                    <tr>
+                      <td colSpan={admin ? 6 : 5} className="px-4 py-10 text-center text-slate-400">
+                        Không tìm thấy serial nào.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            </KhungChon>
           </>
         )}
       </div>
