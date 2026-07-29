@@ -5,15 +5,16 @@ import { listToFix } from '@/app/actions'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
+import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 
 export default async function ToFixPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; trang?: string }>
+  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string }>
 }) {
-  const { q = '', trang: trangRaw } = await searchParams
+  const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const { rows: list, tong, soTrang } = await listToFix(q, { trang })
+  const { rows: list, tong, soTrang } = await listToFix(q, { trang, cot, chieu })
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
@@ -46,14 +47,16 @@ export default async function ToFixPage({
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Khách</th>
-                <th className="text-left px-4 py-3 font-medium">Máy</th>
-                <th className="text-left px-4 py-3 font-medium">SĐT</th>
-                <th className="text-left px-4 py-3 font-medium">Địa chỉ</th>
-              </tr>
-            </thead>
+            <Suspense>
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <TieuDeCotSapXep cot="full_name" nhan="Khách" chieuMacDinh="asc" dangMacDinh />
+                  <th className="text-left px-4 py-3 font-medium">Máy</th>
+                  <th className="text-left px-4 py-3 font-medium">SĐT</th>
+                  <th className="text-left px-4 py-3 font-medium">Địa chỉ</th>
+                </tr>
+              </thead>
+            </Suspense>
             <tbody className="divide-y">
               {list.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 align-top">

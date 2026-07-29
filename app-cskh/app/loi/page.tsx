@@ -7,6 +7,7 @@ import { vnDate } from '@/components/Badge'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
+import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -29,13 +30,13 @@ function HanBadge({ tt, ngay }: { tt: string; ngay: number | null }) {
 export default async function LoiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string; trang?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; trang?: string; cot?: string; chieu?: string }>
 }) {
-  const { q = '', tt, trang: trangRaw } = await searchParams
+  const { q = '', tt, trang: trangRaw, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
   const [{ rows, tong, soTrang }, counts] = await Promise.all([
-    coreForecast(tinhTrang, q, { trang }),
+    coreForecast(tinhTrang, q, { trang, cot, chieu }),
     coreCounts(),
   ])
 
@@ -92,17 +93,20 @@ export default async function LoiPage({
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Khách</th>
-                <th className="text-left px-4 py-3 font-medium">Máy</th>
-                <th className="text-left px-4 py-3 font-medium">Lõi cần thay</th>
-                <th className="text-left px-4 py-3 font-medium">Chu kỳ</th>
-                <th className="text-left px-4 py-3 font-medium">Mốc tính</th>
-                <th className="text-left px-4 py-3 font-medium">Đến hạn</th>
-                <th className="text-left px-4 py-3 font-medium">Ghi log</th>
-              </tr>
-            </thead>
+            <Suspense>
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
+                  {/* Cột hiện product_name + serial — sắp theo serial vì đó là cột trong whitelist. */}
+                  <TieuDeCotSapXep cot="serial" nhan="Máy" chieuMacDinh="asc" />
+                  <th className="text-left px-4 py-3 font-medium">Lõi cần thay</th>
+                  <th className="text-left px-4 py-3 font-medium">Chu kỳ</th>
+                  <th className="text-left px-4 py-3 font-medium">Mốc tính</th>
+                  <TieuDeCotSapXep cot="han_som" nhan="Đến hạn" chieuMacDinh="asc" dangMacDinh />
+                  <th className="text-left px-4 py-3 font-medium">Ghi log</th>
+                </tr>
+              </thead>
+            </Suspense>
             <tbody className="divide-y">
               {rows.map((r) => (
                 <tr key={`${r.serial}-${r.filter_code}`} className="hover:bg-slate-50 align-top">
