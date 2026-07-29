@@ -3,7 +3,7 @@ import { DieuHuong } from '@/components/DieuHuong'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
@@ -14,8 +14,9 @@ import { vnDate } from '@/components/Badge'
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items, me] = await Promise.all([
+  const [t, nhom, notes, staff, items, me, catalog] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
+    listCatalogItems(),
   ])
   if (!t) notFound()
 
@@ -133,7 +134,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
-          <TicketItems code={t.ticket_code} items={items} choPhepSua={await laAdmin()} />
+          <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={await laAdmin()} />
         </section>
 
         <section className="bg-white rounded-xl border p-5">

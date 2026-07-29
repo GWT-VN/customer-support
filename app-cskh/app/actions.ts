@@ -665,7 +665,9 @@ export async function doiTenNhanVien(id: string, ten: string) {
 // ── Chi phí / vật tư / đổi máy của ticket (Đợt 2) ───────────────────────────
 export type TicketMuc = {
   id: string
-  loai: 'thu_phi' | 'vat_tu' | 'doi_may'
+  loai: 'hang_muc' | 'doi_may'
+  catalog_code: string | null
+  so_luong: number | null
   mo_ta: string | null
   so_tien: number | null
   tinh_phi: boolean
@@ -683,18 +685,45 @@ export async function listTicketItems(code: string): Promise<TicketMuc[]> {
   return (data ?? []) as TicketMuc[]
 }
 
+/** Danh mục hạng mục (từ catalog_item) để chọn khi thu phí/vật tư. Services lên đầu. */
+export type CatalogItem = { code: string; ten: string | null; danh_muc: string | null }
+export async function listCatalogItems(): Promise<CatalogItem[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('catalog_item')
+    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1"')
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []).map((r) => {
+    const o = r as Record<string, string | null>
+    return { code: o['Mã nội bộ'] as string, ten: o['Tên ngắn gọn (đề xuất)'], danh_muc: o['Danh mục cấp 1'] }
+  })
+  // Services (DVSC/DVLD/DVBT/DVVC…) lên đầu, rồi theo tên.
+  return rows.sort((a, b) => {
+    const sa = a.danh_muc === 'Services' ? 0 : 1
+    const sb = b.danh_muc === 'Services' ? 0 : 1
+    return sa - sb || (a.ten ?? a.code).localeCompare(b.ten ?? b.code, 'vi')
+  })
+}
+
 export async function addTicketItem(code: string, input: {
-  loai: string; mo_ta?: string; so_tien?: number | null; tinh_phi?: boolean
+  loai: string; catalog_code?: string; so_luong?: number
+  mo_ta?: string; so_tien?: number | null; tinh_phi?: boolean
   serial_cu?: string; serial_moi?: string
 }) {
   const user = await requireStaff()
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
-  if (!['thu_phi', 'vat_tu', 'doi_may'].includes(input.loai)) {
+  if (!['hang_muc', 'doi_may'].includes(input.loai)) {
     return { ok: false as const, error: 'Loại mục không hợp lệ.' }
+  }
+  // Hạng mục (thu phí/vật tư) BẮT BUỘC chọn từ catalog_item.
+  if (input.loai === 'hang_muc' && !input.catalog_code) {
+    return { ok: false as const, error: 'Chọn hạng mục từ danh mục (catalog_item).' }
   }
   const { error } = await dataClient().from('ticket_muc').insert({
     ticket_code: code,
     loai: input.loai,
+    catalog_code: input.loai === 'hang_muc' ? input.catalog_code : null,
+    so_luong: input.so_luong && input.so_luong > 0 ? input.so_luong : 1,
     mo_ta: input.mo_ta?.trim() || null,
     so_tien: input.so_tien ?? null,
     tinh_phi: input.tinh_phi ?? false,
