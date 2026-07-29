@@ -6,6 +6,7 @@ import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri } from '@/app/action
 import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
 import { vnDate } from '@/components/Badge'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { PhanTrang } from '@/components/PhanTrang'
 import { ChipSapXep } from '@/components/ChipSapXep'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
@@ -27,12 +28,13 @@ function TinhTrangBadge({ tt }: { tt: string }) {
 export default async function BaoTriPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string; cot?: string; chieu?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; cot?: string; chieu?: string; trang?: string }>
 }) {
-  const { q = '', tt, cot, chieu } = await searchParams
+  const { q = '', tt, cot, chieu, trang: trangRaw } = await searchParams
+  const trang = Math.max(1, Number(trangRaw) || 1)
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, tong, sapXep }, counts, admin] = await Promise.all([
-    maintenanceDue(tinhTrang, q, { cot, chieu }),
+  const [{ rows, tong, soTrang, sapXep }, counts, admin] = await Promise.all([
+    maintenanceDue(tinhTrang, q, { trang, cot, chieu }),
     maintenanceCounts(),
     laAdmin(),
   ])
@@ -88,8 +90,6 @@ export default async function BaoTriPage({
         </p>
 
         <div className="flex items-center gap-3 flex-wrap text-sm">
-          {/* Nay có tổng thật nên nói được "hiện X trên Y" thay vì chỉ đếm dòng
-              đang tải — trước đây "100 lượt" khiến người dùng tưởng chỉ có 100. */}
           <span className="text-slate-500">
             {rows.length < tong ? `Hiện ${rows.length} trên ${tong} lượt` : `${tong} lượt`}
           </span>
@@ -163,6 +163,10 @@ export default async function BaoTriPage({
           </table>
         </div>
         </KhungChon>
+
+        <Suspense>
+          <PhanTrang trang={trang} soTrang={soTrang} />
+        </Suspense>
       </div>
     </main>
   )

@@ -381,16 +381,14 @@ export async function maintenanceDue(
   tinhTrang: string,
   q: string,
   tuyChon: TuyChonDanhSach = {}
-): Promise<{ rows: MaintenanceDue[]; tong: number; sapXep: SapXep }> {
+): Promise<KetQuaTrang<MaintenanceDue>> {
   await requireStaff()
-  // Trang này KHÔNG phân trang (giới hạn 100 dòng) nên không cần `trang`, nhưng
-  // vẫn cần whitelist cột y như các trang kia — ?cot= trên URL là dữ liệu người
-  // dùng, đưa thẳng vào .order() là lỗ hổng dù trang có phân trang hay không.
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_BAO_TRI, {
     cot: 'due_date', tang: true,
   })
-  // count exact: trang giới hạn 100 dòng nên PHẢI biết tổng thật, không thì
-  // không nói được "hiện 100 trên 467" lẫn "chọn tất cả N khớp bộ lọc".
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const tu = (trang - 1) * moi
   let query = dataClient().from('v_maintenance_due').select('*', { count: 'exact' })
 
   if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
@@ -412,9 +410,17 @@ export async function maintenanceDue(
   const { data, error, count } = await query
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('visit_id', { ascending: true })
-    .limit(tuyChon.moiTrang ?? 100)
+    .range(tu, tu + moi - 1)
   if (error) throw new Error(error.message)
-  return { rows: (data ?? []) as MaintenanceDue[], tong: count ?? 0, sapXep: sx }
+
+  const tong = count ?? 0
+  return {
+    rows: (data ?? []) as MaintenanceDue[],
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
+    sapXep: sx,
+  }
 }
 
 export async function maintenanceCounts() {
@@ -754,9 +760,29 @@ export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]>
   return (await truyVanSerial(q, limit)).rows
 }
 
-/** Như searchSerials nhưng kèm TỔNG số khớp — trang /serial cần để chọn tất cả. */
-export async function searchSerialsCoDem(q: string, limit = 50): Promise<{ rows: SerialRow[]; tong: number }> {
-  return truyVanSerial(q, limit)
+/**
+ * Bản CÓ PHÂN TRANG cho trang /serial.
+ *
+ * Trước đây trang này chỉ `.limit(50)` trên 1.891 serial và KHÔNG có nút chuyển
+ * trang — tức 1.841 dòng vĩnh viễn không xem tới được, trong khi giao diện lại
+ * mời "chọn tất cả 1891". Chọn thứ không nhìn thấy được là sai; sửa gốc là cho
+ * xem tới, chứ không phải bỏ nút chọn.
+ */
+export async function searchSerialsTrang(
+  q: string,
+  tuyChon: TuyChonDanhSach = {}
+): Promise<KetQuaTrang<SerialRow>> {
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const { rows, tong } = await truyVanSerial(q, moi, (trang - 1) * moi)
+  return {
+    rows,
+    tong,
+    trang,
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
+    // Kho serial luôn sắp theo serial tăng dần, chưa cho bấm đổi cột.
+    sapXep: { cot: 'serial', tang: true, macDinh: true },
+  }
 }
 
 export async function listSerialPending(trangThai = 'cho_duyet'): Promise<SerialPending[]> {
@@ -1473,18 +1499,15 @@ export async function khoaTatCaKhach(t: ThamSoLoc): Promise<string[]> {
 }
 
 export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
-  // maintenanceDue dùng .limit() chứ không .range() nên không phân lô được.
-  // Bảng này mới 467 dòng, dưới trần 1000 nên một lượt là đủ — nếu ngày nào đó
-  // vượt 1000 thì phải đổi sang .range() như các hàm kia, không được để im.
-  const { rows } = await maintenanceDue(t.tt ?? '', t.q ?? '', {
-    moiTrang: MOI_LO, cot: t.cot, chieu: t.chieu,
-  })
-  return rows.map((r) => r.visit_id)
+  return gomKhoa(
+    (trang, moiTrang) => maintenanceDue(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    (r) => r.visit_id
+  )
 }
 
 export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
-    async (trang, moiTrang) => truyVanSerial(t.q ?? '', moiTrang, (trang - 1) * moiTrang),
+    (trang, moiTrang) => searchSerialsTrang(t.q ?? '', { trang, moiTrang }),
     (r) => r.serial
   )
 }

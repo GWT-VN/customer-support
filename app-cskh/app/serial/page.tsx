@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
 import { laAdmin } from '@/lib/supabase'
-import { searchSerialsCoDem, listSerialPending, khoaTatCaSerial } from '@/app/actions'
+import { Suspense } from 'react'
+import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, type KetQuaTrang, type SerialRow } from '@/app/actions'
+import { PhanTrang } from '@/components/PhanTrang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
@@ -9,12 +11,18 @@ import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/Chon
 export default async function SerialPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tab?: string }>
+  searchParams: Promise<{ q?: string; tab?: string; trang?: string }>
 }) {
-  const { q = '', tab = '' } = await searchParams
+  const { q = '', tab = '', trang: trangRaw } = await searchParams
+  const trang = Math.max(1, Number(trangRaw) || 1)
   const laCho = tab === 'cho'
-  const [{ rows, tong }, pending, admin] = await Promise.all([
-    laCho ? Promise.resolve({ rows: [], tong: 0 }) : searchSerialsCoDem(q),
+  const [{ rows, tong, soTrang }, pending, admin] = await Promise.all([
+    laCho
+      ? Promise.resolve<KetQuaTrang<SerialRow>>({
+          rows: [], tong: 0, trang: 1, soTrang: 1,
+          sapXep: { cot: 'serial', tang: true, macDinh: true },
+        })
+      : searchSerialsTrang(q, { trang }),
     listSerialPending('cho_duyet'),
     laAdmin(),
   ])
@@ -96,6 +104,10 @@ export default async function SerialPage({
               </table>
             </div>
             </KhungChon>
+
+            <Suspense>
+              <PhanTrang trang={trang} soTrang={soTrang} />
+            </Suspense>
           </>
         )}
       </div>
