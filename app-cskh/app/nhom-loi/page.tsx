@@ -1,17 +1,22 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { issueReport, ticketsChuaPhanNhom } from '@/app/actions'
 import { MucDoBadge, BaoHangBadge } from '@/components/NhomLoiBadge'
+import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 
 export default async function NhomLoiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bh?: string }>
+  searchParams: Promise<{ bh?: string; q?: string }>
 }) {
-  const { bh } = await searchParams
+  const { bh, q = '' } = await searchParams
   const baoHangOnly = bh === '1'
-  const [rows, chuaPhanNhom] = await Promise.all([issueReport(baoHangOnly), ticketsChuaPhanNhom()])
+  const [rows, chuaPhanNhom] = await Promise.all([
+    issueReport(baoHangOnly, q),
+    ticketsChuaPhanNhom(q),
+  ])
 
   const anToan = rows.filter((r) => r.muc_do === 'an_toan')
   const thieuMoTa = chuaPhanNhom.filter((t) => t.ly_do.startsWith('thiếu mô tả')).length
@@ -23,6 +28,10 @@ export default async function NhomLoiPage({
           <h1 className="text-xl font-semibold text-slate-900">Nhóm lỗi</h1>
           <DieuHuong />
         </header>
+
+        <Suspense>
+          <OTimKiem placeholder="Gõ tên nhóm, mô tả lỗi, mã ticket…" />
+        </Suspense>
 
         {anToan.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -36,7 +45,7 @@ export default async function NhomLoiPage({
 
         <div className="flex gap-2 flex-wrap items-center">
           <Link
-            href="/nhom-loi"
+            href={`/nhom-loi?${new URLSearchParams({ ...(q && { q }) })}`}
             className={`px-3 py-1.5 rounded-lg text-sm border ${
               !baoHangOnly ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
             }`}
@@ -44,7 +53,7 @@ export default async function NhomLoiPage({
             Tất cả nhóm
           </Link>
           <Link
-            href="/nhom-loi?bh=1"
+            href={`/nhom-loi?${new URLSearchParams({ ...(q && { q }), bh: '1' })}`}
             className={`px-3 py-1.5 rounded-lg text-sm border ${
               baoHangOnly ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
             }`}
@@ -59,10 +68,15 @@ export default async function NhomLoiPage({
           Một ticket có thể thuộc nhiều nhóm. Bấm vào nhóm để soi từng ticket.
         </p>
 
-        {/* Không gắn OTimKiem lẫn PhanTrang: issueReport()/ticketsChuaPhanNhom() trả về
-            TOÀN BỘ mảng, không nhận từ khoá và không phân trang (không có KetQuaTrang) —
-            gắn ô tìm hay nút chuyển trang ở đây sẽ chỉ có hình thức, không có tác dụng. */}
-        <ThanhDangLoc dieuKien={[]} hienThi={rows.length} tong={rows.length} nhan="nhóm lỗi" />
+        {/* PhanTrang vẫn không gắn: issueReport()/ticketsChuaPhanNhom() trả về TOÀN BỘ mảng
+            đã lọc theo q, không phân trang (không có KetQuaTrang) — danh sách ngắn (13 nhóm)
+            nên chưa cần, xem báo cáo Task 5a. */}
+        <ThanhDangLoc
+          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          hienThi={rows.length}
+          tong={rows.length}
+          nhan="nhóm lỗi"
+        />
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

@@ -2,9 +2,13 @@ import { layNguoiDung } from '@/lib/supabase'
 import { dangXuat } from '@/app/auth/actions'
 
 /**
- * Thanh trên cùng: email đang đăng nhập + nút Đăng xuất.
- * Menu KHÔNG nằm ở đây — nó thuộc dòng tiêu đề của từng trang (xem DieuHuong).
+ * Thanh trên cùng: email đang đăng nhập + nút Đăng xuất. CHỈ vậy.
+ * Menu thuộc dòng tiêu đề của từng trang (xem DieuHuong).
  * Chưa đăng nhập (vd trang /login) thì không hiện gì.
+ *
+ * ⛔ ĐỪNG thêm ô tìm kiếm vào đây. Đã thử và user bác ngay: mỗi trang vốn đã có
+ * một ô tìm to, thêm ô nhỏ ở đây thành HAI ô trên cùng màn hình làm hai việc
+ * khác nhau — người dùng không biết gõ vào đâu. Một trang, một ô tìm.
  *
  * Dùng layNguoiDung() (có cache) chứ KHÔNG tự gọi getUser() — nếu không thì
  * mỗi trang tốn thêm một lượt gọi mạng tới Supabase chỉ để hiện cái email.

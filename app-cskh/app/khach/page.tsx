@@ -2,17 +2,18 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix } from '@/app/actions'
+import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
 
 export default async function ToFixPage({
   searchParams,
 }: {
-  searchParams: Promise<{ trang?: string }>
+  searchParams: Promise<{ q?: string; trang?: string }>
 }) {
-  const { trang: trangRaw } = await searchParams
+  const { q = '', trang: trangRaw } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const { rows: list, tong, soTrang } = await listToFix({ trang })
+  const { rows: list, tong, soTrang } = await listToFix(q, { trang })
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
@@ -22,19 +23,26 @@ export default async function ToFixPage({
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         {/* KHÔNG có link lui: đây là trang danh sách cấp một, có mặt trong menu —
             không phải trang con của "Máy đã lắp". Nút lui chỉ dành cho trang chi tiết. */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
-            {/* Không gắn OTimKiem: listToFix() không nhận từ khoá (Task 3 không thêm tham số
-                q cho hàm này) — gắn ô tìm ở đây sẽ gõ được mà không lọc gì, tệ hơn không có. */}
-            <ThanhDangLoc dieuKien={[]} hienThi={list.length} tong={tong} nhan="khách cần dọn" />
-            <p className="text-sm text-slate-500">
-              Trên trang này: {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
-              Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
-            </p>
-          </div>
+        <header className="flex items-center justify-between gap-4">
+          <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
           <DieuHuong />
-        </div>
+        </header>
+
+        <Suspense>
+          <OTimKiem placeholder="Gõ tên khách, SĐT…" />
+        </Suspense>
+
+        <ThanhDangLoc
+          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          hienThi={list.length}
+          tong={tong}
+          nhan="khách cần dọn"
+        />
+
+        <p className="text-sm text-slate-500">
+          Trên trang này: {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
+          Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
+        </p>
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

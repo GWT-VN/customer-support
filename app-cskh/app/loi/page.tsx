@@ -54,6 +54,10 @@ export default async function LoiPage({
           <DieuHuong />
         </header>
 
+        <Suspense>
+          <OTimKiem placeholder="Gõ serial, tên khách, SĐT, mã lõi…" />
+        </Suspense>
+
         <div className="flex gap-2 flex-wrap">
           {tabs.map((t) => (
             <Link
@@ -78,10 +82,6 @@ export default async function LoiPage({
             đúng ngày. Ghi dần thì con số này tự đúng lên.
           </p>
         )}
-
-        <Suspense>
-          <OTimKiem placeholder="Gõ serial, tên khách, SĐT, mã lõi…" />
-        </Suspense>
 
         <ThanhDangLoc
           dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}

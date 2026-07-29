@@ -790,6 +790,7 @@ export async function ticketTypes(): Promise<string[]> {
 
 /** Khách cần dọn: thiếu/lỗi SĐT HOẶC thiếu địa chỉ. Di trú Odoo không lấp được, phải sửa tay. */
 export async function listToFix(
+  q = '',
   tuyChon: TuyChonDanhSach = {}
 ): Promise<KetQuaTrang<Customer & { machines: number }>> {
   await requireStaff()
@@ -800,12 +801,22 @@ export async function listToFix(
   const trang = Math.max(1, tuyChon.trang ?? 1)
   const tu = (trang - 1) * MOI_TRANG
 
-  // Điều kiện .or() ở đây CỐ ĐỊNH, không ghép từ khoá người dùng -> không cần antoanChoOr.
-  // id (khoá chính, duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
-  const { data, error, count } = await db
+  // Điều kiện needs_phone/address CỐ ĐỊNH, không ghép từ khoá người dùng -> không cần
+  // antoanChoOr cho nó. Từ khoá tìm chung nằm ở .or() RIÊNG bên dưới (2 lệnh .or() liên
+  // tiếp AND với nhau), lọc trên ten_kd + primary_phone. KHÔNG thêm dia_chi_kd -> lỗi C1
+  // đã sửa ở Task 3 ("Phường" bỏ dấu chứa chuỗi con "huong").
+  let truyVan = db
     .from('cs_customers')
     .select('*', { count: 'exact' })
     .or('needs_phone.eq.true,address.is.null')
+
+  const kw = antoanChoOr(chuanHoaTuKhoa(q))
+  if (kw) {
+    truyVan = truyVan.or(`ten_kd.ilike.%${kw}%,primary_phone.ilike.%${kw}%`)
+  }
+
+  // id (khoá chính, duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
+  const { data, error, count } = await truyVan
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('id', { ascending: true })
     .range(tu, tu + MOI_TRANG - 1)
@@ -883,12 +894,19 @@ const UU_TIEN: Record<MucDo, number> = {
   an_toan: 1, nghiem_trong: 2, thuong: 3, nhe: 4, khong_loi: 5,
 }
 
-/** Báo cáo nhóm lỗi. baoHangOnly=true -> chỉ nhóm gửi công ty mẹ. */
-export async function issueReport(baoHangOnly = false): Promise<IssueReport[]> {
+/** Báo cáo nhóm lỗi. baoHangOnly=true -> chỉ nhóm gửi công ty mẹ.
+ *  q lọc trên tên nhóm + mô tả. v_issue_report KHÔNG có cột bỏ dấu riêng (Task 1 chỉ thêm
+ *  cho v_installed_base/v_tickets) -> giữ nguyên có dấu, chỉ chặn ký tự phá cú pháp .or(). */
+export async function issueReport(baoHangOnly = false, q = ''): Promise<IssueReport[]> {
   await requireStaff()
-  let q = dataClient().from('v_issue_report').select('*').gt('so_ticket', 0)
-  if (baoHangOnly) q = q.eq('bao_hang', true)
-  const { data, error } = await q
+  let truyVan = dataClient().from('v_issue_report').select('*').gt('so_ticket', 0)
+  if (baoHangOnly) truyVan = truyVan.eq('bao_hang', true)
+  const term = q.trim()
+  if (term) {
+    const safe = antoanChoOr(term)
+    truyVan = truyVan.or(`ten.ilike.%${safe}%,mo_ta.ilike.%${safe}%`)
+  }
+  const { data, error } = await truyVan
   if (error) throw new Error(error.message)
   return ((data ?? []) as IssueReport[]).sort(
     (a, b) => UU_TIEN[a.muc_do] - UU_TIEN[b.muc_do] || b.so_ticket - a.so_ticket
@@ -925,12 +943,71 @@ export type ChuaPhanNhom = {
   ly_do: string
 }
 
-/** Ticket chưa vào nhóm nào — việc cần người làm, không gom mù được. */
-export async function ticketsChuaPhanNhom(): Promise<ChuaPhanNhom[]> {
+/** Ticket chưa vào nhóm nào — việc cần người làm, không gom mù được.
+ *  q lọc trên mã ticket + mô tả. Không có cột bỏ dấu -> chỉ chặn ký tự phá cú pháp .or(). */
+export async function ticketsChuaPhanNhom(q = ''): Promise<ChuaPhanNhom[]> {
   await requireStaff()
-  const { data, error } = await dataClient()
-    .from('v_ticket_chua_phan_nhom').select('*')
-    .order('created_at', { ascending: false })
+  let truyVan = dataClient().from('v_ticket_chua_phan_nhom').select('*')
+  const term = q.trim()
+  if (term) {
+    const safe = antoanChoOr(term)
+    truyVan = truyVan.or(`ticket_code.ilike.%${safe}%,description.ilike.%${safe}%`)
+  }
+  const { data, error } = await truyVan.order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as ChuaPhanNhom[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 5b — tìm kiếm gộp: tách kết quả theo máy / ticket / khách
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type KetQuaTimGop = {
+  may: Machine[]
+  ticket: Ticket[]
+  khach: Customer[]
+  tongMay: number
+  tongTicket: number
+  tongKhach: number
+}
+
+/**
+ * Tìm gộp — nhân viên nghe khách đọc SĐT thì không phải đoán trước vào trang Máy hay
+ * Ticket. Mỗi nhóm lấy tối đa 5 dòng đầu KÈM tổng số thật (để hiện "xem tất cả N").
+ * Gọi SONG SONG bằng Promise.all — DB ở Singapore, gọi tuần tự cộng dồn độ trễ.
+ */
+export async function timGop(q: string): Promise<KetQuaTimGop> {
+  await requireStaff()
+  const term = q.trim()
+  if (!term) {
+    return { may: [], ticket: [], khach: [], tongMay: 0, tongTicket: 0, tongKhach: 0 }
+  }
+
+  // Khách: tra trên ten_kd (bỏ dấu sẵn) + primary_phone, giống ô tìm chung ở trang Máy.
+  // KHÔNG đưa dia_chi_kd vào -> lỗi C1 đã sửa ở Task 3.
+  const kw = antoanChoOr(chuanHoaTuKhoa(term))
+
+  const [mayRes, ticketRes, khachRes] = await Promise.all([
+    searchMachines(term, { trang: 1 }),
+    searchTickets(term),
+    kw
+      ? dataClient()
+          .from('cs_customers')
+          .select('*', { count: 'exact' })
+          .or(`ten_kd.ilike.%${kw}%,primary_phone.ilike.%${kw}%`)
+          .order('full_name', { ascending: true })
+          .limit(5)
+      : Promise.resolve({ data: [] as Customer[], count: 0, error: null }),
+  ])
+
+  if (khachRes.error) throw new Error(khachRes.error.message)
+
+  return {
+    may: mayRes.rows.slice(0, 5),
+    ticket: ticketRes.rows.slice(0, 5),
+    khach: (khachRes.data ?? []) as Customer[],
+    tongMay: mayRes.tong,
+    tongTicket: ticketRes.tong,
+    tongKhach: khachRes.count ?? 0,
+  }
 }
