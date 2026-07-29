@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { tenModel } from './danhSach'
+import { sapXepHopLe } from '../bang'
+import { tenModel, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from './danhSach'
 
 describe('tenModel — rút tên sản phẩm về mã máy cho ô lọc', () => {
   // 18 tên dưới đây lấy NGUYÊN VĂN từ v_installed_base trên DB thật (2026-07-29),
@@ -56,5 +57,37 @@ describe('tenModel — rút tên sản phẩm về mã máy cho ô lọc', () =>
 
   it('tên kết thúc bằng " GE " (dữ liệu bẩn) thì giữ nguyên chứ không ra rỗng', () => {
     expect(tenModel('Máy lọc nước GE ', 'CTS20NG')).toBe('Máy lọc nước GE ')
+  })
+})
+
+// Whitelist cột là chuyện RIÊNG của dự án này (bộ bảng dùng chung không biết
+// COT_MAY là gì) -> test ở đây chứ không ở bang/.
+describe('sapXepHopLe — ?cot=mat_khau trên URL thật (Task 5, bấm tiêu đề cột)', () => {
+  // Bằng chứng cụ thể: gõ tay ?cot=mat_khau lên bất kỳ trang liệt kê nào cũng KHÔNG
+  // vỡ trang — mat_khau không nằm trong whitelist thật của trang đó nên sapXepHopLe()
+  // lặng lẽ rơi về đúng mặc định của trang, y hệt như chưa từng có ?cot= trên URL.
+  it('COT_MAY (trang "/") bỏ qua mat_khau, rơi về mặc định install_date desc', () => {
+    const macDinh = { cot: 'install_date', tang: false }
+    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, macDinh)).toEqual({ ...macDinh, macDinh: true })
+  })
+
+  it('COT_TICKET (trang "/ticket") bỏ qua mat_khau, rơi về mặc định created_at desc', () => {
+    const macDinh = { cot: 'created_at', tang: false }
+    expect(sapXepHopLe('mat_khau', 'asc', COT_TICKET, macDinh)).toEqual({ ...macDinh, macDinh: true })
+  })
+
+  it('COT_LOI (trang "/loi") bỏ qua mat_khau, rơi về mặc định han_som asc', () => {
+    const macDinh = { cot: 'han_som', tang: true }
+    expect(sapXepHopLe('mat_khau', 'desc', COT_LOI, macDinh)).toEqual({ ...macDinh, macDinh: true })
+  })
+
+  it('COT_KHACH (trang "/khach") bỏ qua mat_khau, rơi về mặc định full_name asc', () => {
+    const macDinh = { cot: 'full_name', tang: true }
+    expect(sapXepHopLe('mat_khau', 'desc', COT_KHACH, macDinh)).toEqual({ ...macDinh, macDinh: true })
+  })
+
+  it('cột lạ bị loại thì KHÔNG hiện nút bỏ sắp xếp — URL bẩn không được tính là "đã sắp"', () => {
+    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, { cot: 'install_date', tang: false }).macDinh)
+      .toBe(true)
   })
 })

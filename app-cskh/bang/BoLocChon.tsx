@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useGiaoDien } from './CauHinh'
 
 /**
  * Ô chọn lọc theo MỘT tham số URL (vd sản phẩm, tình trạng bảo hành, loại lỗi).
@@ -23,6 +24,7 @@ export function BoLocChon({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const gd = useGiaoDien()
 
   const dangChon = searchParams.get(param) ?? ''
   const nhanDangChon = tuyChon.find((t) => t.giaTri === dangChon)?.nhan ?? `${nhan}: Tất cả`
@@ -32,7 +34,7 @@ export function BoLocChon({
     // (appearance: auto) nằm ngoài tầm kiểm soát của CSS: đặt padding-right bao
     // nhiêu nó vẫn bám mép phải theo cách riêng của từng trình duyệt, nên không
     // cân được với lề trái. appearance-none + mũi tên tự vẽ mới chốt được cả hai bên.
-    <div className="relative inline-flex max-w-full">
+    <div className={gd.boLoc_khung}>
       <select
         value={dangChon}
         title={nhanDangChon}
@@ -52,7 +54,7 @@ export function BoLocChon({
         // 192px vừa đủ cho nhãn dài nhất còn lại ("Hết hạn máy, còn lõi") sau khi ô
         // Sản phẩm đã rút về mã máy bằng tenModel(). Loại lỗi ở /ticket vẫn có nhãn
         // dài hơn -> cắt bằng truncate, bù lại bằng title= để rê chuột đọc đủ.
-        className="w-48 max-w-full truncate appearance-none rounded-lg border bg-white pl-3 pr-8 py-1.5 text-sm text-slate-700"
+        className={gd.boLoc_select}
       >
         <option value="">{nhan}: Tất cả</option>
         {tuyChon.map((t) => (
@@ -64,7 +66,7 @@ export function BoLocChon({
       {/* Mép phải mũi tên cách viền 12px = đúng lề trái 12px của chữ. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400"
+        className={gd.boLoc_muiTen}
       >
         ▼
       </span>

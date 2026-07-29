@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { antoanChoOr, boDau, chuanHoaTuKhoa, mauDauTu, sapXepHopLe } from './timkiem'
-import { COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from './danhSach'
 
 describe('boDau', () => {
   it('bỏ dấu tiếng Việt và về chữ thường', () => {
@@ -83,36 +82,6 @@ describe('sapXepHopLe — cờ macDinh quyết định có hiện nút "bỏ s�
 
   it('cột lạ bị loại -> về mặc định, KHÔNG hiện nút bỏ', () => {
     expect(sapXepHopLe('mat_khau', 'asc', CHO_PHEP, MAC_DINH).macDinh).toBe(true)
-  })
-})
-
-describe('sapXepHopLe — ?cot=mat_khau trên URL thật (Task 5, bấm tiêu đề cột)', () => {
-  // Bằng chứng cụ thể: gõ tay ?cot=mat_khau lên bất kỳ trang liệt kê nào cũng KHÔNG
-  // vỡ trang — mat_khau không nằm trong whitelist thật của trang đó nên sapXepHopLe()
-  // lặng lẽ rơi về đúng mặc định của trang, y hệt như chưa từng có ?cot= trên URL.
-  it('COT_MAY (trang "/") bỏ qua mat_khau, rơi về mặc định install_date desc', () => {
-    const macDinh = { cot: 'install_date', tang: false }
-    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, macDinh)).toEqual({ ...macDinh, macDinh: true })
-  })
-
-  it('COT_TICKET (trang "/ticket") bỏ qua mat_khau, rơi về mặc định created_at desc', () => {
-    const macDinh = { cot: 'created_at', tang: false }
-    expect(sapXepHopLe('mat_khau', 'asc', COT_TICKET, macDinh)).toEqual({ ...macDinh, macDinh: true })
-  })
-
-  it('COT_LOI (trang "/loi") bỏ qua mat_khau, rơi về mặc định han_som asc', () => {
-    const macDinh = { cot: 'han_som', tang: true }
-    expect(sapXepHopLe('mat_khau', 'desc', COT_LOI, macDinh)).toEqual({ ...macDinh, macDinh: true })
-  })
-
-  it('COT_KHACH (trang "/khach") bỏ qua mat_khau, rơi về mặc định full_name asc', () => {
-    const macDinh = { cot: 'full_name', tang: true }
-    expect(sapXepHopLe('mat_khau', 'desc', COT_KHACH, macDinh)).toEqual({ ...macDinh, macDinh: true })
-  })
-
-  it('cột lạ bị loại thì KHÔNG hiện nút bỏ sắp xếp — URL bẩn không được tính là "đã sắp"', () => {
-    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, { cot: 'install_date', tang: false }).macDinh)
-      .toBe(true)
   })
 })
 

@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
+import { useGiaoDien } from './CauHinh'
 
 /**
  * Gõ tới đâu lọc tới đó, hoãn 300ms để không bắn truy vấn mỗi phím.
@@ -16,6 +17,7 @@ export function OTimKiem({ placeholder }: { placeholder: string }) {
   const searchParams = useSearchParams()
   const [q, setQ] = useState(searchParams.get('q') ?? '')
   const [, batDau] = useTransition()
+  const gd = useGiaoDien()
 
   useEffect(() => {
     // 🐛 Đã từng gây lỗi "bấm Sau → không sang trang được": searchParams nằm trong
@@ -38,19 +40,19 @@ export function OTimKiem({ placeholder }: { placeholder: string }) {
   }, [q, pathname, router, searchParams])
 
   return (
-    <div className="relative">
+    <div className={gd.oTimKiem_khung}>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border px-4 py-2.5 pr-10 text-slate-900 bg-white"
+        className={gd.oTimKiem_input}
       />
       {q && (
         <button
           type="button"
           onClick={() => setQ('')}
           aria-label="Xoá từ khoá"
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+          className={gd.oTimKiem_nutXoa}
         >
           ×
         </button>

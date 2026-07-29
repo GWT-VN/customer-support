@@ -2,11 +2,12 @@ import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
 import { laAdmin } from '@/lib/supabase'
 import { Suspense } from 'react'
-import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, type KetQuaTrang, type SerialRow } from '@/app/actions'
-import { PhanTrang } from '@/components/PhanTrang'
+import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, type SerialRow } from '@/app/actions'
+import type { KetQuaTrang } from '@/bang'
+import { PhanTrang } from '@/bang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
-import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function SerialPage({
   searchParams,

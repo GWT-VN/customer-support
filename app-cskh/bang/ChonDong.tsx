@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useGiaoDien } from './CauHinh'
+import type { ThamSoLoc } from './kieu'
 
 /**
  * Chọn nhiều dòng trong bảng — MỚI CHỈ CÓ PHẦN CHỌN, chưa có hành động nào.
@@ -25,9 +27,6 @@ import { createContext, useContext, useEffect, useRef, useState, useTransition, 
  * 4. Khoá dòng là khoá chính thật (ticket_code, visit_id, serial+filter_code…),
  *    không phải chỉ số mảng — chỉ số đổi nghĩa mỗi lần sắp xếp lại.
  */
-
-/** Nhận nguyên khối searchParams của trang (đã bỏ `trang`) — xem `thamSo`. */
-type ThamSoLoc = Record<string, string | undefined>
 
 type BoiCanh = {
   bat: boolean
@@ -77,6 +76,7 @@ export function KhungChon({
   layTatCaKhoa?: (t: ThamSoLoc) => Promise<string[]>
   children: ReactNode
 }) {
+  const gd = useGiaoDien()
   const [daChon, setDaChon] = useState<Set<string>>(() => new Set())
   const [daLayToanBo, setDaLayToanBo] = useState(false)
   const [loi, setLoi] = useState<string | null>(null)
@@ -148,7 +148,7 @@ export function KhungChon({
         doiMot, doiTatCa, xoaHet, chonToanBo, daLayToanBo,
       }}
     >
-      <div className="space-y-4">{children}</div>
+      <div className={gd.chon_khung}>{children}</div>
     </Ctx.Provider>
   )
 }
@@ -172,6 +172,7 @@ export function useDaChon() {
 /** `<th>` ô chọn tất cả TRÊN TRANG. Đặt làm cột ĐẦU TIÊN của `<tr>` trong `<thead>`. */
 export function OChonTatCa({ nhan = 'dòng' }: { nhan?: string }) {
   const c = useBoiCanh('OChonTatCa')
+  const gd = useGiaoDien()
   const ref = useRef<HTMLInputElement>(null)
   const tongTrang = c.khoaTrang.length
   const soChon = c.khoaTrang.filter((k) => c.daChon.has(k)).length
@@ -185,7 +186,7 @@ export function OChonTatCa({ nhan = 'dòng' }: { nhan?: string }) {
   if (!c.bat) return null
 
   return (
-    <th className="w-10 px-4 py-3">
+    <th className={gd.chon_oTh}>
       <input
         ref={ref}
         type="checkbox"
@@ -194,7 +195,7 @@ export function OChonTatCa({ nhan = 'dòng' }: { nhan?: string }) {
         onChange={(e) => c.doiTatCa(e.target.checked)}
         aria-label={`Chọn ${tongTrang} ${nhan} trên trang này`}
         title={`Chọn ${tongTrang} ${nhan} trên trang này`}
-        className="align-middle accent-slate-900"
+        className={gd.chon_checkbox}
       />
     </th>
   )
@@ -203,16 +204,17 @@ export function OChonTatCa({ nhan = 'dòng' }: { nhan?: string }) {
 /** `<td>` ô chọn của một dòng. Đặt làm cột ĐẦU TIÊN của mỗi `<tr>` trong `<tbody>`. */
 export function OChonDong({ khoa, moTa }: { khoa: string; moTa?: string }) {
   const c = useBoiCanh('OChonDong')
+  const gd = useGiaoDien()
   if (!c.bat) return null
 
   return (
-    <td className="w-10 px-4 py-3">
+    <td className={gd.chon_oTd}>
       <input
         type="checkbox"
         checked={c.daChon.has(khoa)}
         onChange={(e) => c.doiMot(khoa, e.target.checked)}
         aria-label={`Chọn ${moTa ?? khoa}`}
-        className="align-middle accent-slate-900"
+        className={gd.chon_checkbox}
       />
     </td>
   )
@@ -238,6 +240,7 @@ export function OChonDong({ khoa, moTa }: { khoa: string; moTa?: string }) {
  */
 export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; children?: ReactNode }) {
   const c = useBoiCanh('ThanhDaChon')
+  const gd = useGiaoDien()
   const soDong = c.daChon.size
   if (!c.bat || soDong === 0) return null
 
@@ -253,14 +256,14 @@ export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; child
   const chamTran = c.daLayToanBo && soDong < c.tong
 
   return (
-    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm text-white">
+    <div className={gd.chon_thanh}>
       <span>
         Đã chọn <strong>{soDong}</strong> {nhan}
-        {vuotTrang && <span className="text-slate-300"> (gồm cả dòng ở trang khác)</span>}
+        {vuotTrang && <span className={gd.chon_thanhPhuChu}> (gồm cả dòng ở trang khác)</span>}
       </span>
 
       {chamTran && (
-        <span className="text-amber-300">
+        <span className={gd.chon_thanhCanhBao}>
           Chỉ chọn được tối đa {soDong} mỗi lượt — thu hẹp bộ lọc rồi làm nhiều đợt.
         </span>
       )}
@@ -270,7 +273,7 @@ export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; child
           type="button"
           onClick={c.chonToanBo!}
           disabled={c.dangLay}
-          className="underline decoration-dotted underline-offset-2 text-sky-300 hover:text-white disabled:opacity-50"
+          className={gd.chon_nutChonToanBo}
         >
           {c.dangLay ? 'Đang lấy…' : `Chọn tất cả ${c.tong} ${nhan} khớp bộ lọc`}
         </button>
@@ -281,19 +284,19 @@ export function ThanhDaChon({ nhan = 'dòng', children }: { nhan?: string; child
       <button
         type="button"
         onClick={c.xoaHet}
-        className="text-slate-300 underline hover:text-white"
+        className={gd.chon_nutBoChon}
       >
         Bỏ chọn
       </button>
 
-      {c.loi && <span className="text-red-300">{c.loi}</span>}
+      {c.loi && <span className={gd.chon_loi}>{c.loi}</span>}
 
       {children ? (
-        <div className="flex items-center gap-2 flex-wrap ml-auto">{children}</div>
+        <div className={gd.chon_khuHanhDong}>{children}</div>
       ) : (
         // Nói thật trạng thái thay vì để một nút giả: chọn xong mà không làm gì
         // được thì người dùng phải biết là do CHƯA CÓ, không phải do bấm hỏng.
-        <span className="ml-auto text-xs text-slate-400">
+        <span className={gd.chon_chuaCoHanhDong}>
           Thao tác hàng loạt đang được bổ sung — hiện chỉ chọn được.
         </span>
       )}

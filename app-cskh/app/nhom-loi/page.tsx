@@ -3,8 +3,8 @@ import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { issueReport, ticketsChuaPhanNhom } from '@/app/actions'
 import { MucDoBadge, BaoHangBadge } from '@/components/NhomLoiBadge'
-import { OTimKiem } from '@/components/OTimKiem'
-import { ThanhDangLoc } from '@/components/ThanhDangLoc'
+import { OTimKiem } from '@/bang'
+import { ThanhDangLoc } from '@/bang'
 
 export default async function NhomLoiPage({
   searchParams,

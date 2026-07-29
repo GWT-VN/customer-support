@@ -2,12 +2,12 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix, khoaTatCaKhach } from '@/app/actions'
-import { OTimKiem } from '@/components/OTimKiem'
-import { ThanhDangLoc } from '@/components/ThanhDangLoc'
-import { PhanTrang } from '@/components/PhanTrang'
-import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { OTimKiem } from '@/bang'
+import { ThanhDangLoc } from '@/bang'
+import { PhanTrang } from '@/bang'
+import { TieuDeCotSapXep } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
-import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
+import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function ToFixPage({
   searchParams,

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { NGHIA_SAP_XEP, TEN_COT } from '@/lib/danhSach'
+import { useCauHinh } from './CauHinh'
 
 /**
  * Câu "đang sắp xếp theo gì" bằng tiếng Việt, đặt ngay trên bảng, kèm nút bỏ.
@@ -30,11 +30,12 @@ export function ChipSapXep({
   /** Ràng buộc luôn áp trước cột này, vd "Khẩn luôn lên đầu" ở trang Ticket. */
   ghiChu?: string
 }) {
+  const { giaoDien: gd, tenCot, nghiaSapXep } = useCauHinh()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const ten = TEN_COT[cot] ?? cot
-  const nghia = NGHIA_SAP_XEP[cot]?.[tang ? 'asc' : 'desc'] ?? (tang ? 'tăng dần' : 'giảm dần')
+  const ten = tenCot[cot] ?? cot
+  const nghia = nghiaSapXep[cot]?.[tang ? 'asc' : 'desc'] ?? (tang ? 'tăng dần' : 'giảm dần')
 
   // Bỏ RIÊNG cột/chiều, GIỮ nguyên từ khoá và bộ lọc — khác hẳn nút "Xoá lọc"
   // vốn quét sạch mọi thứ. Người dùng muốn về thứ tự gốc thường vẫn đang cần
@@ -48,21 +49,19 @@ export function ChipSapXep({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 py-1 rounded-full bg-sky-50 text-sky-900 text-xs ${
-        macDinh ? 'px-2.5' : 'pl-2.5 pr-1.5'
-      }`}
+      className={`${gd.sapXep_chip} ${macDinh ? gd.sapXep_chipTron : gd.sapXep_chipCoNutGo}`}
     >
-      <span aria-hidden className="text-sky-500">{tang ? '↑' : '↓'}</span>
+      <span aria-hidden className={gd.sapXep_muiTen}>{tang ? '↑' : '↓'}</span>
       <span>
         Sắp xếp: <strong>{ten}</strong> · {nghia}
-        {ghiChu && <span className="text-sky-700"> · {ghiChu}</span>}
+        {ghiChu && <span className={gd.sapXep_ghiChu}> · {ghiChu}</span>}
       </span>
       {!macDinh && (
         <Link
           href={hrefBo}
           aria-label="Bỏ sắp xếp, về thứ tự mặc định"
           title="Bỏ sắp xếp, về thứ tự mặc định"
-          className="flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-sky-400 hover:bg-sky-200 hover:text-sky-900"
+          className={gd.sapXep_nutGo}
         >
           ×
         </Link>

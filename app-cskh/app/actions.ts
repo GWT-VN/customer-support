@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
-import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, type SapXep } from '@/lib/timkiem'
+import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
+import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, type TinhTrangBH,
@@ -12,40 +13,9 @@ import {
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
 const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
 
-/** Kết quả một trang: dữ liệu + tổng số dòng thật (để tính tổng số trang). */
-export type KetQuaTrang<T> = {
-  rows: T[]
-  tong: number
-  trang: number
-  soTrang: number
-  /**
-   * Cột/chiều máy chủ THỰC SỰ đã dùng, tức kết quả của sapXepHopLe() SAU khi
-   * lọc whitelist — không phải giá trị thô trên URL.
-   *
-   * Trang phải hiện đúng cái này (ChipSapXep), không được tự đọc lại ?cot= :
-   * gõ tay ?cot=mat_khau thì bảng sắp theo mặc định, mà chip đọc URL sẽ khoe
-   * "mat_khau" — nói sai điều đang xảy ra là mất lòng tin nặng hơn không nói.
-   */
-  sapXep: SapXep
-}
-
-/** Tuỳ chọn chung cho các hàm liệt kê có phân trang + sắp xếp. */
-export type TuyChonDanhSach = {
-  trang?: number
-  cot?: string
-  chieu?: string
-  /**
-   * Ghi đè số dòng mỗi trang. CHỈ dùng cho "chọn tất cả khớp bộ lọc" (các hàm
-   * khoaTatCa* ở cuối file) — gọi lại ĐÚNG hàm liệt kê với một trang thật to
-   * rồi lấy khoá.
-   *
-   * Vì sao không viết truy vấn riêng chỉ lấy khoá: bộ lọc sẽ bị chép làm hai bản
-   * và sớm muộn lệch nhau. Lúc đó người dùng thấy "91 ticket" trên màn hình
-   * nhưng bấm chọn tất cả lại ra 87 — không ai phát hiện ra cho tới khi sửa nhầm.
-   * Chấp nhận tốn thêm băng thông một lần bấm để đổi lấy KHÔNG BAO GIỜ lệch.
-   */
-  moiTrang?: number
-}
+// ⚠️ KHÔNG re-export kiểu từ file 'use server': Turbopack coi mỗi export là một
+// server action và build vỡ với "Export KetQuaTrang doesn't exist in target module".
+// Trang nào cần KetQuaTrang/TuyChonDanhSach thì import thẳng từ '@/bang'.
 
 export type Machine = {
   serial: string
@@ -1540,39 +1510,13 @@ export async function timGop(q: string): Promise<KetQuaTimGop> {
 // truyền thẳng từ Server Component xuống Client Component làm Server Action.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ThamSoLoc = Record<string, string | undefined>
-
-/**
- * ⚠️ PostgREST/Supabase chặn cứng 1000 dòng MỖI REQUEST (db-max-rows). Đặt
- * .limit(2000) không báo lỗi — nó lặng lẽ trả về 1000. Đã dính đúng bẫy này:
- * bấm "chọn tất cả 1891 serial" ra 1000, giao diện không hề biết là bị cắt.
- *
- * Nên phải lấy theo LÔ 1000 rồi ghép, và dừng khi đủ `tong` hoặc chạm trần
- * TOI_DA_CHON. Bên gọi so số khoá nhận được với `tong` để biết có bị cắt không —
- * nếu bị thì PHẢI nói ra chứ không im lặng.
- */
-const MOI_LO = 1000
-
-async function gomKhoa<T>(
-  layLo: (trang: number, moiTrang: number) => Promise<{ rows: T[]; tong: number }>,
-  khoaCua: (r: T) => string
-): Promise<string[]> {
-  const ra: string[] = []
-  for (let trang = 1; ra.length < TOI_DA_CHON; trang++) {
-    const { rows, tong } = await layLo(trang, MOI_LO)
-    for (const r of rows) ra.push(khoaCua(r))
-    // Hết dòng, hoặc lô cuối trả về non-đầy -> không còn gì để lấy.
-    if (ra.length >= tong || rows.length < MOI_LO) break
-  }
-  return ra.slice(0, TOI_DA_CHON)
-}
-
 export async function khoaTatCaMay(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => searchMachines(t.q ?? '', {
       trang, moiTrang, cot: t.cot, chieu: t.chieu, maSanPham: t.sp, tinhTrangBH: t.bh,
     }),
-    (r) => r.serial
+    (r) => r.serial,
+    TOI_DA_CHON
   )
 }
 
@@ -1591,7 +1535,8 @@ export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
       me?.id,
       { trang, moiTrang, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined }
     ),
-    (r) => r.ticket_code
+    (r) => r.ticket_code,
+    TOI_DA_CHON
   )
 }
 
@@ -1599,27 +1544,31 @@ export async function khoaTatCaLoi(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => coreForecast(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
     // Khoá ghép: một máy có nhiều lõi nên riêng serial không định danh được 1 dòng.
-    (r) => `${r.serial}-${r.filter_code}`
+    (r) => `${r.serial}-${r.filter_code}`,
+    TOI_DA_CHON
   )
 }
 
 export async function khoaTatCaKhach(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => listToFix(t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
-    (r) => r.id
+    (r) => r.id,
+    TOI_DA_CHON
   )
 }
 
 export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => maintenanceDue(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
-    (r) => r.visit_id
+    (r) => r.visit_id,
+    TOI_DA_CHON
   )
 }
 
 export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => searchSerialsTrang(t.q ?? '', { trang, moiTrang }),
-    (r) => r.serial
+    (r) => r.serial,
+    TOI_DA_CHON
   )
 }

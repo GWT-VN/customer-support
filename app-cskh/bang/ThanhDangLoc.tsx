@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { ChipSapXep } from './ChipSapXep'
+import { useGiaoDien } from './CauHinh'
 
 /**
  * Thanh trạng thái "đang lọc": chip điều kiện đang bật + số dòng đang thấy
@@ -38,13 +39,14 @@ export function ThanhDangLoc({
   // xem chú thích trong ChipSapXep. Trang không sắp xếp được thì bỏ trống.
   sapXep?: { cot: string; tang: boolean; macDinh: boolean; ghiChu?: string }
 }) {
+  const gd = useGiaoDien()
   const pathname = usePathname()
   const dangLoc = dieuKien.length > 0
   const dong = hienThi < tong ? `Hiện ${hienThi} trên ${tong} ${nhan}` : `${tong} ${nhan}`
 
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className={gd.dangLoc_khung}>
+      <div className={gd.dangLoc_nhomChip}>
         {dieuKien.map((d) => (
           // Đệm hai bên phải CÂN MẮT. Trước đây px-2 dùng chung cho cả chip, còn dấu ×
           // là chữ trơn nằm trong luồng văn bản -> bên phải chỉ còn đúng 8px tính từ
@@ -55,9 +57,7 @@ export function ThanhDangLoc({
           // trái 10 / phải 10.5 / trên 4 / dưới 4. Chip không có nút gỡ giữ px-2.5.
           <span
             key={d.nhan}
-            className={`inline-flex items-center gap-1 py-1 rounded-full bg-slate-100 text-slate-700 text-xs ${
-              d.href ? 'pl-2.5 pr-1.5' : 'px-2.5'
-            }`}
+            className={`${gd.dangLoc_chip} ${d.href ? gd.dangLoc_chipCoNutGo : gd.dangLoc_chipTron}`}
           >
             <span>
               {d.nhan}: <strong>{d.giaTri}</strong>
@@ -66,14 +66,14 @@ export function ThanhDangLoc({
               <Link
                 href={d.href}
                 aria-label={`Bỏ lọc ${d.nhan}`}
-                className="flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-900"
+                className={gd.dangLoc_nutGoChip}
               >
                 ×
               </Link>
             )}
           </span>
         ))}
-        <span className="text-slate-500">{dong}</span>
+        <span className={gd.dangLoc_soDong}>{dong}</span>
         {/* ChipSapXep dùng useSearchParams (dựng link bỏ sắp xếp) -> phải có
             Suspense, không thì next build vỡ. Bọc ở đây thay vì bắt 4 trang gọi
             ThanhDangLoc phải nhớ bọc. */}
@@ -86,7 +86,7 @@ export function ThanhDangLoc({
         )}
       </div>
       {dangLoc && (
-        <Link href={pathname} className="text-slate-600 underline hover:text-slate-900 flex-none">
+        <Link href={pathname} className={gd.dangLoc_nutXoaLoc}>
           Xoá lọc
         </Link>
       )}

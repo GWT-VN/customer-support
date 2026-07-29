@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useGiaoDien } from './CauHinh'
 
 /**
  * Nút "Trước"/"Sau" + "Trang X / Y". Giữ nguyên mọi tham số khác trên URL
@@ -12,6 +13,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 export function PhanTrang({ trang, soTrang }: { trang: number; soTrang: number }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const gd = useGiaoDien()
 
   if (soTrang <= 1) return null
 
@@ -27,21 +29,21 @@ export function PhanTrang({ trang, soTrang }: { trang: number; soTrang: number }
   const coSau = trang < soTrang
 
   return (
-    <div className="flex items-center justify-center gap-3 text-sm">
+    <div className={gd.phanTrang_khung}>
       {coTruoc ? (
-        <Link href={hrefTrang(trang - 1)} className="rounded-lg border bg-white text-slate-700 px-3 py-1.5 hover:bg-slate-50">
+        <Link href={hrefTrang(trang - 1)} className={gd.phanTrang_nut}>
           ← Trước
         </Link>
       ) : (
-        <span className="rounded-lg border bg-white text-slate-300 px-3 py-1.5">← Trước</span>
+        <span className={gd.phanTrang_nutTat}>← Trước</span>
       )}
-      <span className="text-slate-500">Trang {trang} / {soTrang}</span>
+      <span className={gd.phanTrang_chuSo}>Trang {trang} / {soTrang}</span>
       {coSau ? (
-        <Link href={hrefTrang(trang + 1)} className="rounded-lg border bg-white text-slate-700 px-3 py-1.5 hover:bg-slate-50">
+        <Link href={hrefTrang(trang + 1)} className={gd.phanTrang_nut}>
           Sau →
         </Link>
       ) : (
-        <span className="rounded-lg border bg-white text-slate-300 px-3 py-1.5">Sau →</span>
+        <span className={gd.phanTrang_nutTat}>Sau →</span>
       )}
     </div>
   )
