@@ -3,7 +3,7 @@ import { DieuHuong } from '@/components/DieuHuong'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
@@ -14,10 +14,14 @@ import { vnDate } from '@/components/Badge'
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items] = await Promise.all([
-    getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma),
+  const [t, nhom, notes, staff, items, me] = await Promise.all([
+    getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
   ])
   if (!t) notFound()
+
+  // Tự bắt người xử lý theo tên đăng nhập: kỹ thuật → ô Kỹ thuật, còn lại → ô CS.
+  const defaultCsId = me && me.vai_tro !== 'ky_thuat' ? me.id : null
+  const defaultKtId = me && me.vai_tro === 'ky_thuat' ? me.id : null
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -137,6 +141,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           <TicketEditor
             code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note}
             staff={staff} csId={t.cs_phu_trach} ktId={t.ky_thuat}
+            defaultCsId={defaultCsId} defaultKtId={defaultKtId}
           />
         </section>
       </div>

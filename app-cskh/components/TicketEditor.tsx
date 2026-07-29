@@ -18,6 +18,8 @@ export function TicketEditor({
   staff,
   csId,
   ktId,
+  defaultCsId = null,
+  defaultKtId = null,
 }: {
   code: string
   state: string
@@ -26,12 +28,15 @@ export function TicketEditor({
   staff: Staff[]
   csId: string | null
   ktId: string | null
+  // Người đang đăng nhập — tự điền vào ô còn trống (đổi/chọn lại được).
+  defaultCsId?: string | null
+  defaultKtId?: string | null
 }) {
   const [st, setSt] = useState(state)
   const [kh, setKh] = useState(khan)
   const [note, setNote] = useState(lastNote ?? '')
-  const [cs, setCs] = useState(csId ?? '')
-  const [kt, setKt] = useState(ktId ?? '')
+  const [cs, setCs] = useState(csId ?? defaultCsId ?? '')
+  const [kt, setKt] = useState(ktId ?? defaultKtId ?? '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
