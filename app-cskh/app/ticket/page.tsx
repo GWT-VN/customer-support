@@ -1,25 +1,30 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { searchTickets, currentStaff, type KetQuaTrang, type Ticket } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
 import { laAdmin } from '@/lib/supabase'
+import { OTimKiem } from '@/components/OTimKiem'
+import { ThanhDangLoc } from '@/components/ThanhDangLoc'
+import { PhanTrang } from '@/components/PhanTrang'
 
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; state?: string; khan?: string; mine?: string }>
+  searchParams: Promise<{ q?: string; state?: string; khan?: string; mine?: string; trang?: string }>
 }) {
-  const { q = '', state = '', khan = '', mine = '' } = await searchParams
+  const { q = '', state = '', khan = '', mine = '', trang: trangRaw } = await searchParams
   const onlyKhan = khan === '1'
   const isMine = mine === '1'
+  const trang = Math.max(1, Number(trangRaw) || 1)
   const me = isMine ? await currentStaff() : null
   // Gõ nguyên hình dạng KetQuaTrang<Ticket> (kể cả `trang`) cho nhánh rỗng — thiếu field
   // không lộ lỗi build ngay bây giờ (chưa ai đọc `trang`) nhưng Task 4 destructure vào là vỡ.
   const ketQua: KetQuaTrang<Ticket> =
     isMine && !me
       ? { rows: [], tong: 0, trang: 1, soTrang: 1 }
-      : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id)
+      : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, { trang })
   const { rows: tickets, tong, soTrang } = ketQua
 
   const tabs = [
@@ -37,15 +42,9 @@ export default async function TicketsPage({
           <DieuHuong />
         </header>
 
-        <form className="flex gap-2">
-          {state && <input type="hidden" name="state" value={state} />}
-          <input
-            name="q" defaultValue={q}
-            placeholder="Gõ mã ticket, serial, tên khách, SĐT hoặc nội dung lỗi…"
-            className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white"
-          />
-          <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
-        </form>
+        <Suspense>
+          <OTimKiem placeholder="Gõ mã ticket, serial, tên khách, SĐT hoặc nội dung lỗi…" />
+        </Suspense>
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-2 flex-wrap">
@@ -82,9 +81,12 @@ export default async function TicketsPage({
           )}
         </div>
 
-        <p className="text-sm text-slate-500">
-          {tong} ticket{soTrang > 1 && ' (giới hạn 50/trang — gõ cụ thể hơn)'}
-        </p>
+        <ThanhDangLoc
+          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          hienThi={tickets.length}
+          tong={tong}
+          nhan="ticket"
+        />
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
@@ -150,6 +152,10 @@ export default async function TicketsPage({
             </tbody>
           </table>
         </div>
+
+        <Suspense>
+          <PhanTrang trang={trang} soTrang={soTrang} />
+        </Suspense>
       </div>
     </main>
   )

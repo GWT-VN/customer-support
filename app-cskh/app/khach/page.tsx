@@ -1,9 +1,18 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix } from '@/app/actions'
+import { ThanhDangLoc } from '@/components/ThanhDangLoc'
+import { PhanTrang } from '@/components/PhanTrang'
 
-export default async function ToFixPage() {
-  const { rows: list, tong, trang, soTrang } = await listToFix()
+export default async function ToFixPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trang?: string }>
+}) {
+  const { trang: trangRaw } = await searchParams
+  const trang = Math.max(1, Number(trangRaw) || 1)
+  const { rows: list, tong, soTrang } = await listToFix({ trang })
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
@@ -14,11 +23,13 @@ export default async function ToFixPage() {
         <Link href="/" className="text-sm text-slate-600 underline">← Máy đã lắp</Link>
 
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="space-y-1.5">
             <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {tong} khách cần dọn{soTrang > 1 && ` (trang ${trang}/${soTrang})`} · trên trang này:{' '}
-              {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
+            {/* Không gắn OTimKiem: listToFix() không nhận từ khoá (Task 3 không thêm tham số
+                q cho hàm này) — gắn ô tìm ở đây sẽ gõ được mà không lọc gì, tệ hơn không có. */}
+            <ThanhDangLoc dieuKien={[]} hienThi={list.length} tong={tong} nhan="khách cần dọn" />
+            <p className="text-sm text-slate-500">
+              Trên trang này: {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
               Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
             </p>
           </div>
@@ -71,6 +82,10 @@ export default async function ToFixPage() {
             </tbody>
           </table>
         </div>
+
+        <Suspense>
+          <PhanTrang trang={trang} soTrang={soTrang} />
+        </Suspense>
       </div>
     </main>
   )

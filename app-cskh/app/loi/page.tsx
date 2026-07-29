@@ -1,8 +1,12 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { coreForecast, coreCounts } from '@/app/actions'
 import { ThayLoiButton } from '@/components/ThayLoiButton'
 import { vnDate } from '@/components/Badge'
+import { OTimKiem } from '@/components/OTimKiem'
+import { ThanhDangLoc } from '@/components/ThanhDangLoc'
+import { PhanTrang } from '@/components/PhanTrang'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -25,12 +29,13 @@ function HanBadge({ tt, ngay }: { tt: string; ngay: number | null }) {
 export default async function LoiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; trang?: string }>
 }) {
-  const { q = '', tt } = await searchParams
+  const { q = '', tt, trang: trangRaw } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
+  const trang = Math.max(1, Number(trangRaw) || 1)
   const [{ rows, tong, soTrang }, counts] = await Promise.all([
-    coreForecast(tinhTrang, q),
+    coreForecast(tinhTrang, q, { trang }),
     coreCounts(),
   ])
 
@@ -74,19 +79,16 @@ export default async function LoiPage({
           </p>
         )}
 
-        <form className="flex gap-2">
-          {tt !== undefined && <input type="hidden" name="tt" value={tt} />}
-          <input
-            name="q" defaultValue={q}
-            placeholder="Gõ serial, tên khách, SĐT, mã lõi…"
-            className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white"
-          />
-          <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
-        </form>
+        <Suspense>
+          <OTimKiem placeholder="Gõ serial, tên khách, SĐT, mã lõi…" />
+        </Suspense>
 
-        <p className="text-sm text-slate-500">
-          {tong} dòng (máy × lõi){soTrang > 1 && ' — giới hạn 100/trang, gõ cụ thể hơn'}
-        </p>
+        <ThanhDangLoc
+          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          hienThi={rows.length}
+          tong={tong}
+          nhan="dòng (máy × lõi)"
+        />
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
@@ -144,6 +146,10 @@ export default async function LoiPage({
             </tbody>
           </table>
         </div>
+
+        <Suspense>
+          <PhanTrang trang={trang} soTrang={soTrang} />
+        </Suspense>
       </div>
     </main>
   )

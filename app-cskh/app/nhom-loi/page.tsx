@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
 import { issueReport, ticketsChuaPhanNhom } from '@/app/actions'
 import { MucDoBadge, BaoHangBadge } from '@/components/NhomLoiBadge'
+import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 
 export default async function NhomLoiPage({
   searchParams,
@@ -57,6 +58,11 @@ export default async function NhomLoiPage({
           vì loại ticket là kênh tiếp nhận (&ldquo;Khác&rdquo; chiếm 25%), không phải triệu chứng.
           Một ticket có thể thuộc nhiều nhóm. Bấm vào nhóm để soi từng ticket.
         </p>
+
+        {/* Không gắn OTimKiem lẫn PhanTrang: issueReport()/ticketsChuaPhanNhom() trả về
+            TOÀN BỘ mảng, không nhận từ khoá và không phân trang (không có KetQuaTrang) —
+            gắn ô tìm hay nút chuyển trang ở đây sẽ chỉ có hình thức, không có tác dụng. */}
+        <ThanhDangLoc dieuKien={[]} hienThi={rows.length} tong={rows.length} nhan="nhóm lỗi" />
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
