@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
-import { antoanChoOr, chuanHoaTuKhoa, sapXepHopLe } from '@/lib/timkiem'
+import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe } from '@/lib/timkiem'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH,
   TINH_TRANG_BH, type TinhTrangBH,
@@ -65,13 +65,14 @@ export async function searchMachines(
 
   const kw = antoanChoOr(chuanHoaTuKhoa(q))
   if (kw) {
-    // KHÔNG đưa dia_chi_kd vào đây: "Phường" bỏ dấu thành "phuong", chứa chuỗi con
-    // "huong" -> gõ "huong" tìm KHÁCH lại ngập kết quả nhiễu vì trúng ĐỊA CHỈ (đo
-    // trên DB thật: 296/472 dòng khớp, 257 dòng trong đó khớp CHỈ vì địa chỉ có chữ
-    // "Phường"/"phường", không phải tên). Tìm theo địa chỉ để dành cho bộ lọc riêng ở
-    // Task 5 — đừng thêm dia_chi_kd lại vào đây, ten_kd đã đủ cho ô tìm chung.
+    // TÊN khách khớp theo ĐẦU TỪ (imatch + \m), xem mauDauTu(): gõ "huong" không
+    // còn ra Phương/Thương nữa. Serial và SĐT vẫn ilike %...% — ở đó người dùng cố
+    // ý gõ một MẨU GIỮA chuỗi (4 số cuối điện thoại, đuôi serial), khớp đầu từ sẽ
+    // làm hỏng đúng thao tác thường dùng nhất.
+    //
+    // KHÔNG đưa dia_chi_kd vào đây: tìm theo địa chỉ để dành cho bộ lọc riêng.
     truyVan = truyVan.or(
-      `ten_kd.ilike.%${kw}%,serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
+      `ten_kd.imatch.${mauDauTu(kw)},serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
     )
   }
 
@@ -502,8 +503,10 @@ export async function searchTickets(
     // đổi sang ten_kd (đã bỏ dấu sẵn, coalesce đúng khuôn customer_name — migration 06).
     const safe = antoanChoOr(term)
     const kw = antoanChoOr(chuanHoaTuKhoa(q))
+    // ten_kd khớp theo ĐẦU TỪ như trang Máy (mauDauTu). Các cột còn lại giữ ilike:
+    // mô tả là văn xuôi, người dùng gõ mẩu giữa câu là chuyện thường.
     truyVan = truyVan.or(
-      `ticket_code.ilike.%${safe}%,source_serial.ilike.%${safe}%,ten_kd.ilike.%${kw}%,` +
+      `ticket_code.ilike.%${safe}%,source_serial.ilike.%${safe}%,ten_kd.imatch.${mauDauTu(kw)},` +
         `primary_phone.ilike.%${safe}%,description.ilike.%${safe}%,ticket_type.ilike.%${safe}%`
     )
   }
@@ -932,7 +935,7 @@ export async function listToFix(
 
   const kw = antoanChoOr(chuanHoaTuKhoa(q))
   if (kw) {
-    truyVan = truyVan.or(`ten_kd.ilike.%${kw}%,primary_phone.ilike.%${kw}%`)
+    truyVan = truyVan.or(`ten_kd.imatch.${mauDauTu(kw)},primary_phone.ilike.%${kw}%`)
   }
 
   // id (khoá chính, duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
@@ -1114,7 +1117,7 @@ export async function timGop(q: string): Promise<KetQuaTimGop> {
       ? dataClient()
           .from('cs_customers')
           .select('*', { count: 'exact' })
-          .or(`ten_kd.ilike.%${kw}%,primary_phone.ilike.%${kw}%`)
+          .or(`ten_kd.imatch.${mauDauTu(kw)},primary_phone.ilike.%${kw}%`)
           .order('full_name', { ascending: true })
           .limit(5)
       : Promise.resolve({ data: [] as Customer[], count: 0, error: null }),

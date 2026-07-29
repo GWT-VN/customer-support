@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { antoanChoOr, boDau, chuanHoaTuKhoa, sapXepHopLe } from './timkiem'
+import { antoanChoOr, boDau, chuanHoaTuKhoa, mauDauTu, sapXepHopLe } from './timkiem'
 import { COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from './danhSach'
 
 describe('boDau', () => {
@@ -101,5 +101,48 @@ describe('antoanChoOr — chốt chặn phá cú pháp .or() của PostgREST', (
 
   it('chuỗi rỗng vẫn trả về rỗng', () => {
     expect(antoanChoOr('')).toBe('')
+  })
+})
+
+describe('mauDauTu — khớp theo đầu từ, hết nhiễu Phương/Thương', () => {
+  // Postgres không có trong test nên mô phỏng: \m (mốc đầu từ của Postgres) tương
+  // đương \b đứng trước ký tự chữ trong JS. Đủ để chốt Ý ĐỊNH của mẫu regex;
+  // hành vi thật trên PostgREST đã đo riêng trên DB (41 dòng -> 20 dòng).
+  const khop = (kw: string, ten: string) =>
+    new RegExp(mauDauTu(kw).replace(/^\\m/, '\\b'), 'i').test(ten)
+
+  it('sinh đúng mẫu có mốc đầu từ', () => {
+    expect(mauDauTu('huong')).toBe('\\mhuong')
+  })
+
+  it('ăn tên có ĐÚNG chữ Hương', () => {
+    expect(khop('huong', 'nguyen thi huong')).toBe(true)
+    expect(khop('huong', 'huong giang')).toBe(true)
+    expect(khop('huong', 'vu huong tra my')).toBe(true)
+  })
+
+  it('KHÔNG ăn Phương / Phượng / Thương / Thường — 21 dòng sai của cách cũ', () => {
+    expect(khop('huong', 'chi minh phuong')).toBe(false)
+    expect(khop('huong', 'chi phuong anh')).toBe(false)
+    expect(khop('huong', 'chi thuong')).toBe(false)
+    expect(khop('huong', 'nguyen hai thuong')).toBe(false)
+    expect(khop('huong', 'cong ty co phan dau tu thuong mai va san xuat xanh xanh')).toBe(false)
+  })
+
+  it('vẫn gõ được một phần tên — mốc chỉ ràng buộc chỗ bắt đầu', () => {
+    expect(khop('le thi', 'chi le thi thu huong - ocean park')).toBe(true)
+    expect(khop('huon', 'nguyen thi huong')).toBe(true)     // gõ dở tới đâu lọc tới đó
+  })
+
+  it('thoát ký tự regex — gõ "[" phải ra mẫu HỢP LỆ, không làm PostgREST trả 400', () => {
+    expect(mauDauTu('a[b')).toBe('\\ma\\[b')
+    for (const xau of ['[', 'a(b', 'a+b', 'a|b', 'a.b', 'a\\b', '?', '{2,']) {
+      expect(() => new RegExp(mauDauTu(xau).replace(/^\\m/, '\\b'))).not.toThrow()
+    }
+  })
+
+  it('dấu chấm là chữ THẬT chứ không phải ký tự đại diện', () => {
+    expect(khop('a.b', 'axb')).toBe(false)
+    expect(khop('a.b', 'a.b')).toBe(true)
   })
 })
