@@ -21,6 +21,15 @@ export const MOI_TRANG = 50
  */
 export const MOI_TRANG_LOI = 100
 
+/**
+ * Trần cứng cho "chọn tất cả khớp bộ lọc".
+ *
+ * Bảng lớn nhất hiện nay mới 472 dòng nên trần này chưa bao giờ chạm tới. Nó ở
+ * đây để một ngày dữ liệu phình lên thì giao diện KHÔNG lặng lẽ chọn 50.000 dòng
+ * rồi đẩy hết vào một Server Action. Chạm trần thì phải nói ra, không cắt lén.
+ */
+export const TOI_DA_CHON = 2000
+
 /** Cột được phép sắp xếp — ngoài danh sách này bị bỏ qua (chống injection). */
 export const COT_MAY = ['install_date', 'serial', 'customer_name', 'product_name', 'warranty_full_end'] as const
 export const COT_TICKET = ['created_at', 'ticket_code', 'state', 'customer_name'] as const

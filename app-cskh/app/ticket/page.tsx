@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
-import { searchTickets, currentStaff, ticketTypes, type KetQuaTrang, type Ticket } from '@/app/actions'
+import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, type KetQuaTrang, type Ticket } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
 import { laAdmin } from '@/lib/supabase'
@@ -137,7 +137,13 @@ export default async function TicketsPage({
 
         {/* Chỉ CHỌN dòng, chưa có hành động — chỗ cắm hành động ở children của
             <ThanhDaChon>, xem hướng dẫn trong components/ChonDong.tsx. */}
-        <KhungChon khoaTrang={tickets.map((t) => t.ticket_code)} bat={admin}>
+        <KhungChon
+          khoaTrang={tickets.map((t) => t.ticket_code)}
+          tong={tong}
+          bat={admin}
+          thamSo={{ q, state, khan, mine, loai, cot, chieu }}
+          layTatCaKhoa={khoaTatCaTicket}
+        >
         <ThanhDaChon nhan="ticket" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

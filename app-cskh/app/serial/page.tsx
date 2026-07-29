@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { DieuHuong } from '@/components/DieuHuong'
 import { laAdmin } from '@/lib/supabase'
-import { searchSerials, listSerialPending } from '@/app/actions'
+import { searchSerialsCoDem, listSerialPending, khoaTatCaSerial } from '@/app/actions'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
@@ -13,8 +13,8 @@ export default async function SerialPage({
 }) {
   const { q = '', tab = '' } = await searchParams
   const laCho = tab === 'cho'
-  const [rows, pending, admin] = await Promise.all([
-    laCho ? Promise.resolve([]) : searchSerials(q),
+  const [{ rows, tong }, pending, admin] = await Promise.all([
+    laCho ? Promise.resolve({ rows: [], tong: 0 }) : searchSerialsCoDem(q),
     listSerialPending('cho_duyet'),
     laAdmin(),
   ])
@@ -51,8 +51,16 @@ export default async function SerialPage({
                 className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white" />
               <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
             </form>
-            <p className="text-sm text-slate-500">{rows.length} serial{rows.length === 50 && ' (giới hạn 50 — gõ cụ thể hơn)'}</p>
-            <KhungChon khoaTrang={rows.map((s) => s.serial)} bat={admin}>
+            <p className="text-sm text-slate-500">
+              {rows.length < tong ? `Hiện ${rows.length} trên ${tong} serial` : `${tong} serial`}
+            </p>
+            <KhungChon
+              khoaTrang={rows.map((s) => s.serial)}
+              tong={tong}
+              bat={admin}
+              thamSo={{ q }}
+              layTatCaKhoa={khoaTatCaSerial}
+            >
             <ThanhDaChon nhan="serial" />
             <div className="bg-white rounded-xl border overflow-x-auto">
               <table className="w-full text-sm">

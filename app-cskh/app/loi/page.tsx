@@ -9,6 +9,7 @@ import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 import { laAdmin } from '@/lib/supabase'
+import { khoaTatCaLoi } from '@/app/actions'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/components/ChonDong'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
@@ -98,7 +99,15 @@ export default async function LoiPage({
         {/* Khoá dòng phải là (serial, filter_code): một máy có NHIỀU lõi nên riêng
             serial KHÔNG định danh được một dòng — trùng khoá là tick một ô sáng
             nhiều ô. Đúng cặp khoá đang dùng cho React key và cho khoá phụ phân trang. */}
-        <KhungChon khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)} bat={admin}>
+        <KhungChon
+          khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)}
+          tong={tong}
+          bat={admin}
+          // `tt` phải là tinhTrang ĐÃ GIẢI (mặc định SAP khi URL trống), không phải
+          // `tt` thô — nếu không, "chọn tất cả" sẽ ôm cả tab khác tab đang xem.
+          thamSo={{ q, tt: tinhTrang, cot, chieu }}
+          layTatCaKhoa={khoaTatCaLoi}
+        >
         <ThanhDaChon nhan="dòng lõi" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

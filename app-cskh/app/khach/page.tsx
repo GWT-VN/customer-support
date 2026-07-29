@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
-import { listToFix } from '@/app/actions'
+import { listToFix, khoaTatCaKhach } from '@/app/actions'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
@@ -51,7 +51,13 @@ export default async function ToFixPage({
           Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
         </p>
 
-        <KhungChon khoaTrang={list.map((c) => c.id)} bat={admin}>
+        <KhungChon
+          khoaTrang={list.map((c) => c.id)}
+          tong={tong}
+          bat={admin}
+          thamSo={{ q, cot, chieu }}
+          layTatCaKhoa={khoaTatCaKhach}
+        >
         <ThanhDaChon nhan="khách" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
-import { searchMachines, machineModels } from './actions'
+import { searchMachines, machineModels, khoaTatCaMay } from './actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
@@ -87,7 +87,14 @@ export default async function Home({
           sapXep={sapXep}
         />
 
-        <KhungChon khoaTrang={machines.map((m) => m.serial)} bat={admin}>
+        <KhungChon
+          khoaTrang={machines.map((m) => m.serial)}
+          tong={tong}
+          bat={admin}
+          // KHÔNG có `trang`: lật trang không được coi là đổi bộ lọc, xem ChonDong.tsx
+          thamSo={{ q, sp, bh, cot, chieu }}
+          layTatCaKhoa={khoaTatCaMay}
+        >
         <ThanhDaChon nhan="máy" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

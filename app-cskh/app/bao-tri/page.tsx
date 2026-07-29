@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
 import { OTimKiem } from '@/components/OTimKiem'
-import { maintenanceDue, maintenanceCounts } from '@/app/actions'
+import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri } from '@/app/actions'
 import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
 import { vnDate } from '@/components/Badge'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
@@ -31,7 +31,7 @@ export default async function BaoTriPage({
 }) {
   const { q = '', tt, cot, chieu } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, sapXep }, counts, admin] = await Promise.all([
+  const [{ rows, tong, sapXep }, counts, admin] = await Promise.all([
     maintenanceDue(tinhTrang, q, { cot, chieu }),
     maintenanceCounts(),
     laAdmin(),
@@ -88,15 +88,23 @@ export default async function BaoTriPage({
         </p>
 
         <div className="flex items-center gap-3 flex-wrap text-sm">
+          {/* Nay có tổng thật nên nói được "hiện X trên Y" thay vì chỉ đếm dòng
+              đang tải — trước đây "100 lượt" khiến người dùng tưởng chỉ có 100. */}
           <span className="text-slate-500">
-            {rows.length} lượt{rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
+            {rows.length < tong ? `Hiện ${rows.length} trên ${tong} lượt` : `${tong} lượt`}
           </span>
           <Suspense>
             <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} macDinh={sapXep.macDinh} />
           </Suspense>
         </div>
 
-        <KhungChon khoaTrang={rows.map((r) => r.visit_id)} bat={admin}>
+        <KhungChon
+          khoaTrang={rows.map((r) => r.visit_id)}
+          tong={tong}
+          bat={admin}
+          thamSo={{ q, tt: tinhTrang, cot, chieu }}
+          layTatCaKhoa={khoaTatCaBaoTri}
+        >
         <ThanhDaChon nhan="lượt bảo trì" />
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">

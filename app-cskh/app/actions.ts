@@ -6,7 +6,7 @@ import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, type SapXep } from '@/lib/timkiem'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
-  TINH_TRANG_BH, type TinhTrangBH,
+  TINH_TRANG_BH, TOI_DA_CHON, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -34,6 +34,17 @@ export type TuyChonDanhSach = {
   trang?: number
   cot?: string
   chieu?: string
+  /**
+   * Ghi đè số dòng mỗi trang. CHỈ dùng cho "chọn tất cả khớp bộ lọc" (các hàm
+   * khoaTatCa* ở cuối file) — gọi lại ĐÚNG hàm liệt kê với một trang thật to
+   * rồi lấy khoá.
+   *
+   * Vì sao không viết truy vấn riêng chỉ lấy khoá: bộ lọc sẽ bị chép làm hai bản
+   * và sớm muộn lệch nhau. Lúc đó người dùng thấy "91 ticket" trên màn hình
+   * nhưng bấm chọn tất cả lại ra 87 — không ai phát hiện ra cho tới khi sửa nhầm.
+   * Chấp nhận tốn thêm băng thông một lần bấm để đổi lấy KHÔNG BAO GIỜ lệch.
+   */
+  moiTrang?: number
 }
 
 export type Machine = {
@@ -66,7 +77,8 @@ export async function searchMachines(
     cot: 'install_date', tang: false,
   })
   const trang = Math.max(1, tuyChon.trang ?? 1)
-  const tu = (trang - 1) * MOI_TRANG
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const tu = (trang - 1) * moi
 
   let truyVan = dataClient()
     .from('v_installed_base')
@@ -121,7 +133,7 @@ export async function searchMachines(
   const { data, error, count } = await truyVan
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('serial', { ascending: true })
-    .range(tu, tu + MOI_TRANG - 1)
+    .range(tu, tu + moi - 1)
   if (error) throw new Error(error.message)
 
   const tong = count ?? 0
@@ -129,7 +141,7 @@ export async function searchMachines(
     rows: (data ?? []) as Machine[],
     tong,
     trang,
-    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
     sapXep: sx,
   }
 }
@@ -294,7 +306,8 @@ export async function coreForecast(
     cot: 'han_som', tang: true,
   })
   const trang = Math.max(1, tuyChon.trang ?? 1)
-  const tu = (trang - 1) * MOI_TRANG_LOI
+  const moi = tuyChon.moiTrang ?? MOI_TRANG_LOI
+  const tu = (trang - 1) * moi
 
   let truyVan = dataClient().from('v_core_forecast').select('*', { count: 'exact' })
 
@@ -318,7 +331,7 @@ export async function coreForecast(
     .order('serial', { ascending: true })
     .order('filter_code', { ascending: true })
   // LoiCuaMay.tsx cần TOÀN BỘ lõi của 1 máy (không phân trang) rồi tự lọc theo serial.
-  if (!tuyChon.tatPhanTrang) cauLenh = cauLenh.range(tu, tu + MOI_TRANG_LOI - 1)
+  if (!tuyChon.tatPhanTrang) cauLenh = cauLenh.range(tu, tu + moi - 1)
 
   const { data, error, count } = await cauLenh
   if (error) throw new Error(error.message)
@@ -328,7 +341,7 @@ export async function coreForecast(
     rows: (data ?? []) as CoreDue[],
     tong,
     trang,
-    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG_LOI)),
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
     sapXep: sx,
   }
 }
@@ -368,7 +381,7 @@ export async function maintenanceDue(
   tinhTrang: string,
   q: string,
   tuyChon: TuyChonDanhSach = {}
-): Promise<{ rows: MaintenanceDue[]; sapXep: SapXep }> {
+): Promise<{ rows: MaintenanceDue[]; tong: number; sapXep: SapXep }> {
   await requireStaff()
   // Trang này KHÔNG phân trang (giới hạn 100 dòng) nên không cần `trang`, nhưng
   // vẫn cần whitelist cột y như các trang kia — ?cot= trên URL là dữ liệu người
@@ -376,7 +389,9 @@ export async function maintenanceDue(
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_BAO_TRI, {
     cot: 'due_date', tang: true,
   })
-  let query = dataClient().from('v_maintenance_due').select('*')
+  // count exact: trang giới hạn 100 dòng nên PHẢI biết tổng thật, không thì
+  // không nói được "hiện 100 trên 467" lẫn "chọn tất cả N khớp bộ lọc".
+  let query = dataClient().from('v_maintenance_due').select('*', { count: 'exact' })
 
   if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
   const kw = antoanChoOr(chuanHoaTuKhoa(q))
@@ -394,12 +409,12 @@ export async function maintenanceDue(
   }
   // visit_id là khoá chính -> khoá phụ đủ để 100 dòng lấy ra luôn cùng một thứ tự
   // giữa hai lần tải (due_date trùng nhau rất nhiều: cả cụm cùng đến hạn một ngày).
-  const { data, error } = await query
+  const { data, error, count } = await query
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('visit_id', { ascending: true })
-    .limit(100)
+    .limit(tuyChon.moiTrang ?? 100)
   if (error) throw new Error(error.message)
-  return { rows: (data ?? []) as MaintenanceDue[], sapXep: sx }
+  return { rows: (data ?? []) as MaintenanceDue[], tong: count ?? 0, sapXep: sx }
 }
 
 export async function maintenanceCounts() {
@@ -525,7 +540,8 @@ export async function searchTickets(
     cot: 'created_at', tang: false,
   })
   const trang = Math.max(1, tuyChon.trang ?? 1)
-  const tu = (trang - 1) * MOI_TRANG
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const tu = (trang - 1) * moi
 
   let truyVan = dataClient().from('v_tickets').select('*', { count: 'exact' })
 
@@ -557,7 +573,7 @@ export async function searchTickets(
     .order('khan', { ascending: false })
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('ticket_code', { ascending: true })
-    .range(tu, tu + MOI_TRANG - 1)
+    .range(tu, tu + moi - 1)
   if (error) throw new Error(error.message)
 
   const tong = count ?? 0
@@ -565,7 +581,7 @@ export async function searchTickets(
     rows: (data ?? []) as Ticket[],
     tong,
     trang,
-    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
     sapXep: sx,
   }
 }
@@ -709,12 +725,17 @@ export type SerialPending = {
   nguoi_tao: string | null; trang_thai: string; ly_do_tu_choi: string | null; created_at: string
 }
 
-/** Tra serial trong kho (serial_registry). Dùng cho ô chọn serial + trang /serial. */
-export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]> {
+/**
+ * Một chỗ DUY NHẤT dựng truy vấn kho serial. searchSerials() và
+ * searchSerialsCoDem() cùng gọi hàm này -> bộ lọc không bao giờ tách làm hai bản
+ * rồi lệch nhau (xem chú thích ở TuyChonDanhSach.moiTrang).
+ * Không export nên không bị luật "'use server' chỉ export async function" đụng tới.
+ */
+async function truyVanSerial(q: string, limit: number) {
   await requireStaff()
   let query = dataClient()
     .from('serial_registry')
-    .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po')
+    .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po', { count: 'exact' })
   const term = q.trim()
   if (term) {
     const safe = term.replace(/[%_]/g, (c) => '\\' + c)
@@ -723,9 +744,19 @@ export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]>
         `ma_quoc_te.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%`
     )
   }
-  const { data, error } = await query.order('serial').limit(limit)
+  const { data, error, count } = await query.order('serial').limit(limit)
   if (error) throw new Error(error.message)
-  return (data ?? []) as SerialRow[]
+  return { rows: (data ?? []) as SerialRow[], tong: count ?? 0 }
+}
+
+/** Tra serial trong kho (serial_registry). Dùng cho ô chọn serial + trang /serial. */
+export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]> {
+  return (await truyVanSerial(q, limit)).rows
+}
+
+/** Như searchSerials nhưng kèm TỔNG số khớp — trang /serial cần để chọn tất cả. */
+export async function searchSerialsCoDem(q: string, limit = 50): Promise<{ rows: SerialRow[]; tong: number }> {
+  return truyVanSerial(q, limit)
 }
 
 export async function listSerialPending(trangThai = 'cho_duyet'): Promise<SerialPending[]> {
@@ -1141,7 +1172,8 @@ export async function listToFix(
     cot: 'full_name', tang: true,
   })
   const trang = Math.max(1, tuyChon.trang ?? 1)
-  const tu = (trang - 1) * MOI_TRANG
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const tu = (trang - 1) * moi
 
   // Điều kiện needs_phone/address CỐ ĐỊNH, không ghép từ khoá người dùng -> không cần
   // antoanChoOr cho nó. Từ khoá tìm chung nằm ở .or() RIÊNG bên dưới (2 lệnh .or() liên
@@ -1161,7 +1193,7 @@ export async function listToFix(
   const { data, error, count } = await truyVan
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false })
     .order('id', { ascending: true })
-    .range(tu, tu + MOI_TRANG - 1)
+    .range(tu, tu + moi - 1)
   if (error) throw new Error(error.message)
   const customers = (data ?? []) as Customer[]
 
@@ -1183,7 +1215,7 @@ export async function listToFix(
     rows: customers.map((c) => ({ ...c, machines: dem.get(c.id) ?? 0 })),
     tong,
     trang,
-    soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
+    soTrang: Math.max(1, Math.ceil(tong / moi)),
     sapXep: sx,
   }
 }
@@ -1353,4 +1385,73 @@ export async function timGop(q: string): Promise<KetQuaTimGop> {
     tongTicket: ticketRes.tong,
     tongKhach: khachRes.count ?? 0,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// "Chọn tất cả khớp bộ lọc" — lấy TOÀN BỘ khoá dòng, không chỉ 50 dòng đang xem
+//
+// Mỗi hàm ở đây gọi lại ĐÚNG hàm liệt kê của trang tương ứng với một trang thật
+// to, rồi rút khoá. KHÔNG viết truy vấn lọc riêng: chép bộ lọc làm hai bản thì
+// sớm muộn hai bản lệch nhau, và lúc đó màn hình ghi "91 ticket" nhưng bấm chọn
+// tất cả lại ra 87 — không ai phát hiện cho tới khi sửa nhầm dữ liệu.
+//
+// Trần TOI_DA_CHON là chốt chặn cuối. Bảng lớn nhất hiện mới 472 dòng nên chưa
+// bao giờ chạm; nếu chạm thì giao diện phải NÓI RA chứ không cắt lén.
+//
+// Tham số nhận nguyên khối searchParams của trang (chuỗi, tuần tự hoá được) để
+// truyền thẳng từ Server Component xuống Client Component làm Server Action.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ThamSoLoc = Record<string, string | undefined>
+
+export async function khoaTatCaMay(t: ThamSoLoc): Promise<string[]> {
+  const { rows } = await searchMachines(t.q ?? '', {
+    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
+    maSanPham: t.sp, tinhTrangBH: t.bh,
+  })
+  return rows.map((r) => r.serial)
+}
+
+export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
+  const onlyKhan = t.khan === '1'
+  const isMine = t.mine === '1'
+  // Phải giải "việc của tôi" y hệt trang /ticket, nếu không chọn tất cả sẽ ôm
+  // luôn ticket của người khác trong khi màn hình chỉ hiện việc của mình.
+  const me = isMine ? await currentStaff() : null
+  if (isMine && !me) return []
+  const { rows } = await searchTickets(
+    t.q ?? '',
+    onlyKhan ? undefined : t.state || undefined,
+    onlyKhan,
+    me?.id,
+    { trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined }
+  )
+  return rows.map((r) => r.ticket_code)
+}
+
+export async function khoaTatCaLoi(t: ThamSoLoc): Promise<string[]> {
+  const { rows } = await coreForecast(t.tt ?? '', t.q ?? '', {
+    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
+  })
+  // Khoá ghép: một máy có nhiều lõi nên riêng serial không định danh được 1 dòng.
+  return rows.map((r) => `${r.serial}-${r.filter_code}`)
+}
+
+export async function khoaTatCaKhach(t: ThamSoLoc): Promise<string[]> {
+  const { rows } = await listToFix(t.q ?? '', {
+    trang: 1, moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
+  })
+  return rows.map((r) => r.id)
+}
+
+export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
+  const { rows } = await maintenanceDue(t.tt ?? '', t.q ?? '', {
+    moiTrang: TOI_DA_CHON, cot: t.cot, chieu: t.chieu,
+  })
+  return rows.map((r) => r.visit_id)
+}
+
+export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
+  const rows = await searchSerials(t.q ?? '', TOI_DA_CHON)
+  return rows.map((r) => r.serial)
 }
