@@ -18,7 +18,7 @@
 | `db750a0` | Ô lọc chốt cứng bề rộng, tự vẽ mũi tên |
 | `2db62fb` | Ô lọc Sản phẩm hiện **mã máy** thay vì tên đầy đủ |
 | `d487a33` | Nút bỏ sắp xếp, đưa bảng về thứ tự gốc |
-| *(commit này)* | Chọn dòng cho **tất cả** trang danh sách + tài liệu này |
+| `ee25812` | Chọn dòng cho **tất cả** trang danh sách + tài liệu này |
 
 **Không đụng dữ liệu nghiệp vụ.** Migration 07 chỉ thêm cột sinh sẵn + index (xem §6).
 69 test đơn vị, `tsc` + `lint` + `next build` sạch.
