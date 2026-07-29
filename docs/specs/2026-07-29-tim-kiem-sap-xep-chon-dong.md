@@ -19,6 +19,8 @@
 | `2db62fb` | Ô lọc Sản phẩm hiện **mã máy** thay vì tên đầy đủ |
 | `d487a33` | Nút bỏ sắp xếp, đưa bảng về thứ tự gốc |
 | `ee25812` | Chọn dòng cho **tất cả** trang danh sách + tài liệu này |
+| `82811c6` | Chọn **tất cả khớp bộ lọc**, không chỉ 50 dòng đang xem |
+| `c097034` | Sửa lỗi Supabase cắt còn 1000 dòng mà không báo |
 
 **Không đụng dữ liệu nghiệp vụ.** Migration 07 chỉ thêm cột sinh sẵn + index (xem §6).
 69 test đơn vị, `tsc` + `lint` + `next build` sạch.
@@ -198,6 +200,26 @@ hiện ra nhưng bấm vào không đổi gì, người dùng tưởng nút hỏ
 không định danh được một dòng — dùng khoá trùng là tick một ô sáng nhiều ô. Đúng cặp khoá
 đang dùng cho React key và cho khoá phụ phân trang.
 
+### Chọn tất cả khớp bộ lọc
+
+Chọn hết trang → thanh mời **"Chọn tất cả N … khớp bộ lọc"**. Hai bước có chủ ý như
+Gmail/GitHub, không âm thầm gom.
+
+Ba điều đáng chú ý về an toàn:
+
+1. **Mốc xoá lựa chọn là CHỮ KÝ BỘ LỌC, không phải danh sách khoá của trang.** Đổi
+   lọc/từ khoá/sắp xếp thì xoá; lật trang thì giữ. Lấy khoá trang làm mốc thì chọn tất cả
+   472 máy xong lật trang 2 là mất sạch — đúng thứ vừa bấm.
+2. **Vượt phạm vi trang thì phải nói ra.** Thanh ghi thêm *"(gồm cả dòng ở trang khác)"*.
+   Tai nạn kinh điển của chọn-xuyên-trang là nhìn thấy 3 ô tick rồi bấm, không biết còn 189
+   dòng nữa đang được chọn.
+3. **Nút "Bỏ chọn" xoá SẠCH** (`xoaHet`), không phải `doiTatCa(false)` vốn chỉ đụng trang
+   hiện tại — nếu không, sau khi chọn 472 rồi bỏ chọn sẽ còn sót 422 dòng ngoài tầm mắt.
+
+Cách lấy khoá: 6 hàm `khoaTatCa*` gọi lại **đúng hàm liệt kê của trang đó** rồi rút khoá.
+KHÔNG viết truy vấn lọc riêng — chép bộ lọc làm hai bản thì sớm muộn lệch, lúc đó màn hình
+ghi "91 ticket" mà bấm chọn tất cả ra 87 và không ai phát hiện cho tới khi sửa nhầm.
+
 **Ba trang cố ý KHÔNG có chọn dòng**, vì dòng ở đó không phải bản ghi thao tác được:
 
 - `/doanh-so` — mỗi dòng là **tổng theo tháng**, không có bản ghi nào để sửa.
@@ -351,6 +373,11 @@ kết quả tìm dù tên vẫn hiện trên màn hình), nên lần này kiểm
 ---
 
 ## 7. Bẫy đã vấp — đọc trước khi sửa
+
+**Supabase chặn cứng 1000 dòng mỗi request** (`db-max-rows` của PostgREST). `.limit(2000)`
+KHÔNG báo lỗi — nó lặng lẽ trả về 1000. Đã dính đúng bẫy này: bấm "chọn tất cả 1891 serial"
+ra 1000, giao diện không hề biết bị cắt nên vẫn mời bấm lại mãi. Phải lấy theo **lô 1000**
+rồi ghép (`gomKhoa()`), và cột dùng `.range()` chứ `.limit()` thì không lấy được lô thứ hai.
 
 **Lỗi ESLint chặn deploy Vercel.** `npm run build` ở máy có thể qua trong khi Vercel thì
 không. Chạy `npm run lint` là bước **bắt buộc** trước khi push, không phải tuỳ chọn.
