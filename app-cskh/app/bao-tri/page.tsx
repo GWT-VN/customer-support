@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
+import { OTimKiem } from '@/components/OTimKiem'
 import { maintenanceDue, maintenanceCounts } from '@/app/actions'
 import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
 import { vnDate } from '@/components/Badge'
@@ -43,6 +45,10 @@ export default async function BaoTriPage({
           <DieuHuong />
         </header>
 
+        <Suspense>
+          <OTimKiem placeholder="Gõ tên khách, SĐT, bộ máy, công trình…" />
+        </Suspense>
+
         <div className="flex gap-2 flex-wrap">
           {tabs.map((t) => {
             const active = t.key === 'all' ? tinhTrang === '' : tinhTrang === t.key
@@ -64,16 +70,6 @@ export default async function BaoTriPage({
           Gói bảo trì POE theo hợp đồng. Bấm <strong>“Đã bảo trì”</strong> sau mỗi lần đi để đúng tiến độ
           — số lần còn lại tự trừ. Dòng “chưa khớp khách” là lịch từ Asana chưa gắn được vào hồ sơ khách.
         </p>
-
-        <form className="flex gap-2">
-          {tt !== undefined && <input type="hidden" name="tt" value={tt} />}
-          <input
-            name="q" defaultValue={q}
-            placeholder="Gõ tên khách, SĐT, bộ máy, công trình…"
-            className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white"
-          />
-          <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
-        </form>
 
         <p className="text-sm text-slate-500">
           {rows.length} lượt{rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}

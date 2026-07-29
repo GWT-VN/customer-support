@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 
 /**
  * Gõ tới đâu lọc tới đó, hoãn 300ms để không bắn truy vấn mỗi phím.
@@ -16,10 +16,17 @@ export function OTimKiem({ placeholder }: { placeholder: string }) {
   const searchParams = useSearchParams()
   const [q, setQ] = useState(searchParams.get('q') ?? '')
   const [, batDau] = useTransition()
-  const lanDau = useRef(true)
 
   useEffect(() => {
-    if (lanDau.current) { lanDau.current = false; return }
+    // 🐛 Đã từng gây lỗi "bấm Sau → không sang trang được": searchParams nằm trong
+    // deps, nên MỌI thay đổi URL đều chạy lại effect này — kể cả khi người dùng
+    // bấm chuyển trang hay đổi tab lọc. Nó lại luôn xoá ?trang= nên vừa sang
+    // trang 2 là bị đá ngược về trang 1.
+    //
+    // Chốt chặn: URL đã khớp ô nhập nghĩa là lần chạy này KHÔNG phải do gõ phím
+    // -> không đụng vào URL.
+    if (q === (searchParams.get('q') ?? '')) return
+
     const hen = setTimeout(() => {
       const sp = new URLSearchParams(searchParams.toString())
       if (q) sp.set('q', q)
