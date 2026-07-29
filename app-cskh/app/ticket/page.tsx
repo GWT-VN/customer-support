@@ -1,30 +1,39 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
-import { searchTickets, currentStaff, type KetQuaTrang, type Ticket } from '@/app/actions'
+import { searchTickets, currentStaff, ticketTypes, type KetQuaTrang, type Ticket } from '@/app/actions'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportButton } from '@/components/ExportButton'
 import { laAdmin } from '@/lib/supabase'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
+import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { BoLocChon } from '@/components/BoLocChon'
 
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; state?: string; khan?: string; mine?: string; trang?: string }>
+  searchParams: Promise<{
+    q?: string; state?: string; khan?: string; mine?: string; trang?: string
+    cot?: string; chieu?: string; loai?: string
+  }>
 }) {
-  const { q = '', state = '', khan = '', mine = '', trang: trangRaw } = await searchParams
+  const { q = '', state = '', khan = '', mine = '', trang: trangRaw, cot, chieu, loai = '' } = await searchParams
   const onlyKhan = khan === '1'
   const isMine = mine === '1'
   const trang = Math.max(1, Number(trangRaw) || 1)
   const me = isMine ? await currentStaff() : null
   // Gõ nguyên hình dạng KetQuaTrang<Ticket> (kể cả `trang`) cho nhánh rỗng — thiếu field
   // không lộ lỗi build ngay bây giờ (chưa ai đọc `trang`) nhưng Task 4 destructure vào là vỡ.
-  const ketQua: KetQuaTrang<Ticket> =
-    isMine && !me
-      ? { rows: [], tong: 0, trang: 1, soTrang: 1 }
-      : await searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, { trang })
+  const [ketQua, loaiList] = await Promise.all([
+    (isMine && !me
+      ? Promise.resolve<KetQuaTrang<Ticket>>({ rows: [], tong: 0, trang: 1, soTrang: 1 })
+      : searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, {
+          trang, cot, chieu, loaiTicket: loai || undefined,
+        })),
+    ticketTypes(),
+  ])
   const { rows: tickets, tong, soTrang } = ketQua
 
   const tabs = [
@@ -33,6 +42,22 @@ export default async function TicketsPage({
     { key: 'Done', label: 'Đã xong' },
     { key: 'Cancel', label: 'Đã huỷ' },
   ]
+
+  // Link bỏ RIÊNG một điều kiện, giữ nguyên điều kiện khác (kể cả cột/chiều đang sắp).
+  // state/khan/mine là tab điều hướng riêng (không phải chip ở ThanhDangLoc) nên vẫn
+  // giữ nguyên — bỏ "Từ khoá" hay "Loại lỗi" không có nghĩa là rời khỏi tab đang chọn.
+  function hrefBoDieuKien(bo: 'q' | 'loai') {
+    const params = new URLSearchParams()
+    if (q && bo !== 'q') params.set('q', q)
+    if (state) params.set('state', state)
+    if (khan) params.set('khan', khan)
+    if (mine) params.set('mine', mine)
+    if (loai && bo !== 'loai') params.set('loai', loai)
+    if (cot) params.set('cot', cot)
+    if (chieu) params.set('chieu', chieu)
+    const qs = params.toString()
+    return qs ? `/ticket?${qs}` : '/ticket'
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -47,7 +72,7 @@ export default async function TicketsPage({
         </Suspense>
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {tabs.map((t) => (
               <Link
                 key={t.key}
@@ -75,6 +100,11 @@ export default async function TicketsPage({
             >
               Việc của tôi
             </Link>
+            <Suspense>
+              {/* Danh sách chọn sinh từ ticketTypes() — chỉ liệt kê loại ĐANG thực sự có
+                  trong cột ticket_type, không hardcode. */}
+              <BoLocChon param="loai" nhan="Loại lỗi" tuyChon={loaiList.map((l) => ({ giaTri: l, nhan: l }))} />
+            </Suspense>
           </div>
           {await laAdmin() && (
             <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
@@ -82,7 +112,10 @@ export default async function TicketsPage({
         </div>
 
         <ThanhDangLoc
-          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          dieuKien={[
+            ...(q ? [{ nhan: 'Từ khoá', giaTri: q, href: hrefBoDieuKien('q') }] : []),
+            ...(loai ? [{ nhan: 'Loại lỗi', giaTri: loai, href: hrefBoDieuKien('loai') }] : []),
+          ]}
           hienThi={tickets.length}
           tong={tong}
           nhan="ticket"
@@ -90,17 +123,19 @@ export default async function TicketsPage({
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Mã</th>
-                <th className="text-left px-4 py-3 font-medium">Ngày</th>
-                <th className="text-left px-4 py-3 font-medium">Loại</th>
-                <th className="text-left px-4 py-3 font-medium">Khách</th>
-                <th className="text-left px-4 py-3 font-medium">Máy</th>
-                <th className="text-left px-4 py-3 font-medium">Phụ trách</th>
-                <th className="text-left px-4 py-3 font-medium">Trạng thái</th>
-              </tr>
-            </thead>
+            <Suspense>
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <TieuDeCotSapXep cot="ticket_code" nhan="Mã" chieuMacDinh="asc" />
+                  <TieuDeCotSapXep cot="created_at" nhan="Ngày" chieuMacDinh="desc" dangMacDinh />
+                  <th className="text-left px-4 py-3 font-medium">Loại</th>
+                  <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
+                  <th className="text-left px-4 py-3 font-medium">Máy</th>
+                  <th className="text-left px-4 py-3 font-medium">Phụ trách</th>
+                  <TieuDeCotSapXep cot="state" nhan="Trạng thái" chieuMacDinh="asc" />
+                </tr>
+              </thead>
+            </Suspense>
             <tbody className="divide-y">
               {tickets.map((t) => (
                 <tr key={t.ticket_code} className="hover:bg-slate-50 align-top">

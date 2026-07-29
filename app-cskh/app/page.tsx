@@ -1,20 +1,43 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { DieuHuong } from '@/components/DieuHuong'
-import { searchMachines } from './actions'
+import { searchMachines, machineModels } from './actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { OTimKiem } from '@/components/OTimKiem'
 import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
+import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
+import { BoLocChon } from '@/components/BoLocChon'
+import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, type TinhTrangBH } from '@/lib/danhSach'
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; trang?: string }>
+  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; sp?: string; bh?: string }>
 }) {
-  const { q = '', trang: trangRaw } = await searchParams
+  const { q = '', trang: trangRaw, cot, chieu, sp, bh } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const { rows: machines, tong, soTrang } = await searchMachines(q, { trang })
+  const [{ rows: machines, tong, soTrang }, models] = await Promise.all([
+    searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh }),
+    machineModels(),
+  ])
+
+  const tenSanPham = models.find((m) => m.internal_code === sp)?.product_name ?? sp
+  const tenBaoHanh = bh && TINH_TRANG_BH.includes(bh as TinhTrangBH) ? NHAN_TINH_TRANG_BH[bh as TinhTrangBH] : bh
+
+  // Link bỏ RIÊNG một điều kiện, giữ nguyên các điều kiện còn lại (kể cả cột/chiều đang
+  // sắp) — không đụng `trang` (bỏ lọc không nhất thiết phải về trang 1, nhưng để đơn
+  // giản thì bỏ luôn cho khỏi lệch).
+  function hrefBoDieuKien(bo: string) {
+    const params = new URLSearchParams()
+    if (q && bo !== 'q') params.set('q', q)
+    if (sp && bo !== 'sp') params.set('sp', sp)
+    if (bh && bo !== 'bh') params.set('bh', bh)
+    if (cot) params.set('cot', cot)
+    if (chieu) params.set('chieu', chieu)
+    const qs = params.toString()
+    return qs ? `/?${qs}` : '/'
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -28,8 +51,27 @@ export default async function Home({
           <OTimKiem placeholder="Gõ SĐT, serial hoặc tên khách…" />
         </Suspense>
 
+        <Suspense>
+          <div className="flex gap-2 flex-wrap">
+            <BoLocChon
+              param="sp"
+              nhan="Sản phẩm"
+              tuyChon={models.map((m) => ({ giaTri: m.internal_code, nhan: m.product_name ?? m.internal_code }))}
+            />
+            <BoLocChon
+              param="bh"
+              nhan="Bảo hành"
+              tuyChon={TINH_TRANG_BH.map((k) => ({ giaTri: k, nhan: NHAN_TINH_TRANG_BH[k] }))}
+            />
+          </div>
+        </Suspense>
+
         <ThanhDangLoc
-          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          dieuKien={[
+            ...(q ? [{ nhan: 'Từ khoá', giaTri: q, href: hrefBoDieuKien('q') }] : []),
+            ...(sp ? [{ nhan: 'Sản phẩm', giaTri: tenSanPham ?? sp, href: hrefBoDieuKien('sp') }] : []),
+            ...(bh ? [{ nhan: 'Bảo hành', giaTri: tenBaoHanh ?? bh, href: hrefBoDieuKien('bh') }] : []),
+          ]}
           hienThi={machines.length}
           tong={tong}
           nhan="máy"
@@ -37,16 +79,18 @@ export default async function Home({
 
         <div className="bg-white rounded-xl border overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Serial</th>
-                <th className="text-left px-4 py-3 font-medium">Máy</th>
-                <th className="text-left px-4 py-3 font-medium">Khách</th>
-                <th className="text-left px-4 py-3 font-medium">SĐT</th>
-                <th className="text-left px-4 py-3 font-medium">Lắp</th>
-                <th className="text-left px-4 py-3 font-medium">Bảo hành</th>
-              </tr>
-            </thead>
+            <Suspense>
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <TieuDeCotSapXep cot="serial" nhan="Serial" chieuMacDinh="asc" />
+                  <TieuDeCotSapXep cot="product_name" nhan="Máy" chieuMacDinh="asc" />
+                  <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
+                  <th className="text-left px-4 py-3 font-medium">SĐT</th>
+                  <TieuDeCotSapXep cot="install_date" nhan="Lắp" chieuMacDinh="desc" dangMacDinh />
+                  <th className="text-left px-4 py-3 font-medium">Bảo hành</th>
+                </tr>
+              </thead>
+            </Suspense>
             <tbody className="divide-y">
               {machines.map((m) => (
                 <tr key={m.serial} className="hover:bg-slate-50">

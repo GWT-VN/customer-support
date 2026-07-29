@@ -23,7 +23,11 @@ export function ThanhDangLoc({
   tong,
   nhan = 'kết quả',
 }: {
-  dieuKien: { nhan: string; giaTri: string }[]
+  // `href`: link BỎ RIÊNG điều kiện này (giữ mọi điều kiện khác) — cho phép
+  // gỡ từng bộ lọc một khi trang có NHIỀU điều kiện cùng lúc (q + sp + bh…).
+  // Không truyền thì chip chỉ hiển thị, không gỡ riêng được (trang cũ chỉ có
+  // đúng 1 điều kiện q -> nút "Xoá lọc" chung đã đủ).
+  dieuKien: { nhan: string; giaTri: string; href?: string }[]
   hienThi: number
   tong: number
   nhan?: string
@@ -38,6 +42,11 @@ export function ThanhDangLoc({
         {dieuKien.map((d) => (
           <span key={d.nhan} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
             {d.nhan}: <strong>{d.giaTri}</strong>
+            {d.href && (
+              <Link href={d.href} aria-label={`Bỏ lọc ${d.nhan}`} className="ml-1 text-slate-400 hover:text-slate-900">
+                ×
+              </Link>
+            )}
           </span>
         ))}
         <span className="text-slate-500">{dong}</span>

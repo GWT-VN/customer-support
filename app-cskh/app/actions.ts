@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
 import { antoanChoOr, chuanHoaTuKhoa, sapXepHopLe } from '@/lib/timkiem'
-import { MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from '@/lib/danhSach'
+import {
+  MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH,
+  TINH_TRANG_BH, type TinhTrangBH,
+} from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
 const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
@@ -47,7 +50,7 @@ export type Machine = {
 /** Tra máy theo serial / tên khách / SĐT / địa chỉ (không dấu). Rỗng -> máy lắp gần nhất. */
 export async function searchMachines(
   q: string,
-  tuyChon: TuyChonDanhSach = {}
+  tuyChon: TuyChonDanhSach & { maSanPham?: string; tinhTrangBH?: string } = {}
 ): Promise<KetQuaTrang<Machine>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_MAY, {
@@ -72,6 +75,32 @@ export async function searchMachines(
     )
   }
 
+  if (tuyChon.maSanPham) truyVan = truyVan.eq('internal_code', tuyChon.maSanPham)
+
+  // 4 nhánh PHẢI khớp Y HỆT WarrantyBadge (components/Badge.tsx) — whitelist qua
+  // TINH_TRANG_BH nên giá trị lạ trên URL bị bỏ qua thay vì lặng lẽ .eq() sai cột.
+  if (tuyChon.tinhTrangBH && TINH_TRANG_BH.includes(tuyChon.tinhTrangBH as TinhTrangBH)) {
+    switch (tuyChon.tinhTrangBH as TinhTrangBH) {
+      case 'chua_kich_hoat':
+        truyVan = truyVan.eq('warranty_activated', false)
+        break
+      case 'con_han_may':
+        truyVan = truyVan
+          .eq('warranty_activated', true).eq('co_chinh_sach_bh', true).eq('con_han_may', true)
+        break
+      case 'het_may_con_loi':
+        truyVan = truyVan
+          .eq('warranty_activated', true).eq('co_chinh_sach_bh', true)
+          .eq('con_han_may', false).eq('con_han_loi', true)
+        break
+      case 'het_ca_hai':
+        truyVan = truyVan
+          .eq('warranty_activated', true).eq('co_chinh_sach_bh', true)
+          .eq('con_han_may', false).eq('con_han_loi', false)
+        break
+    }
+  }
+
   // serial là khoá chính của v_installed_base -> khoá phụ đủ để .range() không
   // nhảy/lặp dòng giữa các trang khi cột sắp xếp chính có nhiều dòng bằng nhau
   // (vd install_date trùng nhau tới 10 dòng — Postgres không tự đảm bảo thứ tự đó).
@@ -88,6 +117,25 @@ export async function searchMachines(
     trang,
     soTrang: Math.max(1, Math.ceil(tong / MOI_TRANG)),
   }
+}
+
+/** Model máy đã lắp — nguồn cho ô lọc "Sản phẩm/model" ở "/". Sinh từ DB thật
+ *  (không hardcode): mỗi internal_code xuất hiện đúng 1 lần, nhãn = product_name. */
+export async function machineModels(): Promise<{ internal_code: string; product_name: string | null }[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_installed_base')
+    .select('internal_code, product_name')
+    .not('internal_code', 'is', null)
+  if (error) throw new Error(error.message)
+
+  const theo = new Map<string, string | null>()
+  for (const r of (data ?? []) as { internal_code: string; product_name: string | null }[]) {
+    if (!theo.has(r.internal_code)) theo.set(r.internal_code, r.product_name)
+  }
+  return [...theo.entries()]
+    .map(([internal_code, product_name]) => ({ internal_code, product_name }))
+    .sort((a, b) => (a.product_name ?? a.internal_code).localeCompare(b.product_name ?? b.internal_code, 'vi'))
 }
 
 export async function getMachine(serial: string): Promise<Machine | null> {
@@ -436,7 +484,7 @@ export async function searchTickets(
   state?: string,
   onlyKhan?: boolean,
   mineStaffId?: string,
-  tuyChon: TuyChonDanhSach = {}
+  tuyChon: TuyChonDanhSach & { loaiTicket?: string } = {}
 ): Promise<KetQuaTrang<Ticket>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_TICKET, {
@@ -462,6 +510,10 @@ export async function searchTickets(
   if (state) truyVan = truyVan.eq('state', state)
   if (onlyKhan) truyVan = truyVan.eq('khan', true)
   if (mineStaffId) truyVan = truyVan.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
+  // Danh sách chọn ở giao diện sinh từ ticketTypes() (dữ liệu thật) nên giá trị luôn
+  // hợp lệ; vẫn .eq() thẳng (không whitelist tĩnh) vì loại ticket là dữ liệu mở, không
+  // cố định như cột sắp xếp.
+  if (tuyChon.loaiTicket) truyVan = truyVan.eq('ticket_type', tuyChon.loaiTicket)
 
   // Khẩn lên đầu, rồi theo cột sắp xếp đã kiểm tra, rồi ticket_code (khoá chính,
   // duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
