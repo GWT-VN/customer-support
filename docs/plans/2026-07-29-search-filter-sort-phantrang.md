@@ -534,6 +534,98 @@ git commit -m "feat(ui): ô tìm gõ-tới-đâu-lọc-tới-đó + thanh đang 
 
 ---
 
+## Task 5a: Bổ sung tìm kiếm cho 2 trang còn thiếu
+
+> **Sửa quyết định sai (2026-07-29).** Task 4 phát hiện `/khach` và `/nhom-loi` không có
+> tham số `q`, và tôi đã chốt bỏ ô tìm ở hai trang đó. User bác bỏ: *"Tại sao lại xoá. Nếu
+> không có phải bổ sung chứ."* Đúng — thiếu thì bổ sung, không phải đóng lại.
+
+**Files:**
+- Modify: `app-cskh/app/actions.ts` — `listToFix`, `issueReport`, `ticketsChuaPhanNhom`
+- Modify: `app-cskh/app/khach/page.tsx`, `app-cskh/app/nhom-loi/page.tsx`
+
+- [ ] **Step 1: `listToFix` nhận `q`**
+
+Thêm tham số `q: string` (mặc định `''`). Lọc trên `cs_customers` bằng `ten_kd` (cột bỏ dấu đã có
+từ Task 1) + `primary_phone`. **Không** thêm `dia_chi_kd` vào nhánh OR — đó chính là lỗi C1 đã sửa
+ở Task 3 (`"Phường"` → `"phuong"` chứa `"huong"`).
+
+- [ ] **Step 2: `issueReport` + `ticketsChuaPhanNhom` nhận `q`**
+
+Hai hàm này trả mảng trần, không phân trang. Lọc trong SQL trên tên nhóm + mô tả (`v_issue_report`),
+và mã ticket + mô tả (`v_ticket_chua_phan_nhom`). Danh sách ngắn (13 nhóm) nên chưa cần phân trang;
+ghi rõ trong báo cáo là cố ý.
+
+- [ ] **Step 3: Gắn `<OTimKiem>` vào cả hai trang**
+
+Placeholder ghi đúng thứ tìm được. Gỡ comment "không gắn OTimKiem" đã viết ở Task 4.
+
+- [ ] **Step 4: Verify + commit**
+
+```bash
+npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+```
+
+```bash
+git commit -m "feat(tim-kiem): bổ sung tìm kiếm cho trang khách cần dọn và nhóm lỗi"
+```
+
+---
+
+## Task 5b: Tìm kiếm gộp — tách kết quả theo loại
+
+> User đặt hàng 2026-07-29: *"Ở phần tìm kiếm khi nhập sẽ tách ra các loại: máy đã lắp →
+> list kết quả, ticket → list kết quả."*
+
+**Vấn đề đang có:** mỗi trang tìm trong phạm vi của nó. Nhân viên nghe khách đọc SĐT thì phải
+đoán trước là vào trang Máy hay trang Ticket, đoán sai thì tưởng không có dữ liệu.
+
+**Files:**
+- Create: `app-cskh/app/tim/page.tsx` — trang kết quả gộp
+- Create: `app-cskh/components/OTimKiemGop.tsx` — ô tìm đặt ở thanh trên cùng
+- Modify: `app-cskh/components/ThanhTaiKhoan.tsx` — nhúng ô tìm gộp
+- Modify: `app-cskh/app/actions.ts` — thêm `timGop(q)`
+
+**Interfaces:**
+- Produces: `timGop(q: string): Promise<{ may: Machine[]; ticket: Ticket[]; khach: Customer[]; tongMay: number; tongTicket: number; tongKhach: number }>`
+
+- [ ] **Step 1: `timGop()` trong `actions.ts`**
+
+Gọi song song `searchMachines`, `searchTickets`, và tra khách trên `cs_customers` (dùng `ten_kd`).
+Mỗi nhóm lấy tối đa 5 dòng đầu **kèm tổng số thật** — để hiện "xem tất cả 47 máy".
+Dùng `Promise.all`, đừng gọi tuần tự.
+
+- [ ] **Step 2: Trang `/tim`**
+
+Ba khối, mỗi khối một tiêu đề kèm số lượng, tối đa 5 dòng, và link "Xem tất cả N …" trỏ sang
+trang danh sách tương ứng kèm `?q=`:
+
+```
+Máy đã lắp (47)          → /?q=huong
+Ticket (3)               → /ticket?q=huong
+Khách hàng (12)          → /khach?q=huong
+```
+
+Khối rỗng thì ghi rõ "Không có máy nào khớp" chứ đừng ẩn đi — người dùng cần biết đã tìm ở đó
+mà không thấy, khác với không tìm.
+
+- [ ] **Step 3: Ô tìm gộp ở thanh trên cùng**
+
+Đặt trong `ThanhTaiKhoan` (cạnh email + Đăng xuất), hiện ở mọi trang khi đã đăng nhập. Gõ Enter
+hoặc chờ debounce thì sang `/tim?q=…`. Ô tìm riêng của từng trang **giữ nguyên** — nó lọc trong
+phạm vi trang, khác việc của ô gộp.
+
+- [ ] **Step 4: Verify + commit**
+
+Thử gõ một SĐT có cả máy lẫn ticket, xác nhận cả hai khối đều ra. Thử từ khoá không có gì,
+xác nhận cả ba khối đều báo rỗng chứ không trắng trang.
+
+```bash
+git commit -m "feat(tim-kiem): trang tìm gộp tách kết quả theo máy / ticket / khách"
+```
+
+---
+
 ## Task 5: Sắp xếp bằng cách bấm tiêu đề cột + bộ lọc bổ sung
 
 **Files:**
