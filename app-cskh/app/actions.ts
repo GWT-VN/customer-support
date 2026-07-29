@@ -785,6 +785,30 @@ export async function searchSerialsTrang(
   }
 }
 
+export type SerialKho = {
+  serial: string; ma_noi_bo: string | null; ten_noi_bo: string | null; ma_goc: string | null; po: string | null
+  trang_thai: string; bh_kich_hoat: boolean | null
+  ten_khach: string | null; sdt_khach: string | null; ngay_lap: string | null; bh_het_han: string | null
+}
+/** Kho serial + trạng thái kích hoạt (view v_serial_kho của DB). */
+export async function serialKho(q: string, trangThai?: string, limit = 100): Promise<SerialKho[]> {
+  await requireStaff()
+  let query = dataClient().from('v_serial_kho')
+    .select('serial, ma_noi_bo, ten_noi_bo, ma_goc, po, trang_thai, bh_kich_hoat, ten_khach, sdt_khach, ngay_lap, bh_het_han')
+  if (trangThai) query = query.eq('trang_thai', trangThai)
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `serial.ilike.%${safe}%,ma_noi_bo.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%,` +
+        `ten_khach.ilike.%${safe}%,sdt_khach.ilike.%${safe}%`
+    )
+  }
+  const { data, error } = await query.order('serial').limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as SerialKho[]
+}
+
 export async function listSerialPending(trangThai = 'cho_duyet'): Promise<SerialPending[]> {
   await requireStaff()
   const { data, error } = await dataClient()
@@ -916,8 +940,82 @@ export async function dangKyBaoHanh(input: {
   const { error: e2 } = await db.rpc('activate_warranty', { p_serial: serial, p_start: input.install_date })
   if (e2) return { ok: false as const, error: e2.message }
   revalidatePath('/')
+  revalidatePath('/bh-cho-kich-hoat')
   revalidatePath(`/may/${encodeURIComponent(serial)}`)
   return { ok: true as const }
+}
+
+// ── Hàng chờ kích hoạt bảo hành ─────────────────────────────────────────────
+export type BHChoKichHoat = {
+  nguon: string
+  serial: string | null
+  ma_noi_bo: string | null
+  ten_noi_bo: string | null
+  customer_id: string | null
+  ten_khach: string | null
+  sdt_khach: string | null
+  dia_chi: string | null
+  ngay_lap: string | null
+  ngay_dat_hang: string | null
+  ma_don: string | null
+  so_luong: number | null
+}
+
+/**
+ * Việc CSKH phải làm: máy đã bán/đã lắp mà bảo hành chưa kích hoạt.
+ *
+ * Đọc view `v_bh_cho_kich_hoat` — kích hoạt xong dòng TỰ biến mất, nên không
+ * có bảng pending nào phải dọn.
+ */
+export async function bhChoKichHoat(q = '', nguon?: string, limit = 200): Promise<BHChoKichHoat[]> {
+  await requireStaff()
+  let query = dataClient().from('v_bh_cho_kich_hoat')
+    .select('nguon, serial, ma_noi_bo, ten_noi_bo, customer_id, ten_khach, sdt_khach, dia_chi, ngay_lap, ngay_dat_hang, ma_don, so_luong')
+  if (nguon) query = query.eq('nguon', nguon)
+  const term = q.trim()
+  if (term) {
+    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+    query = query.or(
+      `serial.ilike.%${safe}%,ma_noi_bo.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%,` +
+        `ten_khach.ilike.%${safe}%,sdt_khach.ilike.%${safe}%,ma_don.ilike.%${safe}%`
+    )
+  }
+  const { data, error } = await query
+    .order('nguon').order('ngay_dat_hang', { ascending: false, nullsFirst: false }).limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as BHChoKichHoat[]
+}
+
+/** Đếm theo nguồn — cho nhãn tab, khỏi tải cả danh sách. */
+export async function bhChoKichHoatDem(): Promise<{ da_lap: number; don_sales: number }> {
+  await requireStaff()
+  const db = dataClient()
+  const dem = async (nguon: string) => {
+    const { count, error } = await db.from('v_bh_cho_kich_hoat')
+      .select('nguon', { count: 'exact', head: true }).eq('nguon', nguon)
+    if (error) throw new Error(error.message)
+    return count ?? 0
+  }
+  const [da_lap, don_sales] = await Promise.all([
+    dem('da_lap_chua_kich_hoat'), dem('don_sales_chua_gan_may'),
+  ])
+  return { da_lap, don_sales }
+}
+
+/**
+ * Kích hoạt ngay từ hàng chờ: khách đã biết sẵn từ đơn/máy đã lắp, CSKH chỉ
+ * điền thêm serial (dòng đơn sales) hoặc không phải điền gì (dòng đã lắp).
+ */
+export async function kichHoatNhanh(input: {
+  serial: string; customer_id: string; install_date?: string; install_address?: string
+}) {
+  const ngay = input.install_date?.trim() || new Date().toISOString().slice(0, 10)
+  const r = await dangKyBaoHanh({
+    serial: input.serial, customer_id: input.customer_id,
+    install_date: ngay, install_address: input.install_address,
+  })
+  if (r.ok) revalidatePath('/bh-cho-kich-hoat')
+  return r
 }
 
 /** Khách đang chờ duyệt (admin xem/duyệt). */
@@ -1144,11 +1242,19 @@ export async function createTicket(input: {
   customer_id?: string
   ticket_type: string
   description: string
-  province?: string
+  created_at?: string          // ngày tạo (backdate ca cũ) — trống thì now()
+  state?: string
+  khan?: boolean
+  last_note?: string
+  cs_phu_trach?: string | null
+  ky_thuat?: string | null
 }) {
   await requireStaff()
   if (!input.ticket_type?.trim()) return { ok: false as const, error: 'Chọn loại ticket.' }
   if (!input.description?.trim()) return { ok: false as const, error: 'Nhập mô tả sự cố.' }
+  if (input.state && !['Open', 'Done', 'Cancel'].includes(input.state)) {
+    return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
+  }
 
   const db = dataClient()
   const yy = String(new Date().getFullYear()).slice(2)
@@ -1163,16 +1269,22 @@ export async function createTicket(input: {
   const next = last?.length ? parseInt(last[0].ticket_code.slice(-4), 10) + 1 : 1
   const code = `GWT-${yy}${String(next).padStart(4, '0')}`
 
-  const { error } = await db.from('tickets').insert({
+  const row: Record<string, unknown> = {
     ticket_code: code,
     serial: input.serial || null,
     source_serial: input.serial || null,
     customer_id: input.customer_id || null,
     ticket_type: input.ticket_type.trim(),
     description: input.description.trim(),
-    province: input.province || null,
-    state: 'Open',
-  })
+    state: input.state || 'Open',
+    khan: input.khan ?? false,
+    last_note: input.last_note?.trim() || null,
+    cs_phu_trach: input.cs_phu_trach || null,
+    ky_thuat: input.ky_thuat || null,
+  }
+  if (input.created_at && input.created_at.trim()) row.created_at = new Date(input.created_at).toISOString()
+
+  const { error } = await db.from('tickets').insert(row)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath('/ticket')
   return { ok: true as const, code }
