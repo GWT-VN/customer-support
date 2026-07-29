@@ -54,6 +54,29 @@ export const TEN_COT: Record<string, string> = {
   province: 'Tỉnh/TP',
 }
 
+/**
+ * Rút tên sản phẩm dài về đúng MÃ MÁY cho ô chọn lọc:
+ *   "Máy lọc nước GE GN610"                        -> "GN610"
+ *   "Thiết bị làm mềm nước trung tâm GE GTEC-15A01-G" -> "GTEC-15A01-G"
+ *   "Máy lọc nước GE CTS10 (màu trắng)"            -> "CTS10 (màu trắng)"
+ *
+ * ⚠️ KHÔNG dùng internal_code làm nhãn, dù nghe có vẻ đúng hơn. internal_code là
+ * mã NHÀ MÁY, lệch hẳn với mã CS đang gọi hằng ngày (đối chiếu trên DB thật
+ * 2026-07-29): GN610 = GPUN-4000XEN-G, DN810 = GTUN-8500XDS-G,
+ * USH10 = GTUN-8600HP-G, B04 = GEUT-50B04-G. Hiện mã nhà máy trong ô lọc là
+ * nhân viên không nhận ra máy của mình.
+ *
+ * Cách cắt: mọi tên đều có dạng "<loại sản phẩm> GE <mã>" — lấy phần sau " GE "
+ * cuối cùng. Tên không theo khuôn thì giữ NGUYÊN VĂN, thà dài còn hơn cắt bậy.
+ */
+export function tenModel(tenDayDu: string | null, maNoiBo: string): string {
+  if (!tenDayDu) return maNoiBo
+  const i = tenDayDu.lastIndexOf(' GE ')
+  if (i === -1) return tenDayDu
+  const duoi = tenDayDu.slice(i + 4).trim()
+  return duoi || tenDayDu
+}
+
 export const NGHIA_SAP_XEP: Record<string, { asc: string; desc: string }> = {
   // Ngày tháng — nói rõ đầu nào lên trước, đây là chỗ mũi tên gây hiểu lầm nhất
   install_date: { asc: 'lắp lâu nhất trước', desc: 'lắp gần đây nhất trước' },

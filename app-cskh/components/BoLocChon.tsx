@@ -44,15 +44,15 @@ export function BoLocChon({
           const qs = params.toString()
           router.push(qs ? `${pathname}?${qs}` : pathname)
         }}
-        // w-56 CỐ ĐỊNH, không để trình duyệt tự co giãn: select tự động rộng bằng
-        // option DÀI NHẤT, mà danh sách sản phẩm có tên tới 47 ký tự -> ô "Sản phẩm"
-        // phình ra 382px trong khi ô "Bảo hành" chỉ 173px. Hai ô cạnh nhau lệch hơn
-        // gấp đôi, và chữ đang chọn thì dính mép trái còn mũi tên bị đẩy ra tận mép
-        // phải, chính giữa trống hoác. (Đo trên bản chạy thật 2026-07-29.)
+        // w-48 CỐ ĐỊNH, không để trình duyệt tự co giãn: select tự động rộng bằng
+        // option DÀI NHẤT -> ô "Sản phẩm" từng phình ra 382px trong khi ô "Bảo hành"
+        // chỉ 173px, chữ dính mép trái còn mũi tên bị đẩy ra tận mép phải, chính giữa
+        // trống hoác. (Đo trên bản chạy thật 2026-07-29.)
         //
-        // Chốt cứng bằng nhau -> hàng bộ lọc thẳng hàng. Tên dài bị cắt bằng
-        // truncate, bù lại bằng title= để rê chuột đọc đủ.
-        className="w-56 max-w-full truncate appearance-none rounded-lg border bg-white pl-3 pr-8 py-1.5 text-sm text-slate-700"
+        // 192px vừa đủ cho nhãn dài nhất còn lại ("Hết hạn máy, còn lõi") sau khi ô
+        // Sản phẩm đã rút về mã máy bằng tenModel(). Loại lỗi ở /ticket vẫn có nhãn
+        // dài hơn -> cắt bằng truncate, bù lại bằng title= để rê chuột đọc đủ.
+        className="w-48 max-w-full truncate appearance-none rounded-lg border bg-white pl-3 pr-8 py-1.5 text-sm text-slate-700"
       >
         <option value="">{nhan}: Tất cả</option>
         {tuyChon.map((t) => (

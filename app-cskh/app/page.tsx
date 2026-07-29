@@ -8,7 +8,7 @@ import { ThanhDangLoc } from '@/components/ThanhDangLoc'
 import { PhanTrang } from '@/components/PhanTrang'
 import { TieuDeCotSapXep } from '@/components/TieuDeCotSapXep'
 import { BoLocChon } from '@/components/BoLocChon'
-import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, type TinhTrangBH } from '@/lib/danhSach'
+import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, type TinhTrangBH } from '@/lib/danhSach'
 
 export default async function Home({
   searchParams,
@@ -56,7 +56,13 @@ export default async function Home({
             <BoLocChon
               param="sp"
               nhan="Sản phẩm"
-              tuyChon={models.map((m) => ({ giaTri: m.internal_code, nhan: m.product_name ?? m.internal_code }))}
+              // Ô chọn hiện MÃ MÁY cho gọn ("GN610"), còn chip lọc bên dưới vẫn
+              // hiện tên đầy đủ — chỗ nào cần đọc kỹ thì có, chỗ nào cần liếc
+              // nhanh thì ngắn.
+              tuyChon={models.map((m) => ({
+                giaTri: m.internal_code,
+                nhan: tenModel(m.product_name, m.internal_code),
+              }))}
             />
             <BoLocChon
               param="bh"
