@@ -40,10 +40,27 @@ export function ThanhDangLoc({
     <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
       <div className="flex items-center gap-2 flex-wrap">
         {dieuKien.map((d) => (
-          <span key={d.nhan} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
-            {d.nhan}: <strong>{d.giaTri}</strong>
+          // Đệm hai bên phải CÂN MẮT. Trước đây px-2 dùng chung cho cả chip, còn dấu ×
+          // là chữ trơn nằm trong luồng văn bản -> bên phải chỉ còn đúng 8px tính từ
+          // nét chữ tới viền, nhìn như dính vào viền trong khi bên trái thoáng hơn hẳn.
+          // Nay × là ô vuông 16px có tâm riêng: lề phải bóp còn pr-1, cộng khoảng trống
+          // trong ô thành ~9px tới nét chữ — cân với pl-2.5 (10px) bên trái. Chip không
+          // có nút gỡ thì không cần bù, giữ px-2.5 đối xứng.
+          <span
+            key={d.nhan}
+            className={`inline-flex items-center gap-1 py-1 rounded-full bg-slate-100 text-slate-700 text-xs ${
+              d.href ? 'pl-2.5 pr-1' : 'px-2.5'
+            }`}
+          >
+            <span>
+              {d.nhan}: <strong>{d.giaTri}</strong>
+            </span>
             {d.href && (
-              <Link href={d.href} aria-label={`Bỏ lọc ${d.nhan}`} className="ml-1 text-slate-400 hover:text-slate-900">
+              <Link
+                href={d.href}
+                aria-label={`Bỏ lọc ${d.nhan}`}
+                className="flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-900"
+              >
                 ×
               </Link>
             )}

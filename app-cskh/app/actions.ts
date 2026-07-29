@@ -70,9 +70,13 @@ export async function searchMachines(
     // ý gõ một MẨU GIỮA chuỗi (4 số cuối điện thoại, đuôi serial), khớp đầu từ sẽ
     // làm hỏng đúng thao tác thường dùng nhất.
     //
-    // KHÔNG đưa dia_chi_kd vào đây: tìm theo địa chỉ để dành cho bộ lọc riêng.
+    // ĐỊA CHỈ đã dùng lại được. Trước đây phải bỏ ra vì "Phường" bỏ dấu thành
+    // "phuong", chứa chuỗi con "huong" -> gõ "huong" ngập 296/472 dòng, 257 dòng
+    // trúng CHỈ vì địa chỉ có chữ "Phường". Khớp đầu từ diệt đúng cái đó: `\mhuong`
+    // không khớp "phuong" nữa, đo lại còn 4 dòng — đều là đường/phố tên Hương thật.
     truyVan = truyVan.or(
-      `ten_kd.imatch.${mauDauTu(kw)},serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
+      `ten_kd.imatch.${mauDauTu(kw)},dia_chi_kd.imatch.${mauDauTu(kw)},` +
+        `serial.ilike.%${kw}%,primary_phone.ilike.%${kw}%`
     )
   }
 
@@ -354,12 +358,17 @@ export async function maintenanceDue(tinhTrang: string, q: string): Promise<Main
   let query = dataClient().from('v_maintenance_due').select('*')
 
   if (tinhTrang) query = query.eq('tinh_trang', tinhTrang)
-  const term = q.trim()
-  if (term) {
-    const safe = term.replace(/[%_]/g, (c) => '\\' + c)
+  const kw = antoanChoOr(chuanHoaTuKhoa(q))
+  if (kw) {
+    // Trước migration 07 trang này so NGUYÊN VĂN: gõ "nguyen" ra ĐÚNG 0 dòng dù có
+    // 18 lượt của khách họ Nguyễn. Nay tra trên cột bỏ dấu (ten_kd/section_kd/bo_may_kd).
+    //
+    // Tên khách và tên công trình khớp theo ĐẦU TỪ (như trang Máy) để không dính
+    // Phương/Thương; bộ máy và SĐT vẫn khớp chuỗi con vì đó là MÃ — gõ "15a" phải
+    // ra "WH15A ECO", mà "15a" nằm giữa chữ nên khớp đầu từ sẽ trượt.
     query = query.or(
-      `customer_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%,` +
-        `section.ilike.%${safe}%,bo_may.ilike.%${safe}%`
+      `ten_kd.imatch.${mauDauTu(kw)},section_kd.imatch.${mauDauTu(kw)},` +
+        `primary_phone.ilike.%${kw}%,bo_may_kd.ilike.%${kw}%`
     )
   }
   const { data, error } = await query
