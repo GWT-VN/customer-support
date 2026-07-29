@@ -36,28 +36,53 @@ describe('chuanHoaTuKhoa', () => {
 describe('sapXepHopLe — chốt chặn injection', () => {
   const CHO_PHEP = ['install_date', 'serial', 'customer_name'] as const
   const MAC_DINH = { cot: 'install_date', tang: false }
+  const ROI_VE_MAC_DINH = { ...MAC_DINH, macDinh: true }
 
   it('cột hợp lệ thì dùng', () => {
     expect(sapXepHopLe('serial', 'asc', CHO_PHEP, MAC_DINH))
-      .toEqual({ cot: 'serial', tang: true })
+      .toEqual({ cot: 'serial', tang: true, macDinh: false })
   })
 
   it('cột LẠ bị bỏ qua, rơi về mặc định', () => {
-    expect(sapXepHopLe('mat_khau', 'asc', CHO_PHEP, MAC_DINH)).toEqual(MAC_DINH)
+    expect(sapXepHopLe('mat_khau', 'asc', CHO_PHEP, MAC_DINH)).toEqual(ROI_VE_MAC_DINH)
   })
 
   it('chuỗi tấn công cũng rơi về mặc định', () => {
     expect(sapXepHopLe('id; drop table cs_customers', 'asc', CHO_PHEP, MAC_DINH))
-      .toEqual(MAC_DINH)
+      .toEqual(ROI_VE_MAC_DINH)
   })
 
   it('thiếu tham số thì dùng mặc định', () => {
-    expect(sapXepHopLe(undefined, undefined, CHO_PHEP, MAC_DINH)).toEqual(MAC_DINH)
+    expect(sapXepHopLe(undefined, undefined, CHO_PHEP, MAC_DINH)).toEqual(ROI_VE_MAC_DINH)
   })
 
   it('chiều chỉ nhận asc/desc, khác đi coi như desc', () => {
     expect(sapXepHopLe('serial', 'lung tung', CHO_PHEP, MAC_DINH))
-      .toEqual({ cot: 'serial', tang: false })
+      .toEqual({ cot: 'serial', tang: false, macDinh: false })
+  })
+})
+
+describe('sapXepHopLe — cờ macDinh quyết định có hiện nút "bỏ sắp xếp" hay không', () => {
+  const CHO_PHEP = ['install_date', 'serial'] as const
+  const MAC_DINH = { cot: 'install_date', tang: false }
+
+  it('bấm ĐÚNG về thứ tự gốc thì tính là mặc định, không cần nút bỏ', () => {
+    // Bấm vòng quanh rồi quay lại install_date giảm dần = y hệt lúc chưa đụng gì.
+    // Nếu chỉ xét "URL có ?cot= hay không" thì ca này ra macDinh=false, nút bỏ hiện
+    // ra nhưng bấm vào không thấy gì đổi -> người dùng tưởng nút hỏng.
+    expect(sapXepHopLe('install_date', 'desc', CHO_PHEP, MAC_DINH).macDinh).toBe(true)
+  })
+
+  it('đúng cột mặc định nhưng NGƯỢC chiều thì KHÔNG phải mặc định', () => {
+    expect(sapXepHopLe('install_date', 'asc', CHO_PHEP, MAC_DINH).macDinh).toBe(false)
+  })
+
+  it('cột khác thì không phải mặc định', () => {
+    expect(sapXepHopLe('serial', 'asc', CHO_PHEP, MAC_DINH).macDinh).toBe(false)
+  })
+
+  it('cột lạ bị loại -> về mặc định, KHÔNG hiện nút bỏ', () => {
+    expect(sapXepHopLe('mat_khau', 'asc', CHO_PHEP, MAC_DINH).macDinh).toBe(true)
   })
 })
 
@@ -67,22 +92,27 @@ describe('sapXepHopLe — ?cot=mat_khau trên URL thật (Task 5, bấm tiêu đ
   // lặng lẽ rơi về đúng mặc định của trang, y hệt như chưa từng có ?cot= trên URL.
   it('COT_MAY (trang "/") bỏ qua mat_khau, rơi về mặc định install_date desc', () => {
     const macDinh = { cot: 'install_date', tang: false }
-    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, macDinh)).toEqual(macDinh)
+    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, macDinh)).toEqual({ ...macDinh, macDinh: true })
   })
 
   it('COT_TICKET (trang "/ticket") bỏ qua mat_khau, rơi về mặc định created_at desc', () => {
     const macDinh = { cot: 'created_at', tang: false }
-    expect(sapXepHopLe('mat_khau', 'asc', COT_TICKET, macDinh)).toEqual(macDinh)
+    expect(sapXepHopLe('mat_khau', 'asc', COT_TICKET, macDinh)).toEqual({ ...macDinh, macDinh: true })
   })
 
   it('COT_LOI (trang "/loi") bỏ qua mat_khau, rơi về mặc định han_som asc', () => {
     const macDinh = { cot: 'han_som', tang: true }
-    expect(sapXepHopLe('mat_khau', 'desc', COT_LOI, macDinh)).toEqual(macDinh)
+    expect(sapXepHopLe('mat_khau', 'desc', COT_LOI, macDinh)).toEqual({ ...macDinh, macDinh: true })
   })
 
   it('COT_KHACH (trang "/khach") bỏ qua mat_khau, rơi về mặc định full_name asc', () => {
     const macDinh = { cot: 'full_name', tang: true }
-    expect(sapXepHopLe('mat_khau', 'desc', COT_KHACH, macDinh)).toEqual(macDinh)
+    expect(sapXepHopLe('mat_khau', 'desc', COT_KHACH, macDinh)).toEqual({ ...macDinh, macDinh: true })
+  })
+
+  it('cột lạ bị loại thì KHÔNG hiện nút bỏ sắp xếp — URL bẩn không được tính là "đã sắp"', () => {
+    expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, { cot: 'install_date', tang: false }).macDinh)
+      .toBe(true)
   })
 })
 

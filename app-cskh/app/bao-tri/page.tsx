@@ -88,7 +88,9 @@ export default async function BaoTriPage({
           <span className="text-slate-500">
             {rows.length} lượt{rows.length === 100 && ' — giới hạn 100, gõ cụ thể hơn'}
           </span>
-          <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} />
+          <Suspense>
+            <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} macDinh={sapXep.macDinh} />
+          </Suspense>
         </div>
 
         <div className="bg-white rounded-xl border overflow-x-auto">

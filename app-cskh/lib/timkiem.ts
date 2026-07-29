@@ -20,7 +20,17 @@ export function chuanHoaTuKhoa(q: string): string {
   return boDau(q).trim().replace(/\s+/g, ' ')
 }
 
-export type SapXep = { cot: string; tang: boolean }
+export type SapXep = {
+  cot: string
+  tang: boolean
+  /**
+   * true = đang là thứ tự MẶC ĐỊNH của trang (người dùng chưa đổi gì, hoặc đã
+   * bấm về đúng thứ tự gốc). Giao diện dựa vào cờ này để chỉ hiện nút "bỏ sắp
+   * xếp" khi thật sự có cái để bỏ — hiện nút lúc đang ở mặc định thì bấm vào
+   * không thấy gì đổi, người dùng tưởng nút hỏng.
+   */
+  macDinh: boolean
+}
 
 /**
  * Cột sắp xếp lấy từ URL mà đưa thẳng vào .order() là lỗ hổng.
@@ -30,10 +40,13 @@ export function sapXepHopLe(
   cot: string | undefined,
   chieu: string | undefined,
   choPhep: readonly string[],
-  macDinh: SapXep
+  macDinh: { cot: string; tang: boolean }
 ): SapXep {
-  if (!cot || !choPhep.includes(cot)) return macDinh
-  return { cot, tang: chieu === 'asc' }
+  if (!cot || !choPhep.includes(cot)) return { ...macDinh, macDinh: true }
+  const tang = chieu === 'asc'
+  // So với giá trị mặc định chứ không phải "URL có ?cot= hay không": bấm vòng
+  // quanh rồi quay đúng về thứ tự gốc thì cũng là mặc định, không cần nút bỏ.
+  return { cot, tang, macDinh: cot === macDinh.cot && tang === macDinh.tang }
 }
 
 /** PostgREST dùng dấu phẩy và ngoặc làm cú pháp .or() — phải bỏ khỏi từ khoá. */

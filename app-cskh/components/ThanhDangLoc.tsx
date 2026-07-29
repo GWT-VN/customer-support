@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Suspense } from 'react'
 import { ChipSapXep } from './ChipSapXep'
 
 /**
@@ -35,7 +36,7 @@ export function ThanhDangLoc({
   nhan?: string
   // Cột/chiều MÁY CHỦ đã chốt (KetQuaTrang.sapXep), không phải giá trị trên URL —
   // xem chú thích trong ChipSapXep. Trang không sắp xếp được thì bỏ trống.
-  sapXep?: { cot: string; tang: boolean; ghiChu?: string }
+  sapXep?: { cot: string; tang: boolean; macDinh: boolean; ghiChu?: string }
 }) {
   const pathname = usePathname()
   const dangLoc = dieuKien.length > 0
@@ -73,7 +74,16 @@ export function ThanhDangLoc({
           </span>
         ))}
         <span className="text-slate-500">{dong}</span>
-        {sapXep && <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} ghiChu={sapXep.ghiChu} />}
+        {/* ChipSapXep dùng useSearchParams (dựng link bỏ sắp xếp) -> phải có
+            Suspense, không thì next build vỡ. Bọc ở đây thay vì bắt 4 trang gọi
+            ThanhDangLoc phải nhớ bọc. */}
+        {sapXep && (
+          <Suspense>
+            <ChipSapXep
+              cot={sapXep.cot} tang={sapXep.tang} macDinh={sapXep.macDinh} ghiChu={sapXep.ghiChu}
+            />
+          </Suspense>
+        )}
       </div>
       {dangLoc && (
         <Link href={pathname} className="text-slate-600 underline hover:text-slate-900 flex-none">

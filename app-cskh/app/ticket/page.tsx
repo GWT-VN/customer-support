@@ -33,7 +33,7 @@ export default async function TicketsPage({
           rows: [], tong: 0, trang: 1, soTrang: 1,
           // Phải khớp mặc định của searchTickets, nếu không nhánh rỗng sẽ khoe
           // sai cột đang sắp ở ChipSapXep.
-          sapXep: { cot: 'created_at', tang: false },
+          sapXep: { cot: 'created_at', tang: false, macDinh: true },
         })
       : searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, {
           trang, cot, chieu, loaiTicket: loai || undefined,
