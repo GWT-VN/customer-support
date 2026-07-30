@@ -58,7 +58,7 @@ export default async function BHChoKichHoatPage({
         </div>
 
         <p className="text-sm text-slate-500">
-          {rows.length} dòng{rows.length === 200 && ' (giới hạn 200 — gõ cụ thể hơn)'}
+          {rows.length} dòng{rows.length === 500 && ' (giới hạn 500 — gõ cụ thể hơn)'}
         </p>
 
         <BHChoKichHoatList items={rows} />

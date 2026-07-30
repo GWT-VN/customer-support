@@ -895,6 +895,17 @@ export async function dangKyBaoHanh(input: {
   if (!input.customer_id) return { ok: false as const, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false as const, error: 'Ngày lắp không hợp lệ.' }
   const db = dataClient()
+  // Chặn GHI ĐÈ CHỦ MÁY: serial đã lắp cho khách KHÁC thì từ chối, không upsert đè.
+  // NV gõ nhầm 1 ký tự serial không được phép đổi chủ máy của người khác.
+  const { data: dangCo } = await db.from('installed_base')
+    .select('customer_id').eq('serial', serial).maybeSingle()
+  const chuHienTai = (dangCo as { customer_id: string | null } | null)?.customer_id
+  if (chuHienTai && chuHienTai !== input.customer_id) {
+    return {
+      ok: false as const,
+      error: 'Serial này đã gắn cho khách khác — kiểm tra lại serial (tránh ghi đè nhầm chủ máy). Nếu đúng là đổi chủ, gỡ khỏi khách cũ trước.',
+    }
+  }
   const { data: sr } = await db.from('serial_registry')
     .select('internal_code, model').eq('serial', serial).maybeSingle()
   const { error: e1 } = await db.from('installed_base').upsert({
@@ -937,7 +948,7 @@ export type BHChoKichHoat = {
  * Đọc view `v_bh_cho_kich_hoat` — kích hoạt xong dòng TỰ biến mất, nên không
  * có bảng pending nào phải dọn.
  */
-export async function bhChoKichHoat(q = '', nguon?: string, limit = 200): Promise<BHChoKichHoat[]> {
+export async function bhChoKichHoat(q = '', nguon?: string, limit = 500): Promise<BHChoKichHoat[]> {
   await requireStaff()
   let query = dataClient().from('v_bh_cho_kich_hoat')
     .select('nguon, serial, ma_noi_bo, ten_noi_bo, customer_id, ten_khach, sdt_khach, dia_chi, ngay_lap, ngay_dat_hang, ma_don, so_luong')

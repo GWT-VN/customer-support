@@ -90,6 +90,11 @@ export function BHChoKichHoatList({ items }: { items: BHChoKichHoat[] }) {
                 </td>
                 <td className="px-4 py-2.5 text-slate-700">
                   {r.ten_noi_bo ?? '—'}
+                  {!daCoSerial && (r.so_luong ?? 1) > 1 && (
+                    <span className="ml-1.5 rounded bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-medium">
+                      còn {r.so_luong} máy
+                    </span>
+                  )}
                   <div className="font-mono text-[10px] text-slate-400">{r.ma_noi_bo ?? '—'}</div>
                 </td>
                 <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
