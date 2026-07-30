@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Pre-commit: quét secret/PII trên các file đang staged trước khi commit.
+# Bật hook: bash scripts/setup-hooks.sh   (đặt core.hooksPath=.githooks)
+# Bỏ qua 1 lần (chịu trách nhiệm): git commit --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+python3 "$ROOT/scripts/scan_pii_secrets.py" --staged
