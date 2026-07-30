@@ -1572,3 +1572,34 @@ export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
     TOI_DA_CHON
   )
 }
+
+// ── Đồng bộ catalog gương từ Masterdata (#2) ────────────────────────────────
+export type CatalogSyncLog = {
+  id: number
+  chay_luc: string
+  ok: boolean
+  chi_tiet: Record<string, unknown> | null
+  thong_bao: string | null
+  ms: number | null
+}
+
+/** Bấm tay chạy đồng bộ 6 bảng catalog ngay (CHỈ ADMIN). Cron vẫn tự chạy hàng ngày. */
+export async function syncCatalogNow() {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { data, error } = await dataClient().rpc('sync_catalog')
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/dong-bo-catalog')
+  return { ok: true as const, ket_qua: data as { ok: boolean; tables: Record<string, unknown>; msg: string | null } }
+}
+
+/** Nhật ký các lần đồng bộ gần nhất (admin xem). */
+export async function catalogSyncLast(n = 10): Promise<CatalogSyncLog[]> {
+  await requireStaff()
+  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  const { data, error } = await dataClient()
+    .from('catalog_sync_log').select('id, chay_luc, ok, chi_tiet, thong_bao, ms')
+    .order('id', { ascending: false }).limit(n)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CatalogSyncLog[]
+}
