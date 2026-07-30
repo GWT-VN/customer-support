@@ -6,7 +6,7 @@ from migrate import parse
 
 # ── split_source: tách nguồn trong ngoặc khỏi tên khách ──────────────────────
 def test_split_source_with_paren():
-    assert parse.split_source("Nguyễn Trung Hiếu (Shopee)") == ("Nguyễn Trung Hiếu", "Shopee")
+    assert parse.split_source("Khách C (Shopee)") == ("Khách C", "Shopee")
 
 
 def test_split_source_no_paren():

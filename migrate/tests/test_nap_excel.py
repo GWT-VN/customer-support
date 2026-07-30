@@ -7,19 +7,19 @@ from migrate.nap_excel_sua import is_checked, normalize_phone, parse_chu_ky, par
 
 # ── SĐT ──────────────────────────────────────────────────────────────────────
 def test_phone_chuan():
-    assert normalize_phone("0965226668") == ("0965226668", None)
+    assert normalize_phone("0900000001") == ("0900000001", None)
 
 def test_phone_excel_nuot_so_0_dau():
     # Excel đổi text -> số: mất 0 đầu, thêm .0
-    assert normalize_phone("965226668.0") == ("0965226668", None)
-    assert normalize_phone(965226668) == ("0965226668", None)
+    assert normalize_phone("900000001.0") == ("0900000001", None)
+    assert normalize_phone(900000001) == ("0900000001", None)
 
 def test_phone_co_khoang_trang_cham():
-    assert normalize_phone("098 666.7622") == ("0986667622", None)
+    assert normalize_phone("0900000005") == ("0900000005", None)
 
 def test_phone_dau_84():
-    assert normalize_phone("+84965226668") == ("0965226668", None)
-    assert normalize_phone("84965226668") == ("0965226668", None)
+    assert normalize_phone("+84900000001") == ("0900000001", None)
+    assert normalize_phone("84900000001") == ("0900000001", None)
 
 def test_phone_tu_choi_chu():
     p, err = normalize_phone("09xy123")

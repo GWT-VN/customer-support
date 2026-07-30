@@ -25,28 +25,28 @@ def test_bo_qua_ton_kho():
 
 
 def test_tach_nguon_trong_ngoac():
-    rows = [row(Serial="S1", Customer="Nguyễn Trung Hiếu (Shopee)")]
+    rows = [row(Serial="S1", Customer="Khách C (Shopee)")]
     customers, _, _ = build(rows, INTERNAL, SUPPLIER)
-    assert customers[("name", "Nguyễn Trung Hiếu")]["source"] == "Shopee"
+    assert customers[("name", "Khách C")]["source"] == "Shopee"
 
 
 # ── Khoá khách = SĐT (đây là điểm cốt lõi) ──────────────────────────────────
 def test_cung_ten_KHAC_sdt_thi_TACH_2_khach():
-    """'Anh Sơn' ở HN và 'Anh Sơn' ở HCM là 2 người — không được gộp."""
+    """'Khách H' ở HN và 'Khách H' ở HCM là 2 người — không được gộp."""
     rows = [
-        row(Serial="S1", Customer="Anh Sơn", **{"Customer/Phone": "0846361991"}),
-        row(Serial="S2", Customer="Anh Sơn", **{"Customer/Phone": "0977769361"}),
+        row(Serial="S1", Customer="Khách H", **{"Customer/Phone": "0900000013"}),
+        row(Serial="S2", Customer="Khách H", **{"Customer/Phone": "0900000014"}),
     ]
     customers, machines, stats = build(rows, INTERNAL, SUPPLIER)
     assert stats["khach"] == 2
-    assert {m["customer_phone"] for m in machines} == {"0846361991", "0977769361"}
+    assert {m["customer_phone"] for m in machines} == {"0900000013", "0900000014"}
 
 
 def test_KHAC_ten_CUNG_sdt_thi_GOP_1_khach():
-    """'Anh Dương' và 'Nguyễn Hoàng Dương' cùng SĐT = 1 người viết 2 kiểu tên."""
+    """'Khách I' và 'Khách D' cùng SĐT = 1 người viết 2 kiểu tên."""
     rows = [
-        row(Serial="S1", Customer="Anh Dương", **{"Customer/Phone": "0965226668"}),
-        row(Serial="S2", Customer="Nguyễn Hoàng Dương", **{"Customer/Phone": "0965226668"}),
+        row(Serial="S1", Customer="Khách I", **{"Customer/Phone": "0900000001"}),
+        row(Serial="S2", Customer="Khách D", **{"Customer/Phone": "0900000001"}),
     ]
     customers, machines, stats = build(rows, INTERNAL, SUPPLIER)
     assert stats["khach"] == 1
@@ -76,10 +76,10 @@ def test_sdt_loi_van_LUU_NGUYEN_GOC_va_gan_co_de_sua_sau():
 
 
 def test_sdt_loi_TRUNG_NHAU_van_gop_1_khach():
-    """3 máy cùng SĐT lỗi '09488782646' -> 1 khách (không nhân bản)."""
+    """3 máy cùng SĐT lỗi '09000000015' -> 1 khách (không nhân bản)."""
     rows = [
-        row(Serial="S1", Customer="A", **{"Customer/Phone": "09488782646"}),
-        row(Serial="S2", Customer="A", **{"Customer/Phone": "09488782646"}),
+        row(Serial="S1", Customer="A", **{"Customer/Phone": "09000000015"}),
+        row(Serial="S2", Customer="A", **{"Customer/Phone": "09000000015"}),
     ]
     customers, machines, stats = build(rows, INTERNAL, SUPPLIER)
     assert stats["khach"] == 1

@@ -62,7 +62,7 @@ def test_ecopark():
 
 # ── KHÔNG đoán khi không nhận ra ────────────────────────────────────────────
 def test_nha_rieng_le_thi_KHONG_doan_phuong():
-    out, why = dia_chi_2025("83 lý thường kiệt")
+    out, why = dia_chi_2025("<địa chỉ>")
     assert out is None and "không đoán" in why
 
 

@@ -9,7 +9,7 @@ Odoo nhập theo MÃ ĐỐI TÁC (mã hãng) -> resolve về mã nội bộ qua 
 import datetime as dt
 import re
 
-# Nguồn nằm trong ngoặc ở CUỐI tên: "Nguyễn Trung Hiếu (Shopee)"
+# Nguồn nằm trong ngoặc ở CUỐI tên: "Khách C (Shopee)"
 _PAREN = re.compile(r"^(.*)\s*\(([^()]+)\)\s*$")
 # Mã nằm trong ngoặc vuông đầu Product name: "[GTUN-5800EN-G] Máy lọc nước..."
 _BRACKET = re.compile(r"\[([^\]]+)\]")
@@ -18,7 +18,7 @@ _TRUE = {True, 1, "true", "True", "TRUE", "1"}
 
 
 def split_source(customer_raw):
-    """"Nguyễn Trung Hiếu (Shopee)" -> ("Nguyễn Trung Hiếu", "Shopee")."""
+    """"Khách C (Shopee)" -> ("Khách C", "Shopee")."""
     s = (customer_raw or "").strip()
     m = _PAREN.match(s)
     if m:
@@ -95,7 +95,7 @@ def normalize_phone(raw):
         return None, None
 
     s = str(raw).strip()
-    if s.endswith(".0"):          # Excel lưu dạng số -> "965226668.0"
+    if s.endswith(".0"):          # Excel lưu dạng số -> "900000001.0"
         s = s[:-2]
     s = re.sub(r"[\s.\-()]", "", s)   # bỏ dấu cách, chấm, gạch, ngoặc
 
@@ -109,7 +109,7 @@ def normalize_phone(raw):
 
     if not s.isdigit():
         return None, f"chứa ký tự lạ: {raw!r}"
-    if len(set(s.lstrip("0"))) == 1:      # 099999999, 0000000000...
+    if len(set(s.lstrip("0"))) == 1:      # 099999999, 0900000012...
         return None, f"số rác (toàn 1 chữ số lặp): {raw!r}"
     if _MOBILE.match(s) or _LANDLINE.match(s):
         return s, None

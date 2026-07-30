@@ -31,8 +31,8 @@ def test_suy_tinh_tu_quan_huyen():
 
 
 def test_KHONG_doan_khi_ten_duong_trung_nhieu_tinh():
-    """'83 lý thường kiệt' có ở hàng chục tỉnh -> PHẢI trả None, không được đoán."""
-    assert guess_province("83 lý thường kiệt") == (None, None)
+    """'<địa chỉ>' có ở hàng chục tỉnh -> PHẢI trả None, không được đoán."""
+    assert guess_province("<địa chỉ>") == (None, None)
     assert guess_province("275 nguyễn trãi") == (None, None)
 
 
@@ -50,12 +50,12 @@ def test_KHONG_doi_ten_cong_ty():
 
 
 def test_ten_dung_roi_thi_thoi():
-    assert fix_name_case("Nguyễn Trung Hiếu") is None
+    assert fix_name_case("Khách C") is None
 
 
 # ── audit tổng hợp ──────────────────────────────────────────────────────────
 def test_thieu_sdt_thi_uu_tien_CAO():
-    n, muc = audit({"full_name": "Anh Cường", "primary_phone": None, "needs_phone": True,
+    n, muc = audit({"full_name": "Người liên hệ D", "primary_phone": None, "needs_phone": True,
                     "address": "60 lê văn thiêm, Thanh Xuân, Hà Nội", "so_may": 1})
     assert "THIẾU SĐT" in n and muc == "CAO"
 
@@ -67,7 +67,7 @@ def test_thieu_dia_chi_KHONG_duoc_bia():
 
 def test_khach_sach_thi_note_rong():
     """Địa chỉ đủ tỉnh/TP + SĐT ok + tên ok -> KHÔNG có note."""
-    n, muc = audit({"full_name": "Nguyễn Trung Hiếu", "primary_phone": "0389599321",
+    n, muc = audit({"full_name": "Khách C", "primary_phone": "0900000021",
                     "needs_phone": False, "so_may": 1,
                     "address": "Chung Cư Stown Tham Lương, Số 102, Dương Thị Giang, Quận 12, TP. Hồ Chí Minh"})
     assert n == "" and muc == ""
@@ -75,12 +75,12 @@ def test_khach_sach_thi_note_rong():
 
 def test_KHONG_nhac_tinh_TP_khi_suy_ra_duoc():
     """Suy được tỉnh/TP thì máy tự điền — không được làm nhiễu Note."""
-    n, _ = audit({"full_name": "Chị Loan", "primary_phone": "0942009799", "needs_phone": False,
+    n, _ = audit({"full_name": "Khách G", "primary_phone": "0900000025", "needs_phone": False,
                   "address": "T11 p2102 Times City, Hai Bà Trưng", "so_may": 1})
     assert "tỉnh/TP" not in n
 
 
 def test_may_nhieu_thi_day_uu_tien_len_CAO():
-    n, muc = audit({"full_name": "X", "primary_phone": "0912345678", "needs_phone": False,
+    n, muc = audit({"full_name": "X", "primary_phone": "0900000026", "needs_phone": False,
                     "address": "Q7", "so_may": 3})
     assert muc == "CAO"

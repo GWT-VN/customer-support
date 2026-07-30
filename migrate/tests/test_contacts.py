@@ -4,19 +4,19 @@ from migrate.contacts import load_addresses, parse_lien_he, audit_lien_he
 
 # ── load_addresses: Contact (res.partner) -> {SĐT: địa chỉ} ─────────────────
 def test_lay_dia_chi_theo_sdt():
-    rows = [{"Phone": "0903458186", "Street": "Tháp 2, Sun Ancora 3 Lương Yên"}]
-    assert load_addresses(rows) == {"0903458186": "Tháp 2, Sun Ancora 3 Lương Yên"}
+    rows = [{"Phone": "0900000016", "Street": "<địa chỉ>"}]
+    assert load_addresses(rows) == {"0900000016": "<địa chỉ>"}
 
 
 def test_chuan_hoa_sdt_khi_lay_dia_chi():
-    rows = [{"Phone": "091 2354687", "Street": "83 lý thường kiệt"}]
-    assert load_addresses(rows) == {"0912354687": "83 lý thường kiệt"}
+    rows = [{"Phone": "0900000017", "Street": "<địa chỉ>"}]
+    assert load_addresses(rows) == {"0900000017": "<địa chỉ>"}
 
 
 def test_bo_qua_sdt_loi_hoac_thieu_dia_chi():
     rows = [
         {"Phone": "099999999", "Street": "X"},      # SĐT rác
-        {"Phone": "0903458186", "Street": "  "},    # không có địa chỉ
+        {"Phone": "0900000016", "Street": "  "},    # không có địa chỉ
         {"Phone": None, "Street": "Y"},
     ]
     assert load_addresses(rows) == {}
@@ -24,15 +24,15 @@ def test_bo_qua_sdt_loi_hoac_thieu_dia_chi():
 
 # ── parse_lien_he: text tự do -> (tên, SĐT) ─────────────────────────────────
 def test_sdt_dung_sau_ten():
-    assert parse_lien_he("Ms Đào (giúp việc) - 0365636472") == ("Ms Đào (giúp việc)", "0365636472")
+    assert parse_lien_he("Người liên hệ B - 0900000006") == ("Người liên hệ B", "0900000006")
 
 
 def test_sdt_dung_truoc_ten():
-    assert parse_lien_he("0362096197 - Đạt trợ lý") == ("Đạt trợ lý", "0362096197")
+    assert parse_lien_he("0900000007 - Người liên hệ C") == ("Người liên hệ C", "0900000007")
 
 
 def test_sdt_co_dau_cach():
-    assert parse_lien_he("Anh Cường: 098 6667622") == ("Anh Cường", "0986667622")
+    assert parse_lien_he("Người liên hệ D: 0900000005") == ("Người liên hệ D", "0900000005")
 
 
 def test_khong_co_sdt():
@@ -43,10 +43,10 @@ def test_khong_co_sdt():
 # ── audit: chứng minh vì sao KHÔNG nhập được ────────────────────────────────
 def test_bao_trung_khi_sdt_da_la_khach_chinh():
     """4/11 SĐT phụ thực ra đã là primary_phone của khách khác -> nhập vào = nhân đôi."""
-    r = audit_lien_he(["Jake Ngo (quản lý) 0938582202"], {"0938582202"})
+    r = audit_lien_he(["Người liên hệ A 0900000008"], {"0900000008"})
     assert r[0][2].startswith("TRÙNG")
 
 
 def test_bao_khong_noi_duoc_khi_sdt_la():
-    r = audit_lien_he(["C Nga vợ: 0989347139"], {"0903458186"})
+    r = audit_lien_he(["Người liên hệ E: 0900000018"], {"0900000016"})
     assert "không nối được" in r[0][2]

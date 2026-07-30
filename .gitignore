@@ -76,3 +76,6 @@ Phiếu theo dõi/GWT_*.xlsx
 
 # CodeGraph — index cục bộ, sinh lại bằng `codegraph init`. Không commit.
 .codegraph/
+
+# File theo dõi nội bộ — chứa PII khách, KHÔNG commit
+docs/CHECKLIST.md

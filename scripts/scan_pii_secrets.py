@@ -38,7 +38,8 @@ ENV_SR = re.compile(r"SUPABASE_SERVICE_ROLE_KEY\s*=\s*(\S+)")
 SB_SECRET = re.compile(r"\bsb_secret_[A-Za-z0-9_-]{5,}")
 PRIVKEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 ALLOW_LINE = ("pii-ok", "allowlist-secret")
-FAKE_PHONE = "0900000000"
+# Dải số giả dành riêng cho test/tài liệu (không phải PII): 0900000000–0900000999.
+FAKE_PHONE = re.compile(r"^0900000\d{3}$")
 
 
 def looks_like_key(val: str) -> bool:
@@ -109,7 +110,7 @@ def scan_content(path: str):
         if PRIVKEY.search(line):
             out.append((i, "SECRET", "PRIVATE KEY block"))
         for ph in PHONE.findall(line):
-            if ph != FAKE_PHONE:
+            if not FAKE_PHONE.match(ph):
                 out.append((i, "PII", f"SĐT VN {ph[:4]}****{ph[-2:]}"))
     return out
 

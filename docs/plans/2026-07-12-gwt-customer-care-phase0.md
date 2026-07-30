@@ -44,13 +44,13 @@
 - Cột: `Activated date, Customer, Expired date, Parent serial, Product name, Serial, Warranty activated`. **Không có SĐT.**
 - File hiện chỉ **80 dòng mẫu**; DB Odoo có ~1.594 serial → chạy thật cần export đầy đủ.
 - Serial KHÔNG gắn khách (Customer rỗng) = tồn kho, **không** đưa vào `installed_base`.
-- `Customer` có thể kèm nguồn trong ngoặc: `Nguyễn Trung Hiếu (Shopee)` → tách `source`.
+- `Customer` có thể kèm nguồn trong ngoặc: `Khách C (Shopee)` → tách `source`.
 - `Product name` dạng `[MÃ] Tên`; `MÃ` thường là **mã đối tác/hãng** → resolve qua `supplier_code`.
 
 **Nguồn 2 — Excel "Theo Dõi Bảo Hành"** (761KB, dùng ở **Phase 0.5**):
 - Sheet `Lọc tổng` / `Khác`: `Khách Hàng, SĐT, Địa Chỉ, Liên hệ, Model Lắp Đặt, Serial Number, Lắp mới, Đăng ký bảo hành, Lịch thay định kỳ, Chi tiết bảo trì`.
 - Sheet `Bảo trì`: tên, SĐT, serial, Lần 1–4.
-- SĐT lộn xộn (dạng số mất số 0 đầu: `965226668.0`); SĐT phụ (giúp việc) nằm trong cột `Liên hệ`; cell serial đa giá trị (máy + lõi).
+- SĐT lộn xộn (dạng số mất số 0 đầu: `900000001.0`); SĐT phụ (giúp việc) nằm trong cột `Liên hệ`; cell serial đa giá trị (máy + lõi).
 
 **Masterdata catalog hiện có** (đã verify live 2026-07-15): `catalog_item` 311 (PK `"Mã nội bộ"`) · `supplier_code` 32 (PK `"Mã đối tác"`, FK→catalog_item) · `catalog_category` 63 · `product_filter` 37 · `product_bundle` 19 · `product_variant` 2 · view `v_catalog_sheet` 311 · view `v_catalog_category` 63 · RPC `search_catalog`.
 
@@ -120,8 +120,8 @@ Expected: mảng rỗng `[]` hoặc lỗi RLS — KHÔNG trả dữ liệu.
 - [ ] **Step 4: Verify khoá SĐT**
 
 ```sql
-insert into public.customers(full_name, primary_phone) values ('KH A','0900000001');
-insert into public.customers(full_name, primary_phone) values ('KH B','0900000001'); -- expect: LỖI unique
+insert into public.customers(full_name, primary_phone) values ('KH A','0900000002');
+insert into public.customers(full_name, primary_phone) values ('KH B','0900000002'); -- expect: LỖI unique
 insert into public.customers(full_name, needs_phone) values ('KH Odoo 1', true);
 insert into public.customers(full_name, needs_phone) values ('KH Odoo 2', true);      -- expect: OK (2 NULL)
 delete from public.customers where full_name like 'KH %';
@@ -290,7 +290,7 @@ $$;
 - [ ] **Step 2: Test máy có policy đầy đủ**
 
 ```sql
-insert into public.customers(full_name, primary_phone) values ('Test KH','0900000099') returning id \gset
+insert into public.customers(full_name, primary_phone) values ('Test KH','0900000003') returning id \gset
 -- chọn 1 máy thật trong catalog:
 insert into public.warranty_policy(internal_code, full_years, core_years)
 values ('GTUN-5800EN-G', 2, 5) on conflict (internal_code) do update set full_years=2, core_years=5;
@@ -389,7 +389,7 @@ git -C GWT-Masterdata commit -m "feat(cskh): domain CSKH — customers/installed
 from migrate import parse
 
 def test_split_source_with_paren():
-    assert parse.split_source("Nguyễn Trung Hiếu (Shopee)") == ("Nguyễn Trung Hiếu", "Shopee")
+    assert parse.split_source("Khách C (Shopee)") == ("Khách C", "Shopee")
 
 def test_split_source_no_paren():
     assert parse.split_source("Bùi Thu Hà") == ("Bùi Thu Hà", None)
@@ -558,7 +558,7 @@ Run: `python -m pytest migrate/tests/test_migrate_integration.py -v` — assert 
 - ~~**Phase 0.5** — Enrich SĐT/địa chỉ/liên hệ phụ từ Excel "Theo Dõi Bảo Hành"~~ **XONG 2026-07-15** — nhưng kết quả khác hẳn dự kiến:
   - ✅ **Địa chỉ: 277/293 khách** — nguồn hoá ra là `Contact (res.partner).xlsx` (Phone + Street), khớp bằng SĐT. Không phải file Theo Dõi BH.
   - ✅ **SĐT chính: 284/293** — đã xong ngay ở Phase 0 nhờ export Odoo mới có cột `Customer/Phone`. Mục tiêu gốc của Phase 0.5 thành thừa.
-  - ❌ **SĐT phụ: KHÔNG nhập được.** 4/11 "SĐT phụ" thực ra **đã là `primary_phone` của khách khác** (Odoo lưu SĐT người liên hệ làm SĐT chính) → nhập vào là nhân đôi. 7/11 còn lại thuộc khách **không có trong DB**. Thêm nữa vài dòng bị **kéo-thả fill Excel** nên số tự tăng dần (`Mrs.Thuỷ/Thành` 0865884194/195/196; `Anh Cường` 098 6667622→6667628) — SĐT giả. Chứng minh + test: `migrate/contacts.py::audit_lien_he`.
+  - ❌ **SĐT phụ: KHÔNG nhập được.** 4/11 "SĐT phụ" thực ra **đã là `primary_phone` của khách khác** (Odoo lưu SĐT người liên hệ làm SĐT chính) → nhập vào là nhân đôi. 7/11 còn lại thuộc khách **không có trong DB**. Thêm nữa vài dòng bị **kéo-thả fill Excel** nên số tự tăng dần (`Khách F` 0900000004/195/196; `Người liên hệ D` 0900000005→6667628) — SĐT giả. Chứng minh + test: `migrate/contacts.py::audit_lien_he`.
   - ❌ **11 khách thiếu/lỗi SĐT: 0/11 dò được** — file Theo Dõi BH không chứa serial nào của họ.
   - Còn lại: 16 khách thiếu địa chỉ, 11 khách thiếu/lỗi SĐT → **sửa tay qua app** (`/khach`), không có nguồn tự động.
 - **Phase 1** — `tickets` + ops ghi nhận lỗi.

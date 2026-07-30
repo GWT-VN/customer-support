@@ -25,7 +25,7 @@ def load_addresses(contact_rows):
     return out
 
 
-# "Ms Đào (giúp việc) - 0365636472" / "Anh Cường: 098 6667622" / "0362096197 - Đạt trợ lý"
+# "Người liên hệ B - 0900000006" / "Người liên hệ D: 0900000005" / "0900000007 - Người liên hệ C"
 _PHONE_IN_TEXT = re.compile(r"(0\d[\d\s.]{7,12}\d)")
 
 
@@ -54,17 +54,17 @@ def audit_lien_he(lien_he_rows, existing_primary_phones):
 
     1. TRÙNG SĐT CHÍNH — 4/11 "SĐT phụ" thực ra đã là primary_phone của khách khác
        trong DB (Odoo lưu SĐT người liên hệ làm SĐT chính của khách). Nhập vào = nhân đôi.
-         0938582202 "Jake Ngo (quản lý)"  -> đã là SĐT chính của khách "Lâm Bảo Ngọc"
-         0902040880 "Mr.Lâm"              -> "Mr Lâm"
-         0978713131 "A Hoàng"             -> "Nguyễn Huy Hoàng"
-         0792333398 "Chị Hợp"             -> "SLP - Trung tâm Giáo dục nghề nghiệp…"
+         0900000008 "Người liên hệ A"  -> đã là SĐT chính của khách "Khách A"
+         0900000009 "Người liên hệ F"              -> "Người liên hệ F"
+         0900000010 "Khách B"             -> "Khách B"
+         0900000011 "Người liên hệ G"             -> "SLP - Trung tâm Giáo dục nghề nghiệp…"
 
     2. KHÔNG NỐI ĐƯỢC — 7/11 còn lại thuộc khách KHÔNG có trong DB
-       (Anh Tuấn Tita Art, Mrs.Thuỷ/Thành, Mr.Toàn, Ms.Linh BVIS, Anh Sơn Mượt, Anh Duy).
+       (Anh Tuấn Tita Art, Khách F, Mr.Toàn, Ms.Linh BVIS, Khách H Mượt, Anh Duy).
 
     3. DỮ LIỆU HỎNG — vài dòng bị kéo-thả fill trong Excel nên số tự tăng dần:
-         Mrs.Thuỷ/Thành: SĐT 0865884194/195/196, giúp việc 0365636472/473/474
-         Anh Cường: 098 6667622 → 6667628 (7 biến thể)
+         Khách F: SĐT 0900000004/195/196, giúp việc 0900000006/473/474
+         Người liên hệ D: 0900000005 → 6667628 (7 biến thể)
        SĐT thật không bao giờ tăng đều 1 đơn vị qua các dòng.
 
     Trả về danh sách (name, phone, van_de) để soi lại.

@@ -5,7 +5,7 @@ Nguồn: file Excel user đã duyệt tay "GWT_goi_bao_tri_tu_hop_dong_2026-07-1
 để khớp customer_id (không khớp bằng tên — bài học từ ca "2 khách tên Yến").
 
 Trích SĐT: chỉ tin số nằm trong khối "BÊN MUA/BÁN (A)" (= khách) tới trước "(B)" (= GWT),
-loại trừ SĐT/MST công ty GWT đã biết (0339946388, 0110530659) — 2 nguồn nhiễu xác nhận
+loại trừ SĐT/MST công ty GWT đã biết (số của CHÍNH GWT, không phải khách — pii-ok) — 2 nguồn nhiễu xác nhận
 lặp lại ở nhiều hợp đồng khác nhau khi thử quét ẩu ban đầu.
 
 Chạy:  .venv/bin/python -m migrate.nap_maintenance_plan          # dry-run
@@ -42,7 +42,7 @@ from migrate.quet_hop_dong import POE, doc_file, khong_dau
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EXCEL = ROOT / "GWT_goi_bao_tri_tu_hop_dong_2026-07-17 (1).xlsx"
 
-GWT_LOAI = {"0339946388", "0110530659"}
+GWT_LOAI = {"0339946388", "0110530659"}  # pii-ok — số ĐT/MST của CHÍNH GWT (lọc nhiễu), không phải khách
 RE_A = re.compile(r"BÊN\s+(?:MUA|BÁN)\s*\(\s*A\s*\)", re.I)
 RE_B = re.compile(r"BÊN\s+(?:MUA|BÁN)\s*\(\s*B\s*\)", re.I)
 RE_SDT = re.compile(r"(?:SĐT|Số điện thoại|Điện thoại)\s*:?\s*(0\d{9,10})", re.I)
