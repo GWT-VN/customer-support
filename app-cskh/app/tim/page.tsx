@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { timGop } from '@/app/actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
@@ -53,7 +52,6 @@ export default async function TimGopPage({
           <h1 className="text-xl font-semibold text-slate-900">
             {coTuKhoa ? <>Kết quả cho &ldquo;{q}&rdquo;</> : 'Tìm kiếm'}
           </h1>
-          <DieuHuong />
         </header>
 
         {!coTuKhoa ? (

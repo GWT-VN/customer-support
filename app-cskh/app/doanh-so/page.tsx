@@ -1,4 +1,3 @@
-import { DieuHuong } from '@/components/DieuHuong'
 import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
 import { doanhSoCskh } from '@/app/actions'
 
@@ -28,7 +27,6 @@ export default async function DoanhSoPage() {
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Doanh số CSKH</h1>
-          <DieuHuong />
         </header>
 
         <p className="text-sm bg-sky-50 text-sky-900 rounded-lg px-3 py-2">

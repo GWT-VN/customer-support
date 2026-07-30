@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
@@ -29,7 +28,6 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <NutQuayLai macDinh="/ticket" />
-          <DieuHuong />
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">

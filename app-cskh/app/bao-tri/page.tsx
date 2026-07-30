@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { DieuHuong } from '@/components/DieuHuong'
 import { OTimKiem } from '@/bang'
 import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri } from '@/app/actions'
 import { BaoTriDoneButton } from '@/components/BaoTriDoneButton'
@@ -52,7 +51,6 @@ export default async function BaoTriPage({
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Lịch bảo trì</h1>
-          <DieuHuong />
         </header>
 
         <Suspense>

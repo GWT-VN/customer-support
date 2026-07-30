@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { DieuHuong } from '@/components/DieuHuong'
 import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, type Ticket } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
@@ -76,7 +75,6 @@ export default async function TicketsPage({
             <Link href="/tao-ticket"
               className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm font-medium">+ Tạo ticket</Link>
           </div>
-          <DieuHuong />
         </header>
 
         <Suspense>

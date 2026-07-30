@@ -1,4 +1,3 @@
-import { DieuHuong } from '@/components/DieuHuong'
 import { BangNhanVien } from '@/components/BangNhanVien'
 import { listAllStaff } from '@/app/actions'
 import { chanNeuKhongPhaiAdmin, layNhanVien } from '@/lib/supabase'
@@ -15,7 +14,6 @@ export default async function NhanVienPage() {
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Nhân viên</h1>
-          <DieuHuong />
         </header>
 
         <p className="text-sm text-slate-500">

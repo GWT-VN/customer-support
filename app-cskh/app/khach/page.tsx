@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { DieuHuong } from '@/components/DieuHuong'
 import { listToFix, khoaTatCaKhach } from '@/app/actions'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
@@ -31,7 +30,6 @@ export default async function ToFixPage({
             không phải trang con của "Máy đã lắp". Nút lui chỉ dành cho trang chi tiết. */}
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Khách cần dọn dữ liệu</h1>
-          <DieuHuong />
         </header>
 
         <Suspense>

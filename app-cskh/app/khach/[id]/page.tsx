@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { notFound } from 'next/navigation'
 import { getCustomer, ticketsOfCustomer, machinesOfCustomer } from '@/app/actions'
 import { CustomerEditor } from '@/components/CustomerEditor'
@@ -18,7 +17,6 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <NutQuayLai macDinh="/" />
-          <DieuHuong />
         </div>
         <h1 className="text-xl font-semibold text-slate-900">{customer.full_name}</h1>
         <CustomerEditor customer={customer} contacts={contacts} />

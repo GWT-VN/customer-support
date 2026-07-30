@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
 import { issueReport, ticketsInGroup } from '@/app/actions'
@@ -30,7 +29,6 @@ export default async function NhomLoiDetail({
         <header className="space-y-2">
           <div className="flex items-center justify-between gap-4">
             <NutQuayLai macDinh="/nhom-loi" />
-            <DieuHuong />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-semibold text-slate-900">{nhom.ten}</h1>

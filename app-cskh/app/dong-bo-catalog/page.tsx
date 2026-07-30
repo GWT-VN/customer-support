@@ -1,4 +1,3 @@
-import { DieuHuong } from '@/components/DieuHuong'
 import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
 import { catalogSyncLast } from '@/app/actions'
 import { NutDongBoCatalog } from '@/components/NutDongBoCatalog'
@@ -12,7 +11,6 @@ export default async function DongBoCatalogPage() {
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Đồng bộ catalog</h1>
-          <DieuHuong />
         </header>
 
         <p className="text-sm bg-sky-50 text-sky-900 rounded-lg px-3 py-2">

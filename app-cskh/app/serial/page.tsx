@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { laAdmin } from '@/lib/supabase'
 import { Suspense } from 'react'
 import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, type SerialRow } from '@/app/actions'
@@ -33,7 +32,6 @@ export default async function SerialPage({
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Kho serial</h1>
-          <DieuHuong />
         </header>
 
         <div className="flex gap-2 flex-wrap">

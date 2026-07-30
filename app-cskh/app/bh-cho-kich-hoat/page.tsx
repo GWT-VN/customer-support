@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { DieuHuong } from '@/components/DieuHuong'
 import { bhChoKichHoat, bhChoKichHoatDem } from '@/app/actions'
 import { BHChoKichHoatList } from '@/components/BHChoKichHoatList'
 
@@ -25,7 +24,6 @@ export default async function BHChoKichHoatPage({
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Chờ kích hoạt BH</h1>
-          <DieuHuong />
         </header>
 
         <p className="text-sm text-slate-500">

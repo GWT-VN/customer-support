@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThanhTaiKhoan } from "@/components/ThanhTaiKhoan";
+import { Sidebar } from "@/components/Sidebar";
+import { layNguoiDung } from "@/lib/supabase";
 import { CauHinhBang } from "@/bang";
 import { TEN_COT, NGHIA_SAP_XEP } from "@/lib/danhSach";
 
@@ -20,11 +22,12 @@ export const metadata: Metadata = {
   description: "Hệ thống chăm sóc khách hàng GWT",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await layNguoiDung();
   return (
     <html
       lang="en"
@@ -39,7 +42,14 @@ export default function RootLayout({
         */}
         <CauHinhBang tenCot={TEN_COT} nghiaSapXep={NGHIA_SAP_XEP}>
           <ThanhTaiKhoan />
-          {children}
+          {user ? (
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+              <Sidebar />
+              <div className="flex-1 min-w-0">{children}</div>
+            </div>
+          ) : (
+            children
+          )}
         </CauHinhBang>
       </body>
     </html>
