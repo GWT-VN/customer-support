@@ -24,6 +24,7 @@ const MUC = [
 
 const MUC_ADMIN = [
   { href: '/doanh-so', nhan: 'Doanh số' },
+  { href: '/dong-bo-catalog', nhan: 'Đồng bộ catalog' },
   { href: '/nhan-vien', nhan: 'Nhân viên' },
 ] as const
 
