@@ -34,6 +34,7 @@ const NHOM: readonly Nhom[] = [
 ] as const
 
 const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
+  { href: '/duyet', nhan: 'Chờ duyệt' },
   { href: '/doanh-so', nhan: 'Doanh số' },
   { href: '/dong-bo-catalog', nhan: 'Đồng bộ catalog' },
   { href: '/audit', nhan: 'Nhật ký thao tác' },

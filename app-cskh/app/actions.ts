@@ -218,25 +218,17 @@ export async function getCustomer(id: string) {
 
 export async function updateCustomer(id: string, patch: Partial<Customer>) {
   await requireStaff()
-  const allowed = {
+  const sdt = patch.primary_phone || null
+  const payload: Record<string, unknown> = {
     full_name: patch.full_name,
-    primary_phone: patch.primary_phone || null,
+    primary_phone: sdt,
     province: patch.province || null,
     address: patch.address || null,
   }
   // Sửa được SĐT hợp lệ -> hạ cờ needs_phone + xoá ghi chú lỗi
-  const { error } = await dataClient()
-    .from('cs_customers')
-    .update(
-      allowed.primary_phone && /^0\d{9,10}$/.test(allowed.primary_phone)
-        ? { ...allowed, needs_phone: false, notes: null }
-        : allowed
-    )
-    .eq('id', id)
-  if (error) return { ok: false as const, error: error.message }
-  revalidatePath(`/khach/${id}`)
-  revalidatePath('/')
-  return { ok: true as const }
+  if (sdt && /^0\d{9,10}$/.test(sdt)) { payload.needs_phone = false; payload.notes = null }
+  // Sửa thông tin khách CẦN ADMIN DUYỆT: admin áp ngay, CS -> hàng chờ.
+  return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'sua', payload })
 }
 
 export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
@@ -256,9 +248,126 @@ export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
 
 export async function deleteContact(id: string, customerId: string) {
   await requireStaff()
-  const { error } = await dataClient().from('customer_contacts').delete().eq('id', id)
+  // Xoá SĐT phụ CẦN ADMIN DUYỆT: admin xoá ngay, CS -> hàng chờ.
+  return guiYeuCauThayDoi({
+    doi_tuong: 'customer_contacts', ban_ghi_id: id, loai: 'xoa',
+    ly_do: `SĐT phụ của khách ${customerId}`,
+  })
+}
+
+// ── Đề xuất SỬA/XOÁ cần admin duyệt (yeu_cau_thay_doi) ─────────────────────
+type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts'
+const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
+  cs_customers: ['full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone'],
+  filter_replacement: ['filter_code', 'replaced_at', 'note'],
+  customer_contacts: ['phone', 'contact_name', 'role', 'zalo_ok'],
+}
+
+/** Áp 1 thay đổi thật xuống DB (dùng cho admin-áp-ngay lẫn khi duyệt). */
+async function apDungThayDoi(
+  db: ReturnType<typeof dataClient>, doiTuong: DoiTuong, banGhiId: string,
+  loai: 'sua' | 'xoa', payload?: Record<string, unknown> | null
+) {
+  if (loai === 'xoa') {
+    // Khách: ẩn mềm (giữ máy/ticket). SĐT phụ + lịch thay lõi: xoá cứng (bảng lá).
+    if (doiTuong === 'cs_customers') {
+      return db.from('cs_customers').update({ trang_thai: 'da_xoa' }).eq('id', banGhiId)
+    }
+    return db.from(doiTuong).delete().eq('id', banGhiId)
+  }
+  const patch: Record<string, unknown> = {}
+  for (const k of COT_CHO_PHEP[doiTuong]) {
+    if (payload && Object.prototype.hasOwnProperty.call(payload, k)) patch[k] = payload[k]
+  }
+  return db.from(doiTuong).update(patch).eq('id', banGhiId)
+}
+
+function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string) {
+  if (doiTuong === 'cs_customers') {
+    revalidatePath('/khach'); revalidatePath(`/khach/${banGhiId}`); revalidatePath('/')
+  } else if (doiTuong === 'customer_contacts') {
+    revalidatePath('/khach')
+  } else {
+    revalidatePath('/loi')
+  }
+}
+
+/** Admin -> áp NGAY (+audit). CS -> vào hàng chờ yeu_cau_thay_doi. */
+export async function guiYeuCauThayDoi(input: {
+  doi_tuong: DoiTuong; ban_ghi_id: string; loai: 'sua' | 'xoa'
+  payload?: Record<string, unknown>; ly_do?: string
+}): Promise<{ ok: true; applied: boolean } | { ok: false; error: string }> {
+  const nv = await layNhanVien()
+  const db = dataClient()
+  if (await laAdmin()) {
+    const { error } = await apDungThayDoi(db, input.doi_tuong, input.ban_ghi_id, input.loai, input.payload)
+    if (error) return { ok: false, error: error.message }
+    await ghiAudit(`${input.loai}_${input.doi_tuong}`, `${input.doi_tuong}:${input.ban_ghi_id}`, input.payload)
+    revalidateThayDoi(input.doi_tuong, input.ban_ghi_id)
+    return { ok: true, applied: true }
+  }
+  const { error } = await db.from('yeu_cau_thay_doi').insert({
+    doi_tuong: input.doi_tuong, ban_ghi_id: input.ban_ghi_id, loai: input.loai,
+    payload: input.payload ?? null, ly_do: input.ly_do ?? null, nguoi_gui: nv?.email ?? null,
+  })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('gui_yeu_cau', `${input.doi_tuong}:${input.ban_ghi_id}`, { loai: input.loai })
+  revalidatePath('/duyet')
+  return { ok: true, applied: false }
+}
+
+/** Đề xuất XOÁ khách (ẩn mềm khi được duyệt). */
+export async function xoaKhach(id: string, lyDo?: string) {
+  await requireStaff()
+  return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'xoa', ly_do: lyDo })
+}
+
+export type YeuCauThayDoi = {
+  id: string; doi_tuong: string; ban_ghi_id: string; loai: string
+  payload: Record<string, unknown> | null; ly_do: string | null; nguoi_gui: string | null; created_at: string
+}
+
+/** Hàng chờ duyệt yêu cầu sửa/xoá (CHỈ ADMIN). */
+export async function listYeuCauThayDoi(): Promise<YeuCauThayDoi[]> {
+  await requireStaff()
+  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  const { data, error } = await dataClient().from('yeu_cau_thay_doi')
+    .select('id, doi_tuong, ban_ghi_id, loai, payload, ly_do, nguoi_gui, created_at')
+    .eq('trang_thai', 'cho_duyet').order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as YeuCauThayDoi[]
+}
+
+/** Duyệt 1 yêu cầu -> áp thật (CHỈ ADMIN). */
+export async function duyetYeuCau(id: string) {
+  const user = await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: yc, error: e0 } = await db.from('yeu_cau_thay_doi')
+    .select('doi_tuong, ban_ghi_id, loai, payload, trang_thai').eq('id', id).maybeSingle()
+  if (e0) return { ok: false as const, error: e0.message }
+  const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: 'sua' | 'xoa'; payload: Record<string, unknown> | null; trang_thai: string } | null
+  if (!y || y.trang_thai !== 'cho_duyet') return { ok: false as const, error: 'Yêu cầu không tồn tại hoặc đã xử lý.' }
+  const { error } = await apDungThayDoi(db, y.doi_tuong, y.ban_ghi_id, y.loai, y.payload)
   if (error) return { ok: false as const, error: error.message }
-  revalidatePath(`/khach/${customerId}`)
+  await db.from('yeu_cau_thay_doi')
+    .update({ trang_thai: 'da_duyet', duyet_boi: user.email ?? '', duyet_luc: new Date().toISOString() }).eq('id', id)
+  await ghiAudit('duyet_yeu_cau', `${y.doi_tuong}:${y.ban_ghi_id}`, { loai: y.loai })
+  revalidateThayDoi(y.doi_tuong, y.ban_ghi_id)
+  revalidatePath('/duyet')
+  return { ok: true as const }
+}
+
+/** Từ chối 1 yêu cầu (CHỈ ADMIN). */
+export async function tuChoiYeuCau(id: string, lyDo?: string) {
+  const user = await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('yeu_cau_thay_doi')
+    .update({ trang_thai: 'tu_choi', ly_do_tu_choi: lyDo?.trim() || null, duyet_boi: user.email ?? '', duyet_luc: new Date().toISOString() })
+    .eq('id', id).eq('trang_thai', 'cho_duyet')
+  if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('tu_choi_yeu_cau', `yeu-cau:${id}`, lyDo?.trim() ? { ly_do: lyDo.trim() } : undefined)
+  revalidatePath('/duyet')
   return { ok: true as const }
 }
 
@@ -492,11 +601,22 @@ export async function logReplacement(input: {
 
 export async function deleteReplacement(id: string, serial: string) {
   await requireStaff()
-  const { error } = await dataClient().from('filter_replacement').delete().eq('id', id)
-  if (error) return { ok: false as const, error: error.message }
-  revalidatePath('/loi')
-  revalidatePath(`/may/${encodeURIComponent(serial)}`)
-  return { ok: true as const }
+  // Xoá lịch thay lõi CẦN ADMIN DUYỆT: admin xoá ngay, CS -> hàng chờ.
+  return guiYeuCauThayDoi({
+    doi_tuong: 'filter_replacement', ban_ghi_id: id, loai: 'xoa',
+    ly_do: `Lịch thay lõi của máy ${serial}`,
+  })
+}
+
+/** Sửa 1 dòng lịch thay lõi — CẦN ADMIN DUYỆT (admin sửa ngay, CS -> hàng chờ). */
+export async function suaReplacement(
+  id: string, patch: { filter_code?: string; replaced_at?: string; note?: string }
+) {
+  await requireStaff()
+  if (patch.replaced_at && !/^\d{4}-\d{2}-\d{2}$/.test(patch.replaced_at)) {
+    return { ok: false as const, error: 'Ngày không hợp lệ.' }
+  }
+  return guiYeuCauThayDoi({ doi_tuong: 'filter_replacement', ban_ghi_id: id, loai: 'sua', payload: { ...patch } })
 }
 
 // ── Tickets (Phase 1) ───────────────────────────────────────────────────────
@@ -889,6 +1009,7 @@ export async function searchCustomers(q: string, limit = 20): Promise<KhachTom[]
   await requireStaff()
   let query = dataClient().from('cs_customers')
     .select('id, full_name, primary_phone, trang_thai, address, province')
+    .neq('trang_thai', 'da_xoa')   // ẩn khách đã xoá mềm
   const term = q.trim()
   if (term) {
     const safe = term.replace(/[%_]/g, (c) => '\\' + c)

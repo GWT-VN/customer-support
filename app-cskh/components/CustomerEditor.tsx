@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addContact, deleteContact, updateCustomer, type Contact, type Customer } from '@/app/actions'
+import { addContact, deleteContact, updateCustomer, xoaKhach, type Contact, type Customer } from '@/app/actions'
 
 const ROLES: Record<string, string> = {
   owner: 'Chủ nhà',
@@ -24,7 +24,16 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
     const r = await updateCustomer(c.id, c)
     setBusy(false)
     if (!r.ok) setErr(r.error)
-    else { setMsg('Đã lưu.'); router.refresh() }
+    else { setMsg(r.applied ? 'Đã lưu.' : 'Đã gửi chờ admin duyệt.'); router.refresh() }
+  }
+
+  async function xoa() {
+    if (!window.confirm('Gửi yêu cầu XOÁ khách này? (admin duyệt mới ẩn)')) return
+    setBusy(true); setErr(null); setMsg(null)
+    const r = await xoaKhach(c.id)
+    setBusy(false)
+    if (!r.ok) setErr(r.error)
+    else { setMsg(r.applied ? 'Đã xoá khách (ẩn).' : 'Đã gửi yêu cầu xoá, chờ admin duyệt.'); router.refresh() }
   }
 
   // form thêm SĐT phụ
@@ -78,7 +87,12 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
             {busy ? 'Đang lưu…' : 'Lưu'}
           </button>
           {msg && <span className="text-sm text-emerald-700">{msg}</span>}
+          <button onClick={xoa} disabled={busy}
+            className="ml-auto rounded-lg border border-red-200 text-red-600 px-3 py-2 text-sm font-medium disabled:opacity-50 hover:bg-red-50">
+            Xoá khách
+          </button>
         </div>
+        <p className="text-xs text-slate-400">Sửa/xoá cần admin duyệt (admin làm là áp ngay).</p>
       </section>
 
       <section className="bg-white rounded-xl border p-5 space-y-3">
@@ -99,8 +113,10 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
                 </span>
                 <button
                   onClick={async () => {
-                    if (!window.confirm('Xoá liên hệ này của khách?')) return
-                    await deleteContact(ct.id, c.id); router.refresh()
+                    if (!window.confirm('Gửi yêu cầu xoá liên hệ này? (admin duyệt mới xoá)')) return
+                    const r = await deleteContact(ct.id, c.id)
+                    if (!r.ok) setErr(r.error)
+                    else { setMsg(r.applied ? 'Đã xoá liên hệ.' : 'Đã gửi yêu cầu xoá, chờ duyệt.'); router.refresh() }
                   }}
                   className="text-xs text-red-600 hover:underline">Xoá</button>
               </li>

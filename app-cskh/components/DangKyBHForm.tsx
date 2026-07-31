@@ -26,6 +26,8 @@ export function DangKyBHForm() {
   const [mayCode, setMayCode] = useState('')            // '' = chưa chọn máy -> gõ serial tự do
   const [serialList, setSerialList] = useState<SerialKho[]>([])
   const [serial, setSerial] = useState('')
+  const [serialQ, setSerialQ] = useState('')        // ô gõ tìm serial (khi đã chọn máy)
+  const [serialOpen, setSerialOpen] = useState(false)
   const [info, setInfo] = useState<SerialKho | null>(null)
 
   const [khachId, setKhachId] = useState('')
@@ -64,12 +66,29 @@ export function DangKyBHForm() {
   }, [serial])
 
   function chonMay(code: string) {
-    setMayCode(code); setSerial(''); setInfo(null); setSerialList([]); setErr(null)
+    setMayCode(code); setSerial(''); setSerialQ(''); setSerialOpen(false)
+    setInfo(null); setSerialList([]); setErr(null)
   }
   function datSerial(v: string) {
     setSerial(v); setErr(null)
     if (!v.trim()) setInfo(null)
   }
+  // Gõ tìm serial theo ĐUÔI (gõ 123 -> ưu tiên serial kết thúc bằng 123).
+  function goSerial(v: string) {
+    setSerialQ(v); setSerialOpen(true)
+    const hit = serialList.find((s) => s.serial === v.trim())
+    datSerial(hit ? hit.serial : '')
+  }
+  function chonSerialTrongList(s: SerialKho) {
+    setSerialQ(s.serial); setSerialOpen(false); datSerial(s.serial)
+  }
+  const q = serialQ.trim().toLowerCase()
+  const serialLoc = (q
+    ? serialList.filter((s) => s.serial.toLowerCase().includes(q))
+        .sort((a, b) =>
+          (a.serial.toLowerCase().endsWith(q) ? 0 : 1) - (b.serial.toLowerCase().endsWith(q) ? 0 : 1))
+    : serialList
+  ).slice(0, 12)
   function chonKhach(id: string, _nhan: string, k?: KhachTom) {
     setKhachId(id); setKhachAddr(k?.address ?? null)
   }
@@ -86,7 +105,7 @@ export function DangKyBHForm() {
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
     setMsg(`Đã đăng ký + kích hoạt BH cho serial ${serial}.`)
-    setMayCode(''); setSerial(''); setInfo(null); setSerialList([])
+    setMayCode(''); setSerial(''); setSerialQ(''); setSerialOpen(false); setInfo(null); setSerialList([])
     setKhachId(''); setKhachAddr(null); setDcLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
     router.refresh()
   }
@@ -112,15 +131,27 @@ export function DangKyBHForm() {
         <label className="text-sm font-medium text-slate-700">2. Serial máy</label>
         {mayCode ? (
           serialList.length ? (
-            <select value={serial} onChange={(e) => datSerial(e.target.value)}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm bg-white font-mono text-slate-900">
-              <option value="">— Chọn serial còn kích hoạt được —</option>
-              {serialList.map((s) => (
-                <option key={s.serial} value={s.serial}>
-                  {s.serial}{s.ten_khach ? ` · đã lắp: ${s.ten_khach}` : ' · tồn kho'}
-                </option>
-              ))}
-            </select>
+            <div className="relative mt-1">
+              <input value={serialQ} onChange={(e) => goSerial(e.target.value)}
+                onFocus={() => setSerialOpen(true)}
+                onBlur={() => setTimeout(() => setSerialOpen(false), 200)}
+                placeholder="Chọn hoặc gõ số CUỐI serial…"
+                className="w-full rounded-lg border px-3 py-2 text-sm bg-white font-mono text-slate-900" />
+              {serialOpen && serialLoc.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border bg-white shadow-lg">
+                  {serialLoc.map((s) => (
+                    <li key={s.serial}>
+                      <button type="button" onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => chonSerialTrongList(s)}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 font-mono">
+                        {s.serial}
+                        <span className="text-slate-400">{s.ten_khach ? ` · đã lắp: ${s.ten_khach}` : ' · tồn kho'}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           ) : (
             <p className="text-sm bg-amber-50 text-amber-900 rounded-lg px-3 py-2 mt-1">
               Máy này không còn serial nào chưa kích hoạt trong kho.
