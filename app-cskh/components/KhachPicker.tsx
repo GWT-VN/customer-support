@@ -7,7 +7,9 @@ import { searchCustomers, taoKhachChoDuyet, type KhachTom } from '@/app/actions'
  * Chọn khách (tìm trong cs_customers) hoặc tạo mới -> chờ admin duyệt.
  * onPick trả (id, nhãn hiển thị). Không setState đồng bộ trong effect (tránh lỗi eslint).
  */
-export function KhachPicker({ onPick }: { onPick: (id: string, nhan: string) => void }) {
+export function KhachPicker(
+  { onPick }: { onPick: (id: string, nhan: string, khach?: KhachTom) => void }
+) {
   const [q, setQ] = useState('')
   const [chon, setChon] = useState<string | null>(null)   // nhãn khách đã chọn
   const [sug, setSug] = useState<KhachTom[]>([])
@@ -30,7 +32,7 @@ export function KhachPicker({ onPick }: { onPick: (id: string, nhan: string) => 
 
   function pick(k: KhachTom) {
     const nhan = `${k.full_name}${k.primary_phone ? ` · ${k.primary_phone}` : ''}`
-    setChon(nhan); onPick(k.id, nhan); setOpen(false)
+    setChon(nhan); onPick(k.id, nhan, k); setOpen(false)
   }
 
   async function taoMoi() {
@@ -39,7 +41,12 @@ export function KhachPicker({ onPick }: { onPick: (id: string, nhan: string) => 
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
     const nhan = `${f.full_name.trim()} (chờ duyệt)`
-    setChon(nhan); onPick(r.id, nhan); setTaoMo(false)
+    setChon(nhan)
+    onPick(r.id, nhan, {
+      id: r.id, full_name: f.full_name.trim(), primary_phone: f.primary_phone.trim() || null,
+      trang_thai: 'cho_duyet', address: f.address.trim() || null, province: f.province.trim() || null,
+    })
+    setTaoMo(false)
   }
 
   if (chon) {

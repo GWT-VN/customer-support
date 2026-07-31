@@ -879,12 +879,16 @@ export async function deleteSerialPending(id: string) {
 }
 
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────
-export type KhachTom = { id: string; full_name: string; primary_phone: string | null; trang_thai: string }
+export type KhachTom = {
+  id: string; full_name: string; primary_phone: string | null; trang_thai: string
+  address?: string | null; province?: string | null
+}
 
 /** Tìm khách (cho ô chọn khách khi đăng ký BH / tạo ticket). */
 export async function searchCustomers(q: string, limit = 20): Promise<KhachTom[]> {
   await requireStaff()
-  let query = dataClient().from('cs_customers').select('id, full_name, primary_phone, trang_thai')
+  let query = dataClient().from('cs_customers')
+    .select('id, full_name, primary_phone, trang_thai, address, province')
   const term = q.trim()
   if (term) {
     const safe = term.replace(/[%_]/g, (c) => '\\' + c)
@@ -893,6 +897,41 @@ export async function searchCustomers(q: string, limit = 20): Promise<KhachTom[]
   const { data, error } = await query.order('full_name').limit(limit)
   if (error) throw new Error(error.message)
   return (data ?? []) as KhachTom[]
+}
+
+// ── Đăng ký BH (Đợt 1): chọn máy -> serial của máy, hoặc serial -> soi trạng thái ──
+export type MayKho = { internal_code: string; ten_noi_bo: string | null; con_lai: number; tong: number }
+
+/** Danh sách máy (có serial trong kho) cho ô chọn máy. Lọc bỏ lõi/vỏ (view v_may_kho). */
+export async function dsMayCoSerial(): Promise<MayKho[]> {
+  await requireStaff()
+  const { data, error } = await dataClient().from('v_may_kho')
+    .select('internal_code, ten_noi_bo, con_lai, tong').order('ten_noi_bo')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as MayKho[]
+}
+
+/** Serial của 1 máy (theo mã nội bộ) còn CHƯA kích hoạt BH — cho dropdown khi đã chọn máy. */
+export async function serialsTheoMay(internalCode: string, limit = 500): Promise<SerialKho[]> {
+  await requireStaff()
+  const { data, error } = await dataClient().from('v_serial_kho')
+    .select('serial, ma_noi_bo, ten_noi_bo, ma_goc, po, trang_thai, bh_kich_hoat, ten_khach, sdt_khach, ngay_lap, bh_het_han')
+    .eq('ma_noi_bo', internalCode).eq('bh_kich_hoat', false)
+    .order('trang_thai').order('serial').limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as SerialKho[]
+}
+
+/** Soi 1 serial (đã có khách/kích hoạt chưa) — cho ca điền serial trước để kiểm tra lại. */
+export async function serialInfo(serial: string): Promise<SerialKho | null> {
+  await requireStaff()
+  const s = serial.trim()
+  if (!s) return null
+  const { data, error } = await dataClient().from('v_serial_kho')
+    .select('serial, ma_noi_bo, ten_noi_bo, ma_goc, po, trang_thai, bh_kich_hoat, ten_khach, sdt_khach, ngay_lap, bh_het_han')
+    .eq('serial', s).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as SerialKho) ?? null
 }
 
 /** Tạo khách mới TỪ CS -> trạng thái chờ admin duyệt (khách đại lý/Shopee đăng ký sau). */
