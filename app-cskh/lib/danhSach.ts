@@ -35,6 +35,22 @@ export const COT_MAY = ['install_date', 'serial', 'customer_name', 'product_name
 export const COT_TICKET = ['created_at', 'ticket_code', 'state', 'customer_name'] as const
 export const COT_LOI = ['han_som', 'serial', 'customer_name'] as const
 export const COT_KHACH = ['full_name', 'province'] as const
+
+/**
+ * Cột có thể XUẤT của bảng khách — cho ô chọn trường export. `pii=true` (SĐT/địa chỉ)
+ * thì bản có cột đó cần admin duyệt (CS gửi yêu cầu). Dùng chung server + client.
+ */
+export const XUAT_KHACH_COT: readonly { key: string; nhan: string; pii: boolean }[] = [
+  { key: 'full_name', nhan: 'Tên', pii: false },
+  { key: 'primary_phone', nhan: 'SĐT', pii: true },
+  { key: 'address', nhan: 'Địa chỉ', pii: true },
+  { key: 'province', nhan: 'Tỉnh/TP', pii: false },
+  { key: 'customer_code', nhan: 'Mã KH', pii: false },
+  { key: 'source', nhan: 'Nguồn', pii: false },
+  { key: 'created_at', nhan: 'Ngày tạo', pii: false },
+]
+/** Trường bật sẵn khi mở ô chọn export. */
+export const XUAT_KHACH_MAC_DINH = ['full_name', 'primary_phone', 'province']
 export const COT_BAO_TRI = ['due_date', 'customer_name'] as const
 
 /**

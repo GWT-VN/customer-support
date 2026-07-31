@@ -7,7 +7,7 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
-  TINH_TRANG_BH, TOI_DA_CHON, type TinhTrangBH,
+  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -477,7 +477,10 @@ function oCsv(v: unknown): string {
   const s = v == null ? '' : String(v)
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
-type KhachXuat = { full_name: string; primary_phone: string | null; address: string | null; province: string | null }
+type KhachXuat = {
+  full_name: string; primary_phone: string | null; address: string | null; province: string | null
+  customer_code: string | null; source: string | null; created_at: string | null
+}
 
 /** Lấy TẤT CẢ khách khớp bộ lọc để xuất (theo lô 1000, bỏ khách da_xoa). */
 async function layKhachXuat(q: string): Promise<KhachXuat[]> {
@@ -487,7 +490,8 @@ async function layKhachXuat(q: string): Promise<KhachXuat[]> {
   const ra: KhachXuat[] = []
   for (let off = 0; off < 50000; off += 1000) {
     let query = db.from('cs_customers')
-      .select('full_name, primary_phone, address, province').neq('trang_thai', 'da_xoa')
+      .select('full_name, primary_phone, address, province, customer_code, source, created_at')
+      .neq('trang_thai', 'da_xoa')
     if (term) {
       const safe = term.replace(/[%_]/g, (c) => '\\' + c)
       query = query.or(`full_name.ilike.%${safe}%,primary_phone.ilike.%${safe}%`)
@@ -501,40 +505,49 @@ async function layKhachXuat(q: string): Promise<KhachXuat[]> {
   return ra
 }
 
-function csvKhach(rows: KhachXuat[], coPii: boolean): string {
-  const header = coPii ? ['Tên', 'SĐT', 'Địa chỉ', 'Tỉnh/TP'] : ['Tên', 'Tỉnh/TP']
-  const lines = [header.map(oCsv).join(',')]
-  for (const r of rows) {
-    const cols = coPii ? [r.full_name, r.primary_phone, r.address, r.province] : [r.full_name, r.province]
-    lines.push(cols.map(oCsv).join(','))
+/** Nội dung CSV (dấu phẩy) cho các cột được chọn. KHÔNG kèm BOM — client mã hoá UTF-16LE. */
+function noiDungXuatKhach(rows: KhachXuat[], cot: string[]): string {
+  const cols = XUAT_KHACH_COT.filter((c) => cot.includes(c.key))
+  const giaTri = (r: KhachXuat, key: string): string => {
+    if (key === 'created_at') return r.created_at ? String(r.created_at).slice(0, 10) : ''
+    const v = (r as unknown as Record<string, unknown>)[key]
+    return v == null ? '' : String(v)
   }
-  return '﻿' + lines.join('\n')   // BOM để Excel đọc UTF-8 đúng
+  const lines = [cols.map((c) => oCsv(c.nhan)).join(',')]
+  for (const r of rows) lines.push(cols.map((c) => oCsv(giaTri(r, c.key))).join(','))
+  return lines.join('\r\n')
+}
+
+function coPiiTrong(cot: string[]): boolean {
+  return XUAT_KHACH_COT.some((c) => c.pii && cot.includes(c.key))
 }
 
 /**
- * Xuất danh sách khách. Bản KHÔNG PII: ai cũng xuất thẳng. Bản CÓ PII (SĐT/địa chỉ):
- * admin xuất thẳng; CS -> tạo yêu cầu chờ admin duyệt (tải sau ở "export của tôi").
+ * Xuất danh sách khách theo CÁC CỘT được chọn. Không có cột PII -> ai cũng xuất thẳng.
+ * Có cột PII (SĐT/địa chỉ) -> admin xuất thẳng; CS -> yêu cầu chờ admin duyệt.
  */
-export async function xuatKhach(q: string, coPii: boolean): Promise<
+export async function xuatKhach(q: string, cot: string[]): Promise<
   { ok: true; csv: string } | { ok: true; pending: true } | { ok: false; error: string }
 > {
   await requireStaff()
-  if (!coPii) {
+  const cols = cot.filter((k) => XUAT_KHACH_COT.some((c) => c.key === k))
+  if (cols.length === 0) return { ok: false, error: 'Chọn ít nhất 1 trường để xuất.' }
+  if (!coPiiTrong(cols)) {
     const rows = await layKhachXuat(q)
-    await ghiAudit('export_khach', 'cs_customers', { q, co_pii: false, so_dong: rows.length })
-    return { ok: true, csv: csvKhach(rows, false) }
+    await ghiAudit('export_khach', 'cs_customers', { q, cot: cols, so_dong: rows.length })
+    return { ok: true, csv: noiDungXuatKhach(rows, cols) }
   }
   if (await laAdmin()) {
     const rows = await layKhachXuat(q)
-    await ghiAudit('export_khach_pii', 'cs_customers', { q, so_dong: rows.length })
-    return { ok: true, csv: csvKhach(rows, true) }
+    await ghiAudit('export_khach_pii', 'cs_customers', { q, cot: cols, so_dong: rows.length })
+    return { ok: true, csv: noiDungXuatKhach(rows, cols) }
   }
   const nv = await layNhanVien()
   const { error } = await dataClient().from('yeu_cau_export')
-    .insert({ bang: 'cs_customers', tieu_chi: { q }, co_pii: true, nguoi_gui: nv?.email ?? null })
+    .insert({ bang: 'cs_customers', tieu_chi: { q, cot: cols }, co_pii: true, nguoi_gui: nv?.email ?? null })
   if (error) return { ok: false, error: error.message }
-  await ghiAudit('gui_yeu_cau_export', 'cs_customers', { q })
-  revalidatePath('/khach'); revalidatePath('/duyet')
+  await ghiAudit('gui_yeu_cau_export', 'cs_customers', { q, cot: cols })
+  revalidatePath('/khach-hang'); revalidatePath('/duyet')
   return { ok: true, pending: true }
 }
 
@@ -594,14 +607,16 @@ export async function taiExportDaDuyet(id: string): Promise<{ ok: true; csv: str
   const { data: yc, error: e0 } = await db.from('yeu_cau_export')
     .select('tieu_chi, nguoi_gui, trang_thai').eq('id', id).maybeSingle()
   if (e0) return { ok: false, error: e0.message }
-  const y = yc as { tieu_chi: { q?: string } | null; nguoi_gui: string | null; trang_thai: string } | null
+  const y = yc as { tieu_chi: { q?: string; cot?: string[] } | null; nguoi_gui: string | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'da_duyet') return { ok: false, error: 'Yêu cầu chưa được duyệt hoặc đã tải.' }
   if (!(await laAdmin()) && y.nguoi_gui !== (u.email ?? '')) return { ok: false, error: KHONG_DU_QUYEN }
+  const cot = Array.isArray(y.tieu_chi?.cot) && y.tieu_chi.cot.length
+    ? y.tieu_chi.cot : XUAT_KHACH_COT.map((c) => c.key)
   const rows = await layKhachXuat(y.tieu_chi?.q ?? '')
   await db.from('yeu_cau_export').update({ trang_thai: 'da_tai' }).eq('id', id)
   await ghiAudit('tai_export_pii', `export:${id}`, { so_dong: rows.length })
-  revalidatePath('/khach')
-  return { ok: true, csv: csvKhach(rows, true) }
+  revalidatePath('/khach-hang')
+  return { ok: true, csv: noiDungXuatKhach(rows, cot) }
 }
 
 // ── Lịch thay lõi (Phase 3) ─────────────────────────────────────────────────
