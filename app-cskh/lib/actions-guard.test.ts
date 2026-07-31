@@ -26,7 +26,8 @@ describe('actions.ts — mọi hàm chạm DB đều gác requireStaff()', () =>
     const m = p.match(/^async function (\w+)/) ?? p.match(/\basync function (\w+)/)
     if (!m) continue
     const ten = m[1]
-    if (p.includes('dataClient(') && !/\brequireStaff\b/.test(p)) viPham.push(ten)
+    // Gate hợp lệ: requireStaff() hoặc layNhanVien() (layNhanVien gọi requireStaff bên trong).
+    if (p.includes('dataClient(') && !/\b(requireStaff|layNhanVien)\b/.test(p)) viPham.push(ten)
   }
 
   it('không hàm nào gọi dataClient() mà thiếu requireStaff()', () => {

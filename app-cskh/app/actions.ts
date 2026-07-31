@@ -13,6 +13,31 @@ import {
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
 const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
 
+/**
+ * Ghi vết thao tác nhạy cảm vào audit_log (ai · làm gì · lên bản ghi nào · lúc nào).
+ * KHÔNG được làm hỏng nghiệp vụ: nuốt mọi lỗi. Gọi SAU khi thao tác chính đã thành công.
+ */
+async function ghiAudit(
+  hanhDong: string,
+  doiTuong?: string,
+  chiTiet?: Record<string, unknown>,
+  ketQua = 'ok'
+) {
+  try {
+    const nv = await layNhanVien()
+    await dataClient().from('audit_log').insert({
+      actor: nv?.email ?? null,
+      actor_id: nv?.id ?? null,
+      hanh_dong: hanhDong,
+      doi_tuong: doiTuong ?? null,
+      chi_tiet: chiTiet ?? null,
+      ket_qua: ketQua,
+    })
+  } catch {
+    // audit hỏng tuyệt đối không chặn nghiệp vụ
+  }
+}
+
 // ⚠️ KHÔNG re-export kiểu từ file 'use server': Turbopack coi mỗi export là một
 // server action và build vỡ với "Export KetQuaTrang doesn't exist in target module".
 // Trang nào cần KetQuaTrang/TuyChonDanhSach thì import thẳng từ '@/bang'.
@@ -825,6 +850,7 @@ export async function approveSerial(id: string) {
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().rpc('duyet_serial_pending', { p_id: id, p_admin: user.email ?? '' })
   if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('duyet_serial', `serial-pending:${id}`)
   revalidatePath('/serial')
   return { ok: true as const }
 }
@@ -836,6 +862,7 @@ export async function rejectSerial(id: string, lyDo?: string) {
   const { error } = await dataClient().from('serial_pending')
     .update({ trang_thai: 'tu_choi', ly_do_tu_choi: lyDo?.trim() || null }).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('tu_choi_serial', `serial-pending:${id}`, lyDo?.trim() ? { ly_do: lyDo.trim() } : undefined)
   revalidatePath('/serial')
   return { ok: true as const }
 }
@@ -846,6 +873,7 @@ export async function deleteSerialPending(id: string) {
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('serial_pending').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('xoa_serial_pending', `serial-pending:${id}`)
   revalidatePath('/serial')
   return { ok: true as const }
 }
@@ -920,6 +948,7 @@ export async function dangKyBaoHanh(input: {
   if (e1) return { ok: false as const, error: e1.message }
   const { error: e2 } = await db.rpc('activate_warranty', { p_serial: serial, p_start: input.install_date })
   if (e2) return { ok: false as const, error: e2.message }
+  await ghiAudit('kich_hoat_bh', `serial:${serial}`, { customer_id: input.customer_id, install_date: input.install_date })
   revalidatePath('/')
   revalidatePath('/bh-cho-kich-hoat')
   revalidatePath(`/may/${encodeURIComponent(serial)}`)
@@ -1015,6 +1044,7 @@ export async function duyetKhach(id: string) {
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('cs_customers').update({ trang_thai: 'da_duyet' }).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('duyet_khach', `khach:${id}`)
   revalidatePath('/khach')
   return { ok: true as const }
 }
@@ -1095,6 +1125,7 @@ export async function suaNhanVien(
 
   const { error } = await db.from('staff').update(patch).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('sua_nv', `nv:${id}`, patch as Record<string, unknown>)
   revalidatePath('/nhan-vien')
   return { ok: true as const }
 }
@@ -1613,4 +1644,27 @@ export async function catalogSyncLast(n = 10): Promise<CatalogSyncLog[]> {
     .order('id', { ascending: false }).limit(n)
   if (error) throw new Error(error.message)
   return (data ?? []) as CatalogSyncLog[]
+}
+
+// ── Nhật ký thao tác (audit_log — Đợt A2) ───────────────────────────────────
+export type AuditRow = {
+  id: number
+  luc: string
+  actor: string | null
+  hanh_dong: string
+  doi_tuong: string | null
+  chi_tiet: Record<string, unknown> | null
+  ket_qua: string
+}
+
+/** Vết thao tác nhạy cảm gần nhất (CHỈ ADMIN xem). */
+export async function auditLog(limit = 100, hanhDong?: string): Promise<AuditRow[]> {
+  await requireStaff()
+  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  let q = dataClient()
+    .from('audit_log').select('id, luc, actor, hanh_dong, doi_tuong, chi_tiet, ket_qua')
+  if (hanhDong) q = q.eq('hanh_dong', hanhDong)
+  const { data, error } = await q.order('id', { ascending: false }).limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as AuditRow[]
 }
