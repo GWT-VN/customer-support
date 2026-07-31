@@ -39,6 +39,17 @@ export async function proxy(request: NextRequest) {
   const DUONG_CONG_KHAI = ['/login', '/auth']
   const congKhai = DUONG_CONG_KHAI.some((p) => request.nextUrl.pathname.startsWith(p))
 
+  // Đã đăng nhập mà còn đứng ở /login -> đá thẳng vào trong.
+  // Không có dòng này thì layout gốc (bọc cả /login) thấy user truthy sẽ dựng
+  // Sidebar BÊN CẠNH form đăng nhập: người dùng thấy "vừa có menu vừa có ô đăng
+  // nhập", và cú router.push('/') sau khi đăng nhập đôi khi không nhảy kịp nên
+  // kẹt lại ngay đây. Chỉ khớp ĐÚNG '/login' để không đụng vòng OAuth ở /auth.
+  if (session && request.nextUrl.pathname === '/login') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
+  }
+
   if (!session && !congKhai) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

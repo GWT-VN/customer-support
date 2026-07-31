@@ -1,7 +1,7 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { xacNhanQuyenVaoCua } from '../auth/actions'
 
@@ -24,7 +24,6 @@ function FormDangNhap() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const maLoi = searchParams.get('loi') ?? ''
@@ -58,8 +57,11 @@ function FormDangNhap() {
       return
     }
 
-    router.push('/')
-    router.refresh()
+    // Hard navigation CỐ Ý (không router.push): sau server action, điều hướng
+    // bằng App Router hay kẹt — layout gốc bọc /login không re-render nên nút cứ
+    // "Đang vào…" dù server đã trả trang chủ 200. Tải lại nguyên trang thì server
+    // dựng '/' với đúng session, proxy cho qua, hết đường treo.
+    window.location.assign('/')
   }
 
   async function dangNhapGoogle() {
