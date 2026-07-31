@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { listToFix, khoaTatCaKhach } from '@/app/actions'
+import { listToFix, khoaTatCaKhach, exportCuaToi } from '@/app/actions'
+import { ExportKhachButton } from '@/components/ExportKhachButton'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
@@ -15,9 +16,10 @@ export default async function ToFixPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: list, tong, soTrang, sapXep }, admin] = await Promise.all([
+  const [{ rows: list, tong, soTrang, sapXep }, admin, exportDuyet] = await Promise.all([
     listToFix(q, { trang, cot, chieu }),
     laAdmin(),
+    exportCuaToi(),
   ])
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
@@ -48,6 +50,8 @@ export default async function ToFixPage({
           Trên trang này: {thieuSdt.length} thiếu/lỗi SĐT · {thieuDiaChi.length} thiếu địa chỉ.
           Di trú từ Odoo không lấp được — phải sửa tay. Bấm tên khách để sửa.
         </p>
+
+        <ExportKhachButton q={q} daDuyet={exportDuyet} />
 
         <KhungChon
           khoaTrang={list.map((c) => c.id)}

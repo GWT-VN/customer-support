@@ -1,11 +1,14 @@
 import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
-import { listKhachChoDuyet, listYeuCauThayDoi } from '@/app/actions'
+import { listKhachChoDuyet, listYeuCauThayDoi, listYeuCauExport } from '@/app/actions'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 import { DuyetList } from '@/components/DuyetList'
+import { DuyetExportList } from '@/components/DuyetExportList'
 
 export default async function DuyetPage() {
   await chanNeuKhongPhaiAdmin()
-  const [khachCho, yeuCau] = await Promise.all([listKhachChoDuyet(), listYeuCauThayDoi()])
+  const [khachCho, yeuCau, yeuCauExport] = await Promise.all([
+    listKhachChoDuyet(), listYeuCauThayDoi(), listYeuCauExport(),
+  ])
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -22,8 +25,14 @@ export default async function DuyetPage() {
 
         <section className="space-y-2">
           <h2 className="font-medium text-slate-900">Yêu cầu sửa/xoá ({yeuCau.length})</h2>
-          <p className="text-xs text-slate-400">CS đề xuất sửa/xoá khách · SĐT phụ · lịch thay lõi. Duyệt là áp thật.</p>
+          <p className="text-xs text-slate-400">CS đề xuất sửa/xoá khách · SĐT phụ · lịch thay lõi · máy đã lắp. Duyệt là áp thật.</p>
           <DuyetList items={yeuCau} />
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="font-medium text-slate-900">Yêu cầu xuất có SĐT/địa chỉ ({yeuCauExport.length})</h2>
+          <p className="text-xs text-slate-400">Duyệt xong người gửi mới tải được bản có PII.</p>
+          <DuyetExportList items={yeuCauExport} />
         </section>
       </div>
     </main>
