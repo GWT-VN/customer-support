@@ -21,6 +21,7 @@ export function ActivateForm({
   const router = useRouter()
 
   async function run() {
+    if (!window.confirm(`Bạn chắc chắn ${activated ? 'kích hoạt LẠI (tính lại hạn)' : 'kích hoạt bảo hành'} cho serial ${serial} từ ${date}?`)) return
     setBusy(true)
     setErr(null)
     const r = await activateWarranty(serial, date)

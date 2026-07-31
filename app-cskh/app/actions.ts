@@ -174,11 +174,12 @@ export async function activateWarranty(serial: string, startDate: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
     return { ok: false as const, error: 'Ngày không hợp lệ.' }
   }
-  const { error } = await dataClient().rpc('activate_warranty', {
-    p_serial: serial,
-    p_start: startDate,
-  })
+  const db = dataClient()
+  const { error } = await db.rpc('activate_warranty', { p_serial: serial, p_start: startDate })
   if (error) return { ok: false as const, error: error.message }
+  // Ngày lắp = ngày bắt đầu BH (một mốc duy nhất) -> đồng bộ install_date.
+  await db.from('installed_base').update({ install_date: startDate }).eq('serial', serial)
+  await ghiAudit('kich_hoat_bh', `serial:${serial}`, { start: startDate })
   revalidatePath('/')
   revalidatePath(`/may/${encodeURIComponent(serial)}`)
   return { ok: true as const }

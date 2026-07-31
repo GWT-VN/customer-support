@@ -26,6 +26,7 @@ export function LichSuThayLoi({ serial, items }: { serial: string; items: Row[] 
     setErr(null); setMsg(r.applied ? okMsg : 'Đã gửi chờ admin duyệt.'); setSuaId(null); router.refresh()
   }
   async function luuSua() {
+    if (!window.confirm('Bạn chắc chắn lưu sửa dòng lịch thay lõi này?')) return
     setBusy(true); setErr(null); setMsg(null)
     const r = await suaReplacement(suaId!, {
       filter_code: f.filter_code.trim(), replaced_at: f.replaced_at, note: f.note.trim() || undefined,

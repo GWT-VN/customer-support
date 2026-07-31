@@ -20,6 +20,7 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
   const [busy, setBusy] = useState(false)
 
   async function save() {
+    if (!window.confirm('Bạn chắc chắn lưu thay đổi thông tin khách này?')) return
     setBusy(true); setErr(null); setMsg(null)
     const r = await updateCustomer(c.id, c)
     setBusy(false)

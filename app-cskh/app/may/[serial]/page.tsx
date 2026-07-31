@@ -21,9 +21,8 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
     { label: 'Máy', value: m.product_name ?? '—' },
     { label: 'Mã nội bộ', value: m.internal_code ?? '—', mono: true },
     { label: 'Nhóm', value: m.category_l2 ?? '—' },
-    { label: 'Ngày lắp', value: vnDate(m.install_date) },
+    { label: 'Ngày bắt đầu BH', value: vnDate(m.warranty_start ?? m.install_date) },
     { label: 'Trạng thái máy', value: m.status },
-    { label: 'Bắt đầu BH', value: vnDate(m.warranty_start) },
     { label: 'Hết BH máy', value: vnDate(m.warranty_full_end) },
     { label: 'Hết BH linh kiện', value: vnDate(m.warranty_core_end) },
   ]
