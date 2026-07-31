@@ -17,6 +17,7 @@ const NHOM: readonly Nhom[] = [
   { ten: 'Máy & khách', muc: [
     { href: '/', nhan: 'Máy đã lắp' },
     { href: '/serial', nhan: 'Kho serial' },
+    { href: '/khach-hang', nhan: 'Khách hàng' },
     { href: '/khach', nhan: 'Khách cần dọn' },
   ] },
   { ten: 'Ticket & lỗi', muc: [

@@ -1763,6 +1763,52 @@ export async function listToFix(
   }
 }
 
+/** Danh sách KHÁCH HÀNG tổng (tất cả khách, trừ da_xoa) — trang /khach-hang. */
+export async function listKhachHang(
+  q = '',
+  tuyChon: TuyChonDanhSach = {}
+): Promise<KetQuaTrang<Customer & { machines: number }>> {
+  await requireStaff()
+  const db = dataClient()
+  const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_KHACH, { cot: 'full_name', tang: true })
+  const trang = Math.max(1, tuyChon.trang ?? 1)
+  const moi = tuyChon.moiTrang ?? MOI_TRANG
+  const tu = (trang - 1) * moi
+
+  let truyVan = db.from('cs_customers').select('*', { count: 'exact' }).neq('trang_thai', 'da_xoa')
+  const kw = antoanChoOr(chuanHoaTuKhoa(q))
+  if (kw) truyVan = truyVan.or(`ten_kd.imatch.${mauDauTu(kw)},primary_phone.ilike.%${kw}%`)
+
+  const { data, error, count } = await truyVan
+    .order(sx.cot, { ascending: sx.tang, nullsFirst: false }).order('id', { ascending: true })
+    .range(tu, tu + moi - 1)
+  if (error) throw new Error(error.message)
+  const customers = (data ?? []) as Customer[]
+
+  const { data: ibs, error: e2 } = await db
+    .from('installed_base').select('customer_id').in('customer_id', customers.map((c) => c.id))
+  if (e2) throw new Error(e2.message)
+  const dem = new Map<string, number>()
+  for (const r of ibs ?? []) {
+    const id = (r as { customer_id: string }).customer_id
+    dem.set(id, (dem.get(id) ?? 0) + 1)
+  }
+
+  const tong = count ?? 0
+  return {
+    rows: customers.map((c) => ({ ...c, machines: dem.get(c.id) ?? 0 })),
+    tong, trang, soTrang: Math.max(1, Math.ceil(tong / moi)), sapXep: sx,
+  }
+}
+
+export async function khoaTatCaKhachHang(t: ThamSoLoc): Promise<string[]> {
+  return gomKhoa(
+    (trang, moiTrang) => listKhachHang(t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    (r) => r.id,
+    TOI_DA_CHON
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 2 — nhóm lỗi + báo cáo lãnh đạo / công ty mẹ
 // ─────────────────────────────────────────────────────────────────────────────
