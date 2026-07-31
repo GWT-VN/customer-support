@@ -6,6 +6,7 @@ import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
+import { SuaMayDaLap } from '@/components/SuaMayDaLap'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
@@ -82,6 +83,11 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
             activated={m.warranty_activated}
             hasPolicy={m.co_chinh_sach_bh}
           />
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Sửa máy đã lắp</h2>
+          <SuaMayDaLap serial={m.serial} internalCode={m.internal_code} />
         </section>
       </div>
     </main>

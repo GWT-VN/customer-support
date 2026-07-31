@@ -1,5 +1,6 @@
 import { coreForecast, replacementsOfSerial } from '@/app/actions'
 import { ThayLoiButton } from '@/components/ThayLoiButton'
+import { LichSuThayLoi } from '@/components/LichSuThayLoi'
 import { vnDate } from '@/components/Badge'
 
 /** Lõi của 1 máy: cần thay khi nào + lịch sử đã thay. Nhúng vào trang chi tiết máy. */
@@ -44,19 +45,7 @@ export async function LoiCuaMay({ serial }: { serial: string }) {
         ))}
       </ul>
 
-      {history.length > 0 && (
-        <div>
-          <p className="text-xs text-slate-500 mb-1">Lịch sử đã thay ({history.length})</p>
-          <ul className="text-xs text-slate-600 space-y-0.5">
-            {history.map((h) => (
-              <li key={h.id}>
-                {vnDate(h.replaced_at)} — <span className="font-mono">{h.filter_code}</span>
-                {h.note && <span className="text-slate-400"> · {h.note}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <LichSuThayLoi serial={serial} items={history} />
     </div>
   )
 }

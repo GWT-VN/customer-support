@@ -256,18 +256,87 @@ export async function deleteContact(id: string, customerId: string) {
 }
 
 // ── Đề xuất SỬA/XOÁ cần admin duyệt (yeu_cau_thay_doi) ─────────────────────
-type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts'
+type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts' | 'installed_base'
+type LoaiTD = 'sua' | 'xoa' | 'doi_serial'
 const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
   cs_customers: ['full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone'],
   filter_replacement: ['filter_code', 'replaced_at', 'note'],
   customer_contacts: ['phone', 'contact_name', 'role', 'zalo_ok'],
+  installed_base: ['customer_id', 'install_date', 'install_address'],
+}
+
+/**
+ * Chặn xoá/đổi serial nếu còn tham chiếu NO ACTION (tickets/maintenance_plan/máy con).
+ * (warranty + filter_replacement là ON DELETE CASCADE nên tự gỡ, không cần chặn.)
+ */
+async function conThamChieuMay(
+  db: ReturnType<typeof dataClient>, serial: string
+): Promise<string | null> {
+  const [t, m, con] = await Promise.all([
+    db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('serial', serial),
+    db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('serial', serial),
+    db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('parent_serial', serial),
+  ])
+  const p: string[] = []
+  if ((t.count ?? 0) > 0) p.push(`${t.count} ticket`)
+  if ((m.count ?? 0) > 0) p.push(`${m.count} lịch bảo trì`)
+  if ((con.count ?? 0) > 0) p.push(`${con.count} máy con`)
+  return p.length ? `Serial còn ${p.join(', ')} — xử lý trước khi xoá/đổi.` : null
+}
+
+/** Áp thay đổi cho MÁY ĐÃ LẮP (khoá theo serial, không phải id). */
+async function apDungMay(
+  db: ReturnType<typeof dataClient>, serial: string, loai: LoaiTD, payload?: Record<string, unknown> | null
+): Promise<{ error: { message: string } | null }> {
+  if (loai === 'xoa') {
+    const chan = await conThamChieuMay(db, serial)
+    if (chan) return { error: { message: chan } }
+    // Xoá bản ghi lắp -> warranty + filter_replacement TỰ xoá theo (CASCADE). Serial về kho.
+    return db.from('installed_base').delete().eq('serial', serial)
+  }
+  if (loai === 'doi_serial') {
+    const serialMoi = String(payload?.serial_moi ?? '').trim()
+    if (!serialMoi) return { error: { message: 'Thiếu serial mới.' } }
+    const chan = await conThamChieuMay(db, serial)
+    if (chan) return { error: { message: chan } }
+    const { data: daCo } = await db.from('installed_base').select('serial').eq('serial', serialMoi).maybeSingle()
+    if (daCo) return { error: { message: 'Serial mới đã được lắp cho máy khác.' } }
+    const { data: cu } = await db.from('installed_base').select('*').eq('serial', serial).maybeSingle()
+    if (!cu) return { error: { message: 'Không thấy máy cũ.' } }
+    const c = cu as { customer_id: string | null; install_date: string | null; install_address: string | null; internal_code: string | null; model_freetext: string | null }
+    const { data: bhCu } = await db.from('warranty').select('start_date').eq('serial', serial).maybeSingle()
+    const { data: sr } = await db.from('serial_registry').select('internal_code, model').eq('serial', serialMoi).maybeSingle()
+    const s = sr as { internal_code: string | null; model: string | null } | null
+    // Tạo bản ghi mới TRƯỚC (nếu lỗi thì máy cũ còn nguyên), rồi mới xoá cũ.
+    const { error: e1 } = await db.from('installed_base').insert({
+      serial: serialMoi,
+      internal_code: s?.internal_code ?? c.internal_code,
+      model_freetext: s?.model ?? c.model_freetext,
+      customer_id: c.customer_id, install_date: c.install_date, install_address: c.install_address,
+      channel_source: 'Đổi serial (sửa nhầm)', status: 'active',
+    })
+    if (e1) return { error: e1 }
+    const start = (bhCu as { start_date: string | null } | null)?.start_date ?? c.install_date
+    if (start) {
+      const { error: e2 } = await db.rpc('activate_warranty', { p_serial: serialMoi, p_start: start })
+      if (e2) return { error: e2 }
+    }
+    return db.from('installed_base').delete().eq('serial', serial)  // CASCADE gỡ warranty/filter cũ
+  }
+  // sua: đổi khách/ngày/địa chỉ
+  const patch: Record<string, unknown> = {}
+  for (const k of COT_CHO_PHEP.installed_base) {
+    if (payload && Object.prototype.hasOwnProperty.call(payload, k)) patch[k] = payload[k]
+  }
+  return db.from('installed_base').update(patch).eq('serial', serial)
 }
 
 /** Áp 1 thay đổi thật xuống DB (dùng cho admin-áp-ngay lẫn khi duyệt). */
 async function apDungThayDoi(
   db: ReturnType<typeof dataClient>, doiTuong: DoiTuong, banGhiId: string,
-  loai: 'sua' | 'xoa', payload?: Record<string, unknown> | null
+  loai: LoaiTD, payload?: Record<string, unknown> | null
 ) {
+  if (doiTuong === 'installed_base') return apDungMay(db, banGhiId, loai, payload)
   if (loai === 'xoa') {
     // Khách: ẩn mềm (giữ máy/ticket). SĐT phụ + lịch thay lõi: xoá cứng (bảng lá).
     if (doiTuong === 'cs_customers') {
@@ -294,7 +363,7 @@ function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string) {
 
 /** Admin -> áp NGAY (+audit). CS -> vào hàng chờ yeu_cau_thay_doi. */
 export async function guiYeuCauThayDoi(input: {
-  doi_tuong: DoiTuong; ban_ghi_id: string; loai: 'sua' | 'xoa'
+  doi_tuong: DoiTuong; ban_ghi_id: string; loai: LoaiTD
   payload?: Record<string, unknown>; ly_do?: string
 }): Promise<{ ok: true; applied: boolean } | { ok: false; error: string }> {
   const nv = await layNhanVien()
@@ -322,6 +391,37 @@ export async function xoaKhach(id: string, lyDo?: string) {
   return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'xoa', ly_do: lyDo })
 }
 
+/** Xoá máy đã lắp -> trả serial về tồn kho (gỡ BH + lịch thay lõi). Qua admin duyệt. */
+export async function xoaMayDaLap(serial: string) {
+  await requireStaff()
+  return guiYeuCauThayDoi({
+    doi_tuong: 'installed_base', ban_ghi_id: serial, loai: 'xoa',
+    ly_do: `Trả serial ${serial} về tồn kho`,
+  })
+}
+
+/** Đổi khách của máy (cùng serial, sang khách khác). Qua admin duyệt. */
+export async function doiKhachMay(serial: string, customerId: string) {
+  await requireStaff()
+  if (!customerId) return { ok: false as const, error: 'Chọn khách.' }
+  return guiYeuCauThayDoi({
+    doi_tuong: 'installed_base', ban_ghi_id: serial, loai: 'sua',
+    payload: { customer_id: customerId }, ly_do: `Đổi khách cho serial ${serial}`,
+  })
+}
+
+/** Đổi serial (giữ khách, nhầm serial). Chuyển bản ghi + BH sang serial mới. Qua admin duyệt. */
+export async function doiSerialMay(serialCu: string, serialMoi: string) {
+  await requireStaff()
+  const sm = serialMoi.trim()
+  if (!sm) return { ok: false as const, error: 'Chọn serial mới.' }
+  if (sm === serialCu) return { ok: false as const, error: 'Serial mới trùng serial cũ.' }
+  return guiYeuCauThayDoi({
+    doi_tuong: 'installed_base', ban_ghi_id: serialCu, loai: 'doi_serial',
+    payload: { serial_moi: sm }, ly_do: `Đổi ${serialCu} -> ${sm}`,
+  })
+}
+
 export type YeuCauThayDoi = {
   id: string; doi_tuong: string; ban_ghi_id: string; loai: string
   payload: Record<string, unknown> | null; ly_do: string | null; nguoi_gui: string | null; created_at: string
@@ -346,7 +446,7 @@ export async function duyetYeuCau(id: string) {
   const { data: yc, error: e0 } = await db.from('yeu_cau_thay_doi')
     .select('doi_tuong, ban_ghi_id, loai, payload, trang_thai').eq('id', id).maybeSingle()
   if (e0) return { ok: false as const, error: e0.message }
-  const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: 'sua' | 'xoa'; payload: Record<string, unknown> | null; trang_thai: string } | null
+  const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: LoaiTD; payload: Record<string, unknown> | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'cho_duyet') return { ok: false as const, error: 'Yêu cầu không tồn tại hoặc đã xử lý.' }
   const { error } = await apDungThayDoi(db, y.doi_tuong, y.ban_ghi_id, y.loai, y.payload)
   if (error) return { ok: false as const, error: error.message }

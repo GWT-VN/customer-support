@@ -8,12 +8,15 @@ const NHAN_BANG: Record<string, string> = {
   cs_customers: 'Khách',
   customer_contacts: 'SĐT phụ',
   filter_replacement: 'Lịch thay lõi',
+  installed_base: 'Máy đã lắp',
 }
 const NHAN_COT: Record<string, string> = {
   full_name: 'Tên', primary_phone: 'SĐT', address: 'Địa chỉ', province: 'Tỉnh/TP', notes: 'Ghi chú',
   filter_code: 'Mã lõi', replaced_at: 'Ngày thay', note: 'Ghi chú',
   phone: 'SĐT', contact_name: 'Tên', role: 'Vai trò', zalo_ok: 'Zalo',
+  customer_id: 'Khách (id)', install_date: 'Ngày lắp', install_address: 'Địa chỉ lắp', serial_moi: 'Serial mới',
 }
+const NHAN_LOAI: Record<string, string> = { xoa: 'XOÁ', sua: 'SỬA', doi_serial: 'ĐỔI SERIAL' }
 
 function tomTat(y: YeuCauThayDoi): string {
   if (y.loai === 'xoa') return 'Xoá'
@@ -48,8 +51,9 @@ export function DuyetList({ items }: { items: YeuCauThayDoi[] }) {
               <div className="text-slate-900">
                 <span className={
                   'text-[10px] font-medium px-1.5 py-0.5 rounded mr-1.5 ' +
-                  (y.loai === 'xoa' ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700')
-                }>{y.loai === 'xoa' ? 'XOÁ' : 'SỬA'}</span>
+                  (y.loai === 'xoa' ? 'bg-red-100 text-red-700'
+                    : y.loai === 'doi_serial' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-700')
+                }>{NHAN_LOAI[y.loai] ?? y.loai}</span>
                 {NHAN_BANG[y.doi_tuong] ?? y.doi_tuong}
               </div>
               <div className="text-slate-600 mt-0.5 break-words">{tomTat(y)}</div>
