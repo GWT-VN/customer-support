@@ -7,6 +7,7 @@ import { xacNhanQuyenVaoCua } from '../auth/actions'
 
 const THONG_BAO_LOI: Record<string, string> = {
   bi_khoa: 'Tài khoản của bạn đã bị khoá quyền vào hệ thống CSKH. Liên hệ quản trị.',
+  cho_duyet: 'Tài khoản @gwt.vn của bạn đã được tạo và đang CHỜ quản trị duyệt. Liên hệ admin để được kích hoạt.',
   ngoai_danh_sach: 'Tài khoản này chưa được cấp quyền vào hệ thống CSKH. Liên hệ quản trị.',
   google: 'Đăng nhập Google không thành công. Thử lại hoặc dùng email + mật khẩu.',
 }
@@ -32,7 +33,7 @@ function FormDangNhap() {
   // Bị luật vào cửa từ chối thì session cũ phải dọn. Không dọn thì người dùng
   // vẫn "đang đăng nhập", mỗi lần mở app lại bị đá về đây mà không hiểu vì sao.
   useEffect(() => {
-    if (maLoi === 'bi_khoa' || maLoi === 'ngoai_danh_sach') {
+    if (maLoi === 'bi_khoa' || maLoi === 'ngoai_danh_sach' || maLoi === 'cho_duyet') {
       taoClient().auth.signOut()
     }
   }, [maLoi])

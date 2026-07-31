@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { xetLuatVaoCua } from './auth'
 
 describe('xetLuatVaoCua', () => {
-  it('luật 3: email @gwt.vn chưa có trong bảng thì được vào', () => {
-    expect(xetLuatVaoCua('ai@gwt.vn', null)).toEqual({ duocVao: true, nguon: 'domain' })
+  it('luật 3 (C1): email @gwt.vn chưa có trong bảng thì CHỜ DUYỆT, không tự vào', () => {
+    expect(xetLuatVaoCua('ai@gwt.vn', null)).toEqual({ duocVao: false, lyDo: 'cho_duyet' })
   })
 
-  it('luật 3: chữ HOA vẫn được vào (chuẩn hoá chữ thường)', () => {
-    expect(xetLuatVaoCua('AI@GWT.VN', null)).toEqual({ duocVao: true, nguon: 'domain' })
+  it('luật 3 (C1): chữ HOA cũng chờ duyệt (chuẩn hoá chữ thường)', () => {
+    expect(xetLuatVaoCua('AI@GWT.VN', null)).toEqual({ duocVao: false, lyDo: 'cho_duyet' })
+  })
+
+  it('luật 1: @gwt.vn đã được duyệt (có hồ sơ, đang bật) thì được vào', () => {
+    expect(xetLuatVaoCua('ai@gwt.vn', { hoat_dong: true }))
+      .toEqual({ duocVao: true, nguon: 'staff' })
   })
 
   it('luật 2: email ngoài domain nhưng có trong bảng và đang bật thì được vào', () => {

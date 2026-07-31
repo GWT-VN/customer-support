@@ -17,7 +17,7 @@ export async function dangXuat() {
  * client nên cần bản tương đương chạy server, nếu không rào chỉ áp một nửa.
  */
 export async function xacNhanQuyenVaoCua(): Promise<
-  { ok: true } | { ok: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' }
+  { ok: true } | { ok: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' | 'cho_duyet' }
 > {
   const supabase = await authClient()
   const { data } = await supabase.auth.getUser()
@@ -27,9 +27,10 @@ export async function xacNhanQuyenVaoCua(): Promise<
   const kq = await kiemTraVaoCua(email)
 
   if (!kq.duocVao) {
+    // Người @gwt.vn lần đầu -> tạo hồ sơ CHỜ DUYỆT (inactive) để admin thấy + bật.
+    if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
     await supabase.auth.signOut()
     return { ok: false, lyDo: kq.lyDo }
   }
-  if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
   return { ok: true }
 }

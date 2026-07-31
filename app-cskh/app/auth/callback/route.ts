@@ -25,12 +25,13 @@ export async function GET(request: NextRequest) {
   const kq = await kiemTraVaoCua(email)
 
   if (!kq.duocVao) {
+    // Người @gwt.vn lần đầu -> tạo hồ sơ CHỜ DUYỆT (inactive) để admin thấy + bật.
+    if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
     // Dọn session ngay: xác thực được nhưng không có quyền vào.
     // KHÔNG kèm email vào URL — dữ liệu cá nhân không đưa lên query string.
     await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/login?loi=${kq.lyDo}`)
   }
 
-  if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
   return NextResponse.redirect(`${origin}/`)
 }

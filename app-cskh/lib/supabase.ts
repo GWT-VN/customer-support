@@ -93,14 +93,21 @@ export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   return xetLuatVaoCua(e, dong ? { hoat_dong: dong.hoat_dong } : null)
 }
 
-/** Ghi nhận người vào lần đầu theo luật domain. KHÔNG đụng dòng đã có. */
+/**
+ * Tạo hồ sơ CHỜ DUYỆT cho người @gwt.vn vào lần đầu. KHÔNG đụng dòng đã có.
+ *
+ * hoat_dong=false -> chưa vào được; admin bật ở /nhan-vien mới cấp quyền (C1).
+ * vai_tro để DB tự điền mặc định 'cs' — người mới không tự thành admin.
+ * ten NOT NULL -> tạm lấy phần trước @, admin sửa lại sau.
+ */
 export async function ghiNhanNhanVienMoi(email: string) {
   const e = chuanHoaEmail(email)
   const { error } = await dataClient()
     .from('staff')
-    // ten NOT NULL -> tạm lấy phần trước @, admin sửa lại ở màn quản lý nhân viên.
-    // vai_tro để DB tự điền mặc định 'cs' — người mới không tự thành admin.
-    .upsert({ email: e, ten: e.split('@')[0] }, { onConflict: 'email', ignoreDuplicates: true })
+    .upsert(
+      { email: e, ten: e.split('@')[0], hoat_dong: false },
+      { onConflict: 'email', ignoreDuplicates: true }
+    )
   if (error) throw error
 }
 
@@ -121,8 +128,11 @@ export const requireStaff = cache(async () => {
 
   const email = chuanHoaEmail(user.email)
   const kq = await kiemTraVaoCua(email)
-  if (!kq.duocVao) redirect(`/login?loi=${kq.lyDo}`)
-  if (kq.nguon === 'domain') await ghiNhanNhanVienMoi(email)
+  if (!kq.duocVao) {
+    // Người @gwt.vn lần đầu -> tạo hồ sơ CHỜ DUYỆT (inactive) để admin thấy + bật.
+    if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
+    redirect(`/login?loi=${kq.lyDo}`)
+  }
 
   return user
 })

@@ -13,8 +13,8 @@ export const DOMAIN_CONG_TY = '@gwt.vn'
 export type DongStaff = { hoat_dong: boolean } | null
 
 export type KetQuaVaoCua =
-  | { duocVao: true; nguon: 'staff' | 'domain' }
-  | { duocVao: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' }
+  | { duocVao: true; nguon: 'staff' }
+  | { duocVao: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' | 'cho_duyet' }
 
 export function chuanHoaEmail(email: string | null | undefined): string {
   return (email ?? '').trim().toLowerCase()
@@ -32,8 +32,9 @@ export function xetLuatVaoCua(email: string, dong: DongStaff): KetQuaVaoCua {
       : { duocVao: false, lyDo: 'bi_khoa' }
   }
 
-  // Luật 3 — chưa có tên nhưng đúng domain công ty
-  if (e.endsWith(DOMAIN_CONG_TY)) return { duocVao: true, nguon: 'domain' }
+  // Luật 3 — đúng domain công ty nhưng CHƯA có hồ sơ: tạo hồ sơ CHỜ DUYỆT,
+  // KHÔNG tự cấp quyền vào. Admin phải bật hoat_dong ở /nhan-vien mới vào được.
+  if (e.endsWith(DOMAIN_CONG_TY)) return { duocVao: false, lyDo: 'cho_duyet' }
 
   // Luật 4
   return { duocVao: false, lyDo: 'ngoai_danh_sach' }
