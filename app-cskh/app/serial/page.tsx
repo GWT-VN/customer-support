@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { laAdmin } from '@/lib/supabase'
 import { Suspense } from 'react'
-import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, type SerialRow } from '@/app/actions'
+import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, type SerialRow, type CatalogChon } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
+import { NhapKhoSerial } from '@/components/NhapKhoSerial'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function SerialPage({
@@ -16,8 +17,9 @@ export default async function SerialPage({
   const { q = '', tab = '', trang: trangRaw } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const laCho = tab === 'cho'
-  const [{ rows, tong, soTrang }, pending, admin] = await Promise.all([
-    laCho
+  const laNhap = tab === 'nhap'
+  const [{ rows, tong, soTrang }, pending, admin, catalog] = await Promise.all([
+    laCho || laNhap
       ? Promise.resolve<KetQuaTrang<SerialRow>>({
           rows: [], tong: 0, trang: 1, soTrang: 1,
           sapXep: { cot: 'serial', tang: true, macDinh: true },
@@ -25,6 +27,7 @@ export default async function SerialPage({
       : searchSerialsTrang(q, { trang }),
     listSerialPending('cho_duyet'),
     laAdmin(),
+    laNhap ? catalogChon() : Promise.resolve<CatalogChon[]>([]),
   ])
 
   return (
@@ -36,16 +39,30 @@ export default async function SerialPage({
 
         <div className="flex gap-2 flex-wrap">
           <Link href="/serial"
-            className={`px-3 py-1.5 rounded-lg text-sm border ${!laCho ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm border ${!laCho && !laNhap ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
             Kho serial
           </Link>
+          {admin && (
+            <Link href="/serial?tab=nhap"
+              className={`px-3 py-1.5 rounded-lg text-sm border ${laNhap ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+              + Nhập kho
+            </Link>
+          )}
           <Link href="/serial?tab=cho"
             className={`px-3 py-1.5 rounded-lg text-sm border ${laCho ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-amber-700 border-amber-200'}`}>
             Chờ duyệt ({pending.length})
           </Link>
         </div>
 
-        {laCho ? (
+        {laNhap ? (
+          <section className="space-y-3">
+            {admin ? (
+              <NhapKhoSerial catalog={catalog} />
+            ) : (
+              <p className="text-sm text-amber-600">Chỉ admin mới nhập kho trực tiếp. Bạn có thể “Tạo serial mới (chờ duyệt)”.</p>
+            )}
+          </section>
+        ) : laCho ? (
           <section className="space-y-3">
             <SerialTao />
             <SerialPendingList items={pending} laAdmin={admin} />

@@ -1247,6 +1247,149 @@ export async function deleteSerialPending(id: string) {
   return { ok: true as const }
 }
 
+// ── Nhập kho serial: tạo thẳng + import lô (CHỈ ADMIN) ───────────────────────
+export type CatalogChon = { internal_code: string; ten: string | null; danh_muc: string | null }
+
+/** Danh mục sản phẩm (catalog_item) cho ô chọn khi tạo/nhập serial. */
+export async function catalogChon(): Promise<CatalogChon[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('catalog_item')
+    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 2"')
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as Record<string, string | null>[]
+  const theo = new Map<string, CatalogChon>()
+  for (const r of rows) {
+    const ic = (r['Mã nội bộ'] ?? '').trim()
+    if (!ic || theo.has(ic)) continue
+    theo.set(ic, { internal_code: ic, ten: r['Tên ngắn gọn (đề xuất)'], danh_muc: r['Danh mục cấp 2'] })
+  }
+  return [...theo.values()].sort((a, b) =>
+    (a.ten ?? a.internal_code).localeCompare(b.ten ?? b.internal_code, 'vi'))
+}
+
+/** Thông tin phụ của 1 mã nội bộ để điền kèm khi ghi serial_registry. */
+async function thongTinCatalog(internalCode: string): Promise<{ ten: string | null } | null> {
+  await requireStaff()
+  if (!internalCode) return null
+  const { data } = await dataClient()
+    .from('catalog_item')
+    .select('"Tên ngắn gọn (đề xuất)"')
+    .eq('Mã nội bộ', internalCode)
+    .limit(1)
+    .maybeSingle()
+  if (!data) return null
+  return { ten: (data as Record<string, string | null>)['Tên ngắn gọn (đề xuất)'] }
+}
+
+/** Tạo THẲNG 1 serial vào kho (CHỈ ADMIN) — không qua hàng chờ. */
+export async function themSerialKho(input: {
+  serial: string; internal_code: string; ma_quoc_te?: string; model?: string; ghi_chu?: string
+}) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const serial = input.serial?.trim()
+  const ic = input.internal_code?.trim()
+  if (!serial) return { ok: false as const, error: 'Nhập serial.' }
+  if (!ic) return { ok: false as const, error: 'Chọn sản phẩm (mã nội bộ).' }
+  const db = dataClient()
+  const { data: co } = await db.from('serial_registry').select('serial').eq('serial', serial).maybeSingle()
+  if (co) return { ok: false as const, error: 'Serial này đã có trong kho.' }
+  const tt = await thongTinCatalog(ic)
+  const { error } = await db.from('serial_registry').insert({
+    serial,
+    code: ic,
+    internal_code: ic,
+    ten_noi_bo: tt?.ten ?? null,
+    ma_quoc_te: input.ma_quoc_te?.trim() || null,
+    model: input.model?.trim() || null,
+    po: 'CSKH-app',
+    source_file: 'CSKH-app-tao',
+    imported_at: new Date().toISOString(),
+  })
+  if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('them_serial_kho', `serial:${serial}`, { internal_code: ic })
+  revalidatePath('/serial')
+  return { ok: true as const }
+}
+
+export type KetQuaNhapLo = {
+  tong: number
+  them: number
+  boQua: { serial: string; ly_do: string }[]
+}
+
+/**
+ * Import LÔ serial vào kho (CHỈ ADMIN). Nhận danh sách serial + 1 mã nội bộ chung.
+ * Chỉ nhận mã MỚI: bỏ qua mã trùng trong kho, trùng đang chờ duyệt, hoặc trùng
+ * ngay trong danh sách. Trả về số thành công + danh sách bỏ qua kèm lý do.
+ */
+export async function nhapSerialLo(input: {
+  dsSerial: string[]; internal_code: string; ma_quoc_te?: string; model?: string
+}): Promise<{ ok: true; kq: KetQuaNhapLo } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const ic = input.internal_code?.trim()
+  if (!ic) return { ok: false, error: 'Chọn sản phẩm (mã nội bộ) cho cả lô.' }
+
+  const boQua: { serial: string; ly_do: string }[] = []
+  const daGap = new Set<string>()
+  const sach: string[] = []
+  let tong = 0
+  for (const raw of input.dsSerial) {
+    const s = (raw ?? '').trim()
+    if (!s) continue
+    tong++
+    if (daGap.has(s)) { boQua.push({ serial: s, ly_do: 'trùng trong danh sách' }); continue }
+    daGap.add(s)
+    sach.push(s)
+  }
+  if (!sach.length) return { ok: false, error: 'Không có serial hợp lệ trong danh sách.' }
+
+  const db = dataClient()
+  // Đã có trong kho? (chia lô 200 cho .in an toàn)
+  const daCo = new Set<string>()
+  for (let i = 0; i < sach.length; i += 200) {
+    const lo = sach.slice(i, i + 200)
+    const { data, error } = await db.from('serial_registry').select('serial').in('serial', lo)
+    if (error) return { ok: false, error: error.message }
+    for (const r of (data ?? []) as { serial: string }[]) daCo.add(r.serial)
+  }
+  // Đang chờ duyệt?
+  const dangCho = new Set<string>()
+  for (let i = 0; i < sach.length; i += 200) {
+    const lo = sach.slice(i, i + 200)
+    const { data, error } = await db.from('serial_pending')
+      .select('serial').eq('trang_thai', 'cho_duyet').in('serial', lo)
+    if (error) return { ok: false, error: error.message }
+    for (const r of (data ?? []) as { serial: string }[]) dangCho.add(r.serial)
+  }
+
+  const tt = await thongTinCatalog(ic)
+  const nay = new Date().toISOString()
+  const canThem: string[] = []
+  for (const s of sach) {
+    if (daCo.has(s)) { boQua.push({ serial: s, ly_do: 'đã có trong kho' }); continue }
+    if (dangCho.has(s)) { boQua.push({ serial: s, ly_do: 'đang chờ duyệt' }); continue }
+    canThem.push(s)
+  }
+
+  let them = 0
+  for (let i = 0; i < canThem.length; i += 500) {
+    const lo = canThem.slice(i, i + 500)
+    const { error } = await db.from('serial_registry').insert(lo.map((serial) => ({
+      serial, code: ic, internal_code: ic, ten_noi_bo: tt?.ten ?? null,
+      ma_quoc_te: input.ma_quoc_te?.trim() || null, model: input.model?.trim() || null,
+      po: 'CSKH-app', source_file: 'CSKH-app-import', imported_at: nay,
+    })))
+    if (error) return { ok: false, error: error.message }
+    them += lo.length
+  }
+  await ghiAudit('nhap_serial_lo', 'serial_registry', { internal_code: ic, tong, them, bo_qua: boQua.length })
+  revalidatePath('/serial')
+  return { ok: true, kq: { tong, them, boQua } }
+}
+
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────
 export type KhachTom = {
   id: string; full_name: string; primary_phone: string | null; trang_thai: string
