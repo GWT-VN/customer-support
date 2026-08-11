@@ -332,7 +332,13 @@ async function apDungMay(
       const { error: e2 } = await db.rpc('activate_warranty', { p_serial: serialMoi, p_start: start })
       if (e2) return { error: e2 }
     }
-    return db.from('installed_base').delete().eq('serial', serial)  // CASCADE gỡ warranty/filter cũ
+    const kqDoi = await db.from('installed_base').delete().eq('serial', serial)  // CASCADE gỡ warranty/filter cũ
+    if (!kqDoi.error) {
+      // Serial CŨ (gõ nhầm) nhả ra -> Tồn kho; serial MỚI -> Đã lắp.
+      await ghiSuDung(db, { serial, su_kien: 'doi_serial_nha', tu: 'da_lap', den: 'ton_kho', ghi_chu: `Đổi serial nhầm sang ${serialMoi}` })
+      await ghiSuDung(db, { serial: serialMoi, su_kien: 'doi_serial_nhan', tu: 'ton_kho', den: 'da_lap', customer_id: c.customer_id, ghi_chu: `Thay serial cũ ${serial}` })
+    }
+    return kqDoi
   }
   // sua: đổi khách/ngày/địa chỉ
   const patch: Record<string, unknown> = {}

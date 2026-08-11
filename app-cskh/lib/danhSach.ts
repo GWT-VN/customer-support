@@ -188,10 +188,12 @@ export function tenModel(tenDayDu: string | null, maNoiBo: string): string {
 /** Trạng thái sử dụng của 1 serial (vòng đời máy). */
 export const NHAN_TRANG_THAI_SERIAL: Record<string, string> = {
   ton_kho: 'Tồn kho', da_lap: 'Đã lắp (khách)', trung_bay: 'Trưng bày',
-  mkt: 'Marketing/Quay', bao_tri: 'Thu hồi bảo trì', thanh_ly: 'Thanh lý',
+  mkt: 'Marketing / Quay phim', kiem_dinh_nuoc: 'Kiểm định nước', lap_test: 'Lắp test thử',
+  bao_tri: 'Thu hồi bảo trì', thanh_ly: 'Thanh lý',
 }
 /** Các trạng thái KHO có thể đặt tay cho máy chưa gắn khách (không gồm da_lap). */
-export const TRANG_THAI_KHO_DAT_TAY = ['ton_kho', 'trung_bay', 'mkt', 'bao_tri', 'thanh_ly'] as const
+export const TRANG_THAI_KHO_DAT_TAY =
+  ['ton_kho', 'trung_bay', 'mkt', 'kiem_dinh_nuoc', 'lap_test', 'bao_tri', 'thanh_ly'] as const
 
 export const MA_COMBO = ['WH15A', 'WH30A', 'WH15AECO', 'WH30AECO'] as const
 export type MaCombo = (typeof MA_COMBO)[number]

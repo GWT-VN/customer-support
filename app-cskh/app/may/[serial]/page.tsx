@@ -6,8 +6,7 @@ import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
-import { SuaMayDaLap } from '@/components/SuaMayDaLap'
-import { VongDoiMay } from '@/components/VongDoiMay'
+import { QuanLyMay } from '@/components/QuanLyMay'
 import { laAdmin } from '@/lib/supabase'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
@@ -89,14 +88,9 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
         </section>
 
         <section className="bg-white rounded-xl border p-5">
-          <h2 className="font-medium text-slate-900 mb-3">Vòng đời máy</h2>
-          <VongDoiMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
+          <h2 className="font-medium text-slate-900 mb-3">Quản lý máy</h2>
+          <QuanLyMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
             dangLap={!!m.customer_id} laAdmin={admin} />
-        </section>
-
-        <section className="bg-white rounded-xl border p-5">
-          <h2 className="font-medium text-slate-900 mb-3">Sửa máy đã lắp</h2>
-          <SuaMayDaLap serial={m.serial} internalCode={m.internal_code} />
         </section>
       </div>
     </main>
