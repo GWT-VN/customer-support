@@ -210,6 +210,7 @@ export type Customer = {
   address: string | null
   needs_phone: boolean
   notes: string | null
+  channel_id: number | null
 }
 
 export async function getCustomer(id: string) {
@@ -1487,6 +1488,48 @@ export async function lapBoCombo(input: {
   revalidatePath('/')
   revalidatePath(`/khach/${input.customer_id}`)
   return { ok: true, ma_bo: maBo }
+}
+
+// ── Kênh/đối tác (đại lý/KTS/KOL) — dùng dim_channel của Sales, CS chỉ ĐỌC + GÁN (D2) ──
+export type Kenh = { id: number; channel_l1: string; channel_l2: string | null; so_khach?: number }
+
+/** Danh sách kênh (dim_channel) + số khách CSKH đang gắn — cho trang /kenh. */
+export async function listKenh(): Promise<Kenh[]> {
+  await requireStaff()
+  const db = dataClient()
+  const { data, error } = await db.from('dim_channel')
+    .select('id, channel_l1, channel_l2, sort_order').order('channel_l1').order('sort_order').order('channel_l2')
+  if (error) throw new Error(error.message)
+  const ds = (data ?? []) as (Kenh & { sort_order: number })[]
+  const { data: kh } = await db.from('cs_customers').select('channel_id').not('channel_id', 'is', null)
+  const dem = new Map<number, number>()
+  for (const r of (kh ?? []) as { channel_id: number }[]) dem.set(r.channel_id, (dem.get(r.channel_id) ?? 0) + 1)
+  return ds.map((d) => ({ id: d.id, channel_l1: d.channel_l1, channel_l2: d.channel_l2, so_khach: dem.get(d.id) ?? 0 }))
+}
+
+/** Danh sách kênh gọn cho ô chọn (gắn khách). */
+export async function kenhChon(): Promise<Kenh[]> {
+  await requireStaff()
+  const { data, error } = await dataClient().from('dim_channel')
+    .select('id, channel_l1, channel_l2, sort_order').order('channel_l1').order('sort_order').order('channel_l2')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((d) => {
+    const r = d as { id: number; channel_l1: string; channel_l2: string | null }
+    return { id: r.id, channel_l1: r.channel_l1, channel_l2: r.channel_l2 }
+  })
+}
+
+/** Gắn / gỡ khách vào 1 kênh (nhân viên làm được). Taxonomy kênh do Sales quản. */
+export async function ganKenh(customerId: string, channelId: number | null) {
+  await requireStaff()
+  if (!customerId) return { ok: false as const, error: 'Thiếu khách.' }
+  const { error } = await dataClient().from('cs_customers')
+    .update({ channel_id: channelId ?? null, updated_at: new Date().toISOString() }).eq('id', customerId)
+  if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('gan_kenh', `khach:${customerId}`, { channel_id: channelId })
+  revalidatePath('/kenh')
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true as const }
 }
 
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────

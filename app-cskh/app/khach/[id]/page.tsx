@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getCustomer, ticketsOfCustomer, machinesOfCustomer } from '@/app/actions'
+import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon } from '@/app/actions'
 import { CustomerEditor } from '@/components/CustomerEditor'
+import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { NutQuayLai } from '@/components/NutQuayLai'
@@ -10,7 +11,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines] = await Promise.all([ticketsOfCustomer(id), machinesOfCustomer(id)])
+  const [tickets, machines, kenh] = await Promise.all([
+    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(),
+  ])
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -19,6 +22,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <NutQuayLai macDinh="/" />
         </div>
         <h1 className="text-xl font-semibold text-slate-900">{customer.full_name}</h1>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-1">Kênh / đối tác</h2>
+          <p className="text-xs text-slate-400 mb-2">Đại lý/KTS/KOL quản lý khách này (taxonomy chung với Sales).</p>
+          <GanKenh customerId={customer.id} channelId={customer.channel_id} kenh={kenh} />
+        </section>
+
         <CustomerEditor customer={customer} contacts={contacts} />
 
         <section className="bg-white rounded-xl border p-5">
