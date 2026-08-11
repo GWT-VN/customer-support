@@ -10,6 +10,7 @@ import { BoLocChon } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, type TinhTrangBH } from '@/lib/danhSach'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { ExportMayButton } from '@/components/ExportMayButton'
 
 export default async function Home({
   searchParams,
@@ -84,6 +85,8 @@ export default async function Home({
           nhan="máy"
           sapXep={sapXep}
         />
+
+        {admin && <ExportMayButton q={q} sp={sp} bh={bh} />}
 
         <KhungChon
           khoaTrang={machines.map((m) => m.serial)}

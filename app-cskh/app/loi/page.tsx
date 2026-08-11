@@ -10,6 +10,7 @@ import { TieuDeCotSapXep } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
 import { khoaTatCaLoi } from '@/app/actions'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { ExportLoiButton } from '@/components/ExportLoiButton'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -97,6 +98,8 @@ export default async function LoiPage({
         {/* Khoá dòng phải là (serial, filter_code): một máy có NHIỀU lõi nên riêng
             serial KHÔNG định danh được một dòng — trùng khoá là tick một ô sáng
             nhiều ô. Đúng cặp khoá đang dùng cho React key và cho khoá phụ phân trang. */}
+        {admin && <ExportLoiButton tt={tt} q={q} />}
+
         <KhungChon
           khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)}
           tong={tong}

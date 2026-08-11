@@ -7,7 +7,8 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
-  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG, type TinhTrangBH,
+  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -1676,6 +1677,57 @@ export async function xuatTicket(
   for (const t of rows) lines.push(cols.map((c) => oCsv(gt(t as unknown as Record<string, unknown>, c.key))).join(','))
   await ghiAudit('export_ticket', 'tickets', { q, cot: cols.map((c) => c.key), so_dong: rows.length })
   return { ok: true, csv: lines.join('\r\n') }
+}
+
+// ── Export chung cho Máy / Bảo trì / Lịch lõi (admin-only, dùng lại list action) ──
+/** Gom TẤT CẢ dòng khớp bộ lọc bằng cách lặp chính hàm liệt kê (lô 1000). */
+async function gomTatCa<T>(layLo: (trang: number, moiTrang: number) => Promise<{ rows: T[]; tong: number }>): Promise<T[]> {
+  const ra: T[] = []
+  for (let trang = 1; ra.length < 50000; trang++) {
+    const { rows, tong } = await layLo(trang, 1000)
+    ra.push(...rows)
+    if (ra.length >= tong || rows.length < 1000) break
+  }
+  return ra
+}
+/** Giá trị 1 ô để xuất CSV: ISO timestamp -> cắt còn ngày; còn lại String. */
+function giaTriBang(r: Record<string, unknown>, key: string): string {
+  const v = r[key]
+  if (v == null) return ''
+  const s = String(v)
+  return /^\d{4}-\d{2}-\d{2}T/.test(s) ? s.slice(0, 10) : s
+}
+function noiDungCsvBang(rows: Record<string, unknown>[], cols: readonly { key: string; nhan: string }[]): string {
+  const lines = [cols.map((c) => oCsv(c.nhan)).join(',')]
+  for (const r of rows) lines.push(cols.map((c) => oCsv(giaTriBang(r, c.key))).join(','))
+  return lines.join('\r\n')
+}
+
+export async function xuatMay(q: string, sp: string | undefined, bh: string | undefined, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const rows = await gomTatCa((trang, moiTrang) => searchMachines(q, { trang, moiTrang, maSanPham: sp, tinhTrangBH: bh }))
+  const cols = XUAT_MAY_COT.filter((c) => cot.includes(c.key))
+  await ghiAudit('export_may', 'installed_base', { q, so_dong: rows.length })
+  return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
+}
+
+export async function xuatBaoTri(tt: string | undefined, q: string, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const rows = await gomTatCa((trang, moiTrang) => maintenanceDue(tt ?? '', q, { trang, moiTrang }))
+  const cols = XUAT_BAOTRI_COT.filter((c) => cot.includes(c.key))
+  await ghiAudit('export_bao_tri', 'maintenance_visit', { q, so_dong: rows.length })
+  return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
+}
+
+export async function xuatLoi(tt: string | undefined, q: string, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const rows = await gomTatCa((trang, moiTrang) => coreForecast(tt ?? '', q, { trang, moiTrang }))
+  const cols = XUAT_LOI_COT.filter((c) => cot.includes(c.key))
+  await ghiAudit('export_loi', 'filter_replacement', { q, so_dong: rows.length })
+  return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
 }
 
 /** Tạo ticket mới. Mã tự sinh GWT-YYnnnn theo năm hiện tại. */

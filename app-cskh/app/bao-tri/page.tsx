@@ -9,6 +9,7 @@ import { PhanTrang } from '@/bang'
 import { ChipSapXep } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -95,6 +96,8 @@ export default async function BaoTriPage({
             <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} macDinh={sapXep.macDinh} />
           </Suspense>
         </div>
+
+        {admin && <ExportBaoTriButton tt={tt} q={q} />}
 
         <KhungChon
           khoaTrang={rows.map((r) => r.visit_id)}

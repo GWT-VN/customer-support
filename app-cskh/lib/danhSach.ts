@@ -86,6 +86,49 @@ export const SUA_HL_KHACH: readonly CotSuaHL[] = [
 export const SUA_HL_BANG: Record<string, readonly CotSuaHL[]> = {
   cs_customers: SUA_HL_KHACH,
 }
+
+/** Cột xuất — Máy đã lắp (export admin-only). */
+export const XUAT_MAY_COT: readonly { key: string; nhan: string; pii?: boolean }[] = [
+  { key: 'serial', nhan: 'Serial' },
+  { key: 'product_name', nhan: 'Máy' },
+  { key: 'internal_code', nhan: 'Mã nội bộ' },
+  { key: 'customer_name', nhan: 'Khách' },
+  { key: 'primary_phone', nhan: 'SĐT' },
+  { key: 'install_date', nhan: 'Ngày bắt đầu BH' },
+  { key: 'status', nhan: 'Trạng thái' },
+  { key: 'warranty_full_end', nhan: 'Hết BH máy' },
+  { key: 'warranty_core_end', nhan: 'Hết BH lõi' },
+]
+export const XUAT_MAY_MAC_DINH = ['serial', 'product_name', 'customer_name', 'primary_phone', 'install_date', 'warranty_full_end']
+
+/** Cột xuất — Lịch bảo trì. */
+export const XUAT_BAOTRI_COT: readonly { key: string; nhan: string; pii?: boolean }[] = [
+  { key: 'customer_name', nhan: 'Khách' },
+  { key: 'section', nhan: 'Công trình' },
+  { key: 'bo_may', nhan: 'Bộ máy' },
+  { key: 'loai_goi', nhan: 'Gói' },
+  { key: 'lan_thu', nhan: 'Lần' },
+  { key: 'tong_lan', nhan: 'Tổng lần' },
+  { key: 'due_date', nhan: 'Đến hạn' },
+  { key: 'completed_at', nhan: 'Đã xong' },
+  { key: 'tinh_trang', nhan: 'Tình trạng' },
+]
+export const XUAT_BAOTRI_MAC_DINH = ['customer_name', 'bo_may', 'lan_thu', 'due_date', 'tinh_trang']
+
+/** Cột xuất — Lịch thay lõi. */
+export const XUAT_LOI_COT: readonly { key: string; nhan: string; pii?: boolean }[] = [
+  { key: 'serial', nhan: 'Serial' },
+  { key: 'product_name', nhan: 'Máy' },
+  { key: 'customer_name', nhan: 'Khách' },
+  { key: 'primary_phone', nhan: 'SĐT' },
+  { key: 'filter_code', nhan: 'Mã lõi' },
+  { key: 'filter_name', nhan: 'Lõi' },
+  { key: 'chu_ky_raw', nhan: 'Chu kỳ' },
+  { key: 'han_som', nhan: 'Đến hạn' },
+  { key: 'tinh_trang', nhan: 'Tình trạng' },
+  { key: 'lan_thay_gan_nhat', nhan: 'Thay gần nhất' },
+]
+export const XUAT_LOI_MAC_DINH = ['serial', 'customer_name', 'filter_code', 'han_som', 'tinh_trang']
 export const COT_BAO_TRI = ['due_date', 'customer_name'] as const
 
 /**
