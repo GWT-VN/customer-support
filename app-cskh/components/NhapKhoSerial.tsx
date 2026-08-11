@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { themSerialKho, nhapSerialLo, type CatalogChon, type KetQuaNhapLo } from '@/app/actions'
+import { themSerialKho, nhapSerialBang, type CatalogChon, type KetQuaNhapLo } from '@/app/actions'
+import { phanTichBangSerial } from '@/lib/danhSach'
 import { SerialRo } from '@/components/SerialRo'
 import { ChonCatalog } from '@/components/ChonCatalog'
 
@@ -83,17 +84,20 @@ function ImportLo({ catalog }: { catalog: CatalogChon[] }) {
   const [err, setErr] = useState<string | null>(null)
   const [kq, setKq] = useState<KetQuaNhapLo | null>(null)
 
-  // Xem trước: tách dòng, đếm hợp lệ + trùng ngay trong danh sách.
+  // Xem trước: phân tích bảng (Serial|PO|Ngày), đếm hợp lệ + trùng trong lô + có PO/ngày.
   const truoc = useMemo(() => {
-    const ds = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+    const dong = phanTichBangSerial(text)
     const gap = new Set<string>(); const trung = new Set<string>()
-    for (const s of ds) { if (gap.has(s)) trung.add(s); else gap.add(s) }
-    return { tong: ds.length, duy: gap.size, trung: [...trung], ds }
+    for (const d of dong) { if (gap.has(d.serial)) trung.add(d.serial); else gap.add(d.serial) }
+    return {
+      tong: dong.length, duy: gap.size, trung: [...trung], dong,
+      coPo: dong.filter((d) => d.po).length, coNgay: dong.filter((d) => d.ngay).length,
+    }
   }, [text])
 
   async function nhap() {
     setBusy(true); setErr(null); setKq(null)
-    const r = await nhapSerialLo({ dsSerial: truoc.ds, internal_code: ic, ma_quoc_te: mqt })
+    const r = await nhapSerialBang({ dong: truoc.dong, internal_code: ic, ma_quoc_te: mqt })
     setBusy(false)
     if (!r.ok) setErr(r.error)
     else { setKq(r.kq); setText(''); router.refresh() }
@@ -102,15 +106,21 @@ function ImportLo({ catalog }: { catalog: CatalogChon[] }) {
   return (
     <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
       <ChonSanPham catalog={catalog} value={ic} onChange={setIc} />
+      <p className="text-xs text-slate-500">
+        Dán từ Excel — mỗi dòng: <span className="font-mono">Serial</span> ·{' '}
+        <span className="font-mono">PO</span> (tuỳ chọn) · <span className="font-mono">Ngày nhập</span> (tuỳ chọn,
+        dd/mm/yyyy). Cách nhau bằng Tab/phẩy. Dòng tiêu đề tự bỏ.
+      </p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8}
-        placeholder="Dán danh sách serial — mỗi dòng 1 serial"
+        placeholder={"F00000...0001\tPO-2026-08\t05/08/2026\nF00000...0002\tPO-2026-08\t05/08/2026"}
         className="rounded-lg border px-3 py-2 text-slate-900 font-mono text-xs w-full" />
       <input value={mqt} onChange={(e) => setMqt(e.target.value)} placeholder="Mã quốc tế chung (tuỳ chọn)"
         className="rounded-lg border px-3 py-2 text-slate-900 text-sm w-full" />
       {truoc.tong > 0 && (
         <p className="text-xs text-slate-600">
           {truoc.duy} serial hợp lệ{truoc.tong !== truoc.duy && ` · ${truoc.tong - truoc.duy} trùng trong danh sách`}
-          {truoc.trung.length > 0 && <span className="text-amber-700"> ({truoc.trung.slice(0, 5).join(', ')}{truoc.trung.length > 5 ? '…' : ''})</span>}
+          {' · '}{truoc.coPo} có PO · {truoc.coNgay} có ngày
+          {truoc.trung.length > 0 && <span className="text-amber-700"> (trùng: {truoc.trung.slice(0, 5).join(', ')}{truoc.trung.length > 5 ? '…' : ''})</span>}
         </p>
       )}
       <div className="flex items-center gap-3">

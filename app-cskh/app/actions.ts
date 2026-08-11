@@ -8,7 +8,8 @@ import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, type TinhTrangBH,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay,
+  type TinhTrangBH, type DongNhapSerial,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -1338,12 +1339,13 @@ export type KetQuaNhapLo = {
 }
 
 /**
- * Import LÔ serial vào kho (CHỈ ADMIN). Nhận danh sách serial + 1 mã nội bộ chung.
- * Chỉ nhận mã MỚI: bỏ qua mã trùng trong kho, trùng đang chờ duyệt, hoặc trùng
- * ngay trong danh sách. Trả về số thành công + danh sách bỏ qua kèm lý do.
+ * Import LÔ serial vào kho (CHỈ ADMIN). Nhận bảng dòng {serial, po?, ngay?} (dán từ
+ * Excel) + 1 mã nội bộ chung. PO -> cột po; ngay -> imported_at (thiếu thì lấy nay).
+ * Chỉ nhận mã MỚI: bỏ qua trùng-kho / trùng-chờ-duyệt / trùng-trong-lô. Trả về số
+ * thành công + danh sách bỏ qua kèm lý do.
  */
-export async function nhapSerialLo(input: {
-  dsSerial: string[]; internal_code: string; ma_quoc_te?: string; model?: string
+export async function nhapSerialBang(input: {
+  dong: DongNhapSerial[]; internal_code: string; ma_quoc_te?: string
 }): Promise<{ ok: true; kq: KetQuaNhapLo } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
@@ -1352,53 +1354,52 @@ export async function nhapSerialLo(input: {
 
   const boQua: { serial: string; ly_do: string }[] = []
   const daGap = new Set<string>()
-  const sach: string[] = []
+  const sach: DongNhapSerial[] = []
   let tong = 0
-  for (const raw of input.dsSerial) {
-    const s = (raw ?? '').trim()
+  for (const d of input.dong ?? []) {
+    const s = (d.serial ?? '').trim()
     if (!s) continue
     tong++
     if (daGap.has(s)) { boQua.push({ serial: s, ly_do: 'trùng trong danh sách' }); continue }
     daGap.add(s)
-    sach.push(s)
+    sach.push({ serial: s, po: d.po?.trim() || null, ngay: d.ngay || null })
   }
   if (!sach.length) return { ok: false, error: 'Không có serial hợp lệ trong danh sách.' }
 
   const db = dataClient()
+  const serials = sach.map((d) => d.serial)
   // Đã có trong kho? (chia lô 200 cho .in an toàn)
   const daCo = new Set<string>()
-  for (let i = 0; i < sach.length; i += 200) {
-    const lo = sach.slice(i, i + 200)
-    const { data, error } = await db.from('serial_registry').select('serial').in('serial', lo)
+  for (let i = 0; i < serials.length; i += 200) {
+    const { data, error } = await db.from('serial_registry').select('serial').in('serial', serials.slice(i, i + 200))
     if (error) return { ok: false, error: error.message }
     for (const r of (data ?? []) as { serial: string }[]) daCo.add(r.serial)
   }
   // Đang chờ duyệt?
   const dangCho = new Set<string>()
-  for (let i = 0; i < sach.length; i += 200) {
-    const lo = sach.slice(i, i + 200)
+  for (let i = 0; i < serials.length; i += 200) {
     const { data, error } = await db.from('serial_pending')
-      .select('serial').eq('trang_thai', 'cho_duyet').in('serial', lo)
+      .select('serial').eq('trang_thai', 'cho_duyet').in('serial', serials.slice(i, i + 200))
     if (error) return { ok: false, error: error.message }
     for (const r of (data ?? []) as { serial: string }[]) dangCho.add(r.serial)
   }
 
   const tt = await thongTinCatalog(ic)
   const nay = new Date().toISOString()
-  const canThem: string[] = []
-  for (const s of sach) {
-    if (daCo.has(s)) { boQua.push({ serial: s, ly_do: 'đã có trong kho' }); continue }
-    if (dangCho.has(s)) { boQua.push({ serial: s, ly_do: 'đang chờ duyệt' }); continue }
-    canThem.push(s)
-  }
+  const canThem = sach.filter((d) => {
+    if (daCo.has(d.serial)) { boQua.push({ serial: d.serial, ly_do: 'đã có trong kho' }); return false }
+    if (dangCho.has(d.serial)) { boQua.push({ serial: d.serial, ly_do: 'đang chờ duyệt' }); return false }
+    return true
+  })
 
   let them = 0
   for (let i = 0; i < canThem.length; i += 500) {
     const lo = canThem.slice(i, i + 500)
-    const { error } = await db.from('serial_registry').insert(lo.map((serial) => ({
-      serial, code: ic, internal_code: ic, ten_noi_bo: tt?.ten ?? null,
-      ma_quoc_te: input.ma_quoc_te?.trim() || null, model: input.model?.trim() || null,
-      po: 'CSKH-app', source_file: 'CSKH-app-import', imported_at: nay,
+    const { error } = await db.from('serial_registry').insert(lo.map((d) => ({
+      serial: d.serial, code: ic, internal_code: ic, ten_noi_bo: tt?.ten ?? null,
+      ma_quoc_te: input.ma_quoc_te?.trim() || null,
+      po: d.po ?? 'CSKH-app', source_file: 'CSKH-app-import',
+      imported_at: d.ngay ? `${d.ngay}T00:00:00Z` : nay,
     })))
     if (error) return { ok: false, error: error.message }
     them += lo.length

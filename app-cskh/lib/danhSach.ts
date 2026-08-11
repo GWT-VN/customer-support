@@ -202,6 +202,41 @@ export function docLocNgay(sp: { ngtu?: string; ngden?: string }): { tu: string 
   return { tu: ok(sp.ngtu), den: ok(sp.ngden) }
 }
 
+/** Chuẩn hoá 1 ô ngày nhập kho về ISO YYYY-MM-DD. Nhận YYYY-MM-DD, DD/MM/YYYY,
+ *  DD-MM-YYYY (kể cả năm 2 số). Không hợp lệ -> null (giữ serial, chỉ bỏ ngày). */
+export function chuanNgayNhap(s: string | null | undefined): string | null {
+  const t = (s ?? '').trim()
+  if (!t) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t
+  const m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (!m) return null
+  const [, d, mo, yRaw] = m
+  const y = yRaw.length === 2 ? '20' + yRaw : yRaw
+  const dd = d.padStart(2, '0'), mm = mo.padStart(2, '0')
+  if (+mm < 1 || +mm > 12 || +dd < 1 || +dd > 31) return null
+  return `${y}-${mm}-${dd}`
+}
+
+export type DongNhapSerial = { serial: string; po: string | null; ngay: string | null }
+
+/**
+ * Phân tích bảng serial dán từ Excel: mỗi dòng `Serial [TAB/phẩy PO [TAB/phẩy Ngày]]`.
+ * Cột 1 = serial (bắt buộc), cột 2 = PO, cột 3 = ngày nhập (chuẩn hoá ISO). Bỏ dòng
+ * trống + dòng tiêu đề (ô đầu chứa "serial"). Thuần — test được, không đụng DB/React.
+ */
+export function phanTichBangSerial(text: string): DongNhapSerial[] {
+  const ra: DongNhapSerial[] = []
+  for (const raw of (text ?? '').split(/\r?\n/)) {
+    if (!raw.trim()) continue
+    const cells = raw.split(/\t|,|;/).map((c) => c.trim())
+    const serial = cells[0]
+    if (!serial) continue
+    if (/serial/i.test(serial) && ra.length === 0) continue   // bỏ dòng tiêu đề
+    ra.push({ serial, po: cells[1] || null, ngay: chuanNgayNhap(cells[2]) })
+  }
+  return ra
+}
+
 /** Mô tả điều kiện lọc ngày để hiện chip (vd "Ngày = 01/08/2026", "Từ …", "Đến …"). */
 export function moTaLocNgay(tu: string | null, den: string | null, nhan = 'Ngày'): string | null {
   const vn = (d: string) => d.split('-').reverse().join('/')
