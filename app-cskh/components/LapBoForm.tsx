@@ -11,12 +11,15 @@ import { SerialRo } from '@/components/SerialRo'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 
-/** Ô chọn serial tồn kho cho 1 thiết bị của bộ (lọc theo mã nội bộ, chưa kích hoạt BH). */
+/** Ô chọn serial tồn kho cho 1 thiết bị của bộ (lọc theo mã nội bộ, chưa kích hoạt BH).
+ *  Chọn từ danh sách HOẶC gõ số CUỐI để tìm (gõ 123 -> ưu tiên serial kết thúc 123). */
 function ChonSerialThietBi({
   lk, value, onChange,
 }: { lk: LinhKienCombo; value: string; onChange: (serial: string) => void }) {
   const [ds, setDs] = useState<SerialKho[]>([])
   const [tai, setTai] = useState(true)
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
   // Keyed theo internal_code ở parent -> mỗi thiết bị là một instance riêng, effect
   // chỉ chạy 1 lần lúc mount. Không setState đồng bộ trong thân effect (eslint chặn).
   useEffect(() => {
@@ -24,6 +27,22 @@ function ChonSerialThietBi({
     serialsTheoMay(lk.internal_code).then((r) => { if (song) { setDs(r); setTai(false) } })
     return () => { song = false }
   }, [lk.internal_code])
+
+  const kq = q.trim().toLowerCase()
+  const loc = (kq
+    ? ds.filter((s) => s.serial.toLowerCase().includes(kq))
+        .sort((a, b) =>
+          (a.serial.toLowerCase().endsWith(kq) ? 0 : 1) - (b.serial.toLowerCase().endsWith(kq) ? 0 : 1))
+    : ds
+  ).slice(0, 12)
+
+  function go(v: string) {
+    setQ(v); setOpen(true)
+    // Gõ trúng nguyên serial tồn kho -> nhận luôn; chưa trúng thì bỏ chọn.
+    const hit = ds.find((s) => s.serial.toLowerCase() === v.trim().toLowerCase())
+    onChange(hit ? hit.serial : '')
+  }
+  function chon(s: SerialKho) { setQ(s.serial); setOpen(false); onChange(s.serial) }
 
   return (
     <div className="rounded-lg border p-3 bg-white space-y-1">
@@ -36,16 +55,25 @@ function ChonSerialThietBi({
           Không còn serial tồn kho cho thiết bị này — nhập kho trước.
         </p>
       ) : (
-        <>
-          <select value={value} onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm bg-white text-slate-900 font-mono">
-            <option value="">— Chọn serial (còn {ds.length}) —</option>
-            {ds.map((s) => (
-              <option key={s.serial} value={s.serial}>{s.serial}</option>
-            ))}
-          </select>
-          {value && <div className="text-xs text-slate-500">Đã chọn: <SerialRo serial={value} /></div>}
-        </>
+        <div className="relative">
+          <input value={q} onChange={(e) => go(e.target.value)}
+            onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder={`Chọn hoặc gõ số CUỐI serial (còn ${ds.length})…`}
+            className={`w-full rounded-lg border px-3 py-2 text-sm bg-white font-mono text-slate-900 ${value ? 'border-emerald-400' : ''}`} />
+          {open && loc.length > 0 && (
+            <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border bg-white shadow-lg">
+              {loc.map((s) => (
+                <li key={s.serial}>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chon(s)}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 font-mono">
+                    {s.serial}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {value && <div className="text-xs text-slate-500 mt-1">Đã chọn: <SerialRo serial={value} /></div>}
+        </div>
       )}
     </div>
   )

@@ -4,25 +4,13 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { themSerialKho, nhapSerialLo, type CatalogChon, type KetQuaNhapLo } from '@/app/actions'
 import { SerialRo } from '@/components/SerialRo'
+import { ChonCatalog } from '@/components/ChonCatalog'
 
-/** Ô chọn sản phẩm (catalog) — hiện "tên (mã nội bộ)", trả về mã nội bộ. */
+/** Ô chọn sản phẩm (catalog) — gõ để lọc theo tên + mã nội bộ. */
 function ChonSanPham({
   catalog, value, onChange,
 }: { catalog: CatalogChon[]; value: string; onChange: (ic: string) => void }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-lg border px-3 py-2 text-slate-900 text-sm bg-white w-full"
-    >
-      <option value="">— Chọn sản phẩm (mã nội bộ) —</option>
-      {catalog.map((c) => (
-        <option key={c.internal_code} value={c.internal_code}>
-          {c.ten ? `${c.ten} (${c.internal_code})` : c.internal_code}
-        </option>
-      ))}
-    </select>
-  )
+  return <ChonCatalog catalog={catalog} value={value} onChange={onChange} placeholder="Gõ tên hoặc mã nội bộ sản phẩm…" />
 }
 
 export function NhapKhoSerial({ catalog }: { catalog: CatalogChon[] }) {
