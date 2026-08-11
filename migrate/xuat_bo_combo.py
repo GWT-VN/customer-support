@@ -120,6 +120,19 @@ def main():
                 so_con, ", ".join(c.get("internal_code") or "?" for c in cons) or "—",
             ])
 
+    # Làm mềm (GTEC-15A/30A) ĐỨNG MỘT MÌNH: chưa thuộc bộ nào -> khách mua 15A/30A hoặc
+    # ECO nhưng mới kích hoạt mỗi làm mềm, thiếu các thiết bị/UPF10 còn lại.
+    LAM_MEM = {'GTEC-15A01-G', 'GTEC-30A01-G'}
+    mot_minh = []
+    for r in ib:
+        if r.get('internal_code') in LAM_MEM and not r.get('parent_serial') and r['serial'] not in cha:
+            k = kh.get(r.get('customer_id')) or {}
+            w = wr.get(r['serial']) or {}
+            mot_minh.append([
+                r['serial'], r['internal_code'], k.get('full_name'), k.get('primary_phone'),
+                r.get('install_date'), 'có' if w.get('activated') else 'KHÔNG',
+            ])
+
     wb = Workbook(); wb.remove(wb.active)
     bang(wb.create_sheet("Bộ (mẹ+con)"),
          ["Mã bộ", "Kiểu", "Combo", "Khách", "SĐT", "Ngày lắp",
@@ -130,12 +143,17 @@ def main():
          ["Mã bộ", "Combo", "Khách", "SĐT", "Số con", "Thiết bị đang có (bổ sung phần thiếu)"],
          [20, 10, 26, 14, 8, 40], sorted(thieu, key=lambda r: (r[2] or "")),
          to_mau=lambda r: DO)
+    bang(wb.create_sheet("Làm mềm ĐỨNG 1 MÌNH"),
+         ["Serial làm mềm", "Mã", "Khách", "SĐT", "Ngày lắp", "BH kích hoạt?"],
+         [22, 14, 26, 14, 12, 12], sorted(mot_minh, key=lambda r: (r[2] or "")),
+         to_mau=lambda r: DO)
     tt_rows = sorted([[c, k, n] for (c, k), n in tomtat.items()], key=lambda r: (r[0], r[1]))
     bang(wb.create_sheet("Tóm tắt"), ["Combo", "Kiểu", "Số bộ"], [12, 8, 10], tt_rows)
     wb.save(out)
 
     n_bo = len(cha); n_moi = sum(1 for s in cha if RE_MOI.match(s))
-    print(f"Tổng bộ: {n_bo} (mới: {n_moi} · cũ: {n_bo - n_moi}) · dòng thiết bị: {len(rows)} · BỘ THIẾU con: {len(thieu)}")
+    print(f"Tổng bộ: {n_bo} (mới: {n_moi} · cũ: {n_bo - n_moi}) · dòng thiết bị: {len(rows)} · "
+          f"BỘ THIẾU con: {len(thieu)} · làm mềm đứng 1 mình: {len(mot_minh)}")
     print(f"-> {out}")
 
 
