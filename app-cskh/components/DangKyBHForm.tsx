@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   dangKyBaoHanh, dsMayCoSerial, serialsTheoMay, serialInfo,
-  type SerialKho, type MayKho, type KhachTom,
+  type SerialKho, type MayKho, type KhachTom, type CatalogChon,
 } from '@/app/actions'
 import { SerialPicker } from '@/components/SerialPicker'
 import { KhachPicker } from '@/components/KhachPicker'
+import { ChonCatalog } from '@/components/ChonCatalog'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 
@@ -95,6 +96,13 @@ export function DangKyBHForm() {
 
   const daKichHoat = info?.bh_kich_hoat === true
   const dcLapCuoi = dungDcKhach ? (khachAddr ?? '') : dcLap
+  // dsMayCoSerial (v_may_kho) đã LỌC chỉ máy (bỏ lõi/vỏ) -> danh sách typeahead chỉ có máy.
+  const catalogMay: CatalogChon[] = useMemo(
+    () => dsMay.map((m) => ({
+      internal_code: m.internal_code,
+      ten: `${m.ten_noi_bo ?? m.internal_code} (còn ${m.con_lai})`,
+      danh_muc: null,
+    })), [dsMay])
 
   async function luu() {
     setBusy(true); setErr(null); setMsg(null)
@@ -112,18 +120,13 @@ export function DangKyBHForm() {
 
   return (
     <div className="bg-white rounded-xl border p-5 space-y-4 max-w-2xl">
-      {/* 1. Máy */}
+      {/* 1. Máy — gõ để lọc theo tên/mã (chỉ MÁY, không lõi/vật tư); bỏ trống = gõ serial tự do */}
       <div>
-        <label className="text-sm font-medium text-slate-700">1. Máy (chọn để lọc serial)</label>
-        <select value={mayCode} onChange={(e) => chonMay(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm bg-white text-slate-900">
-          <option value="">— Chưa chọn (sẽ gõ serial tự do) —</option>
-          {dsMay.map((m) => (
-            <option key={m.internal_code} value={m.internal_code}>
-              {m.ten_noi_bo ?? m.internal_code} · {m.internal_code} (còn {m.con_lai})
-            </option>
-          ))}
-        </select>
+        <label className="text-sm font-medium text-slate-700">1. Máy (gõ tên/mã để lọc serial)</label>
+        <div className="mt-1">
+          <ChonCatalog catalog={catalogMay} value={mayCode} onChange={chonMay}
+            placeholder="Gõ tên/mã máy… (bỏ trống để gõ serial tự do)" />
+        </div>
       </div>
 
       {/* 2. Serial */}

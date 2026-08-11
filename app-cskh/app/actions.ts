@@ -1770,9 +1770,19 @@ export async function dangKyBaoHanh(input: {
   }
   const { data: sr } = await db.from('serial_registry')
     .select('internal_code, model').eq('serial', serial).maybeSingle()
+  const ic = (sr as { internal_code: string | null } | null)?.internal_code ?? null
+  // CHỈ đăng ký BH cho MÁY (catalog "Danh mục cấp 1" = Machines). Lõi/vật tư -> từ chối.
+  if (ic) {
+    const { data: cat } = await db.from('catalog_item')
+      .select('"Danh mục cấp 1"').eq('Mã nội bộ', ic).limit(1).maybeSingle()
+    const dm1 = (cat as Record<string, string | null> | null)?.['Danh mục cấp 1']
+    if (dm1 && dm1 !== 'Machines') {
+      return { ok: false as const, error: `Chỉ đăng ký bảo hành cho MÁY. Mã "${ic}" thuộc "${dm1}" (lõi/vật tư) — không kích hoạt BH.` }
+    }
+  }
   const { error: e1 } = await db.from('installed_base').upsert({
     serial,
-    internal_code: (sr as { internal_code: string | null } | null)?.internal_code ?? null,
+    internal_code: ic,
     model_freetext: (sr as { model: string | null } | null)?.model ?? null,
     customer_id: input.customer_id,
     install_date: input.install_date,
