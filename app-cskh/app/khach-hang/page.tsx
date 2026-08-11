@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { listKhachHang, khoaTatCaKhachHang, exportCuaToi } from '@/app/actions'
 import { ExportKhachButton } from '@/components/ExportKhachButton'
+import { ThaoTacHangLoat } from '@/components/ThaoTacHangLoat'
+import { SUA_HL_KHACH } from '@/lib/danhSach'
 import { OTimKiem, ThanhDangLoc, PhanTrang, TieuDeCotSapXep } from '@/bang'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
@@ -47,7 +49,9 @@ export default async function KhachHangPage({
           thamSo={{ q, cot, chieu }}
           layTatCaKhoa={khoaTatCaKhachHang}
         >
-          <ThanhDaChon nhan="khách" />
+          <ThanhDaChon nhan="khách">
+            <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} />
+          </ThanhDaChon>
           <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="w-full text-sm">
               <Suspense>

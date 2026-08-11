@@ -68,6 +68,24 @@ export const XUAT_TICKET_COT: readonly { key: string; nhan: string; pii?: boolea
   { key: 'description', nhan: 'Mô tả' },
 ]
 export const XUAT_TICKET_MAC_DINH = ['ticket_code', 'created_at', 'state', 'ticket_type', 'customer_name', 'serial', 'product_name']
+
+/** Trường CẬP NHẬT HÀNG LOẠT (dùng chung client + server). enum -> dropdown; text/date -> nhập. */
+export type CotSuaHL = {
+  key: string; nhan: string; kieu: 'text' | 'enum' | 'date'; chonLua?: { gt: string; nhan: string }[]
+}
+export const SUA_HL_KHACH: readonly CotSuaHL[] = [
+  { key: 'province', nhan: 'Tỉnh/TP', kieu: 'text' },
+  { key: 'address', nhan: 'Địa chỉ', kieu: 'text' },
+  { key: 'notes', nhan: 'Ghi chú', kieu: 'text' },
+  { key: 'source', nhan: 'Nguồn', kieu: 'text' },
+  { key: 'trang_thai', nhan: 'Trạng thái', kieu: 'enum', chonLua: [
+    { gt: 'da_duyet', nhan: 'Đã duyệt' }, { gt: 'cho_duyet', nhan: 'Chờ duyệt' },
+  ] },
+]
+/** Bảng nào cho sửa hàng loạt trường nào — server whitelist theo đây. */
+export const SUA_HL_BANG: Record<string, readonly CotSuaHL[]> = {
+  cs_customers: SUA_HL_KHACH,
+}
 export const COT_BAO_TRI = ['due_date', 'customer_name'] as const
 
 /**

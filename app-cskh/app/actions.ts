@@ -7,7 +7,7 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
-  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, type TinhTrangBH,
+  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -1844,6 +1844,46 @@ export async function khoaTatCaKhachHang(t: ThamSoLoc): Promise<string[]> {
     (r) => r.id,
     TOI_DA_CHON
   )
+}
+
+// ── Thao tác HÀNG LOẠT (Đợt B — CHỈ ADMIN, chia lô, audit) ──────────────────
+function revalidateHangLoat(bang: string) {
+  if (bang === 'cs_customers') { revalidatePath('/khach-hang'); revalidatePath('/khach'); revalidatePath('/') }
+}
+
+/** Cập nhật 1 trường cho NHIỀU dòng (CHỈ ADMIN). Whitelist trường theo SUA_HL_BANG, chia lô 200. */
+export async function capNhatHangLoat(bang: string, ids: string[], truong: string, giaTri: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const reg = SUA_HL_BANG[bang]
+  if (!reg) return { ok: false as const, error: 'Bảng không hỗ trợ sửa hàng loạt.' }
+  if (!reg.some((f) => f.key === truong)) return { ok: false as const, error: 'Trường không hợp lệ.' }
+  if (!ids.length) return { ok: false as const, error: 'Chưa chọn dòng nào.' }
+  const db = dataClient()
+  const patch: Record<string, unknown> = { [truong]: giaTri === '' ? null : giaTri }
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error } = await db.from(bang).update(patch).in('id', ids.slice(i, i + 200))
+    if (error) return { ok: false as const, error: error.message }
+  }
+  await ghiAudit('sua_hang_loat', bang, { truong, gia_tri: giaTri, so_dong: ids.length })
+  revalidateHangLoat(bang)
+  return { ok: true as const, soDong: ids.length }
+}
+
+/** Xoá NHIỀU dòng (CHỈ ADMIN). Khách = ẩn mềm (da_xoa). Chia lô 200, audit. */
+export async function xoaHangLoat(bang: string, ids: string[]) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (bang !== 'cs_customers') return { ok: false as const, error: 'Bảng không hỗ trợ xoá hàng loạt.' }
+  if (!ids.length) return { ok: false as const, error: 'Chưa chọn dòng nào.' }
+  const db = dataClient()
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error } = await db.from('cs_customers').update({ trang_thai: 'da_xoa' }).in('id', ids.slice(i, i + 200))
+    if (error) return { ok: false as const, error: error.message }
+  }
+  await ghiAudit('xoa_hang_loat', bang, { so_dong: ids.length })
+  revalidateHangLoat(bang)
+  return { ok: true as const, soDong: ids.length }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
