@@ -24,8 +24,17 @@ export function NutDongBoCatalog({ logs }: { logs: CatalogSyncLog[] }) {
     const r = await syncCatalogNow()
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
-    const t = r.ket_qua?.tables ?? {}
-    setOk('Đã đồng bộ: ' + BANG.map((b) => `${b}=${(t as Record<string, unknown>)[b] ?? '—'}`).join(' · '))
+    const t = (r.ket_qua?.tables ?? {}) as Record<string, unknown>
+    const fmt = (v: unknown): string => {
+      if (typeof v === 'number') return `${v} dòng`
+      if (v && typeof v === 'object') {
+        const o = v as { error?: unknown; skipped?: unknown }
+        if (o.error != null) return `lỗi: ${o.error}`
+        if (o.skipped != null) return `bỏ qua (${o.skipped})`
+      }
+      return v == null ? '—' : String(v)
+    }
+    setOk('Đã đồng bộ: ' + BANG.map((b) => `${b} ${fmt(t[b])}`).join(' · '))
     router.refresh()
   }
 
