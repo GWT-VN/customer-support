@@ -103,6 +103,26 @@ function ImportLo({ catalog }: { catalog: CatalogChon[] }) {
     else { setKq(r.kq); setText(''); router.refresh() }
   }
 
+  // Đọc file .xlsx/.csv -> đổ vào ô văn bản (dạng Tab) rồi tái dùng phanTichBangSerial.
+  // Import xlsx động để không phình bundle chung.
+  async function docFile(f: File) {
+    setErr(null)
+    try {
+      const ten = f.name.toLowerCase()
+      if (ten.endsWith('.csv') || ten.endsWith('.txt')) {
+        setText(await f.text())
+        return
+      }
+      const XLSX = await import('xlsx')
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const aoa = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, blankrows: false })
+      setText(aoa.map((row) => (row ?? []).map((c) => (c ?? '').toString().trim()).join('\t')).join('\n'))
+    } catch {
+      setErr('Không đọc được file — thử lưu lại .xlsx/.csv rồi tải lại, hoặc dán tay.')
+    }
+  }
+
   return (
     <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
       <ChonSanPham catalog={catalog} value={ic} onChange={setIc} />
@@ -111,6 +131,14 @@ function ImportLo({ catalog }: { catalog: CatalogChon[] }) {
         <span className="font-mono">PO</span> (tuỳ chọn) · <span className="font-mono">Ngày nhập</span> (tuỳ chọn,
         dd/mm/yyyy). Cách nhau bằng Tab/phẩy. Dòng tiêu đề tự bỏ.
       </p>
+      <div className="flex items-center gap-2 text-sm">
+        <label className="rounded-lg border bg-white px-3 py-1.5 text-slate-700 cursor-pointer hover:bg-slate-50">
+          📄 Chọn file .xlsx/.csv
+          <input type="file" accept=".xlsx,.xls,.csv,.txt" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) docFile(f); e.target.value = '' }} />
+        </label>
+        <span className="text-xs text-slate-400">hoặc dán trực tiếp bên dưới</span>
+      </div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8}
         placeholder={"F00000...0001\tPO-2026-08\t05/08/2026\nF00000...0002\tPO-2026-08\t05/08/2026"}
         className="rounded-lg border px-3 py-2 text-slate-900 font-mono text-xs w-full" />
