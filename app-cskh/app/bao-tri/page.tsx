@@ -7,7 +7,6 @@ import { ChipSapXep } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { LocNgay } from '@/bang'
-import { docLocNgay, moTaLocNgay } from '@/lib/danhSach'
 import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
 import { BangBaoTri } from '@/components/BangBaoTri'
 
@@ -21,8 +20,6 @@ export default async function BaoTriPage({
   const { q = '', tt, cot, chieu, trang: trangRaw, ngtu, ngden } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const { tu: ngTuOk, den: ngDenOk } = docLocNgay({ ngtu, ngden })
-  const moTaNgay = moTaLocNgay(ngTuOk, ngDenOk, 'Đến hạn')
   const [{ rows, tong, soTrang, sapXep }, counts, views, admin] = await Promise.all([
     maintenanceDue(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     maintenanceCounts(),
@@ -79,23 +76,12 @@ export default async function BaoTriPage({
           — số lần còn lại tự trừ. Dòng “chưa khớp khách” là lịch từ Asana chưa gắn được vào hồ sơ khách.
         </p>
 
-        <Suspense>
-          <LocNgay nhan="Đến hạn" />
-        </Suspense>
-
-        <div className="flex items-center gap-3 flex-wrap text-sm">
-          <span className="text-slate-500">
-            {rows.length < tong ? `Hiện ${rows.length} trên ${tong} lượt` : `${tong} lượt`}
-          </span>
-          {moTaNgay && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs">{moTaNgay}</span>
-          )}
+        <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
+          <span>{rows.length < tong ? `Hiện ${rows.length} trên ${tong} lượt` : `${tong} lượt`}</span>
           <Suspense>
             <ChipSapXep cot={sapXep.cot} tang={sapXep.tang} macDinh={sapXep.macDinh} />
           </Suspense>
         </div>
-
-        {admin && <ExportBaoTriButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
 
         <KhungChon
           khoaTrang={rows.map((r) => r.visit_id)}
@@ -105,7 +91,12 @@ export default async function BaoTriPage({
           layTatCaKhoa={khoaTatCaBaoTri}
         >
         <ThanhDaChon nhan="lượt bảo trì" />
-        <BangBaoTri rows={rows} admin={admin} views={views} />
+        <BangBaoTri rows={rows} admin={admin} views={views} congCu={
+          <>
+            <Suspense><LocNgay nhan="Đến hạn" /></Suspense>
+            {admin && <ExportBaoTriButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
+          </>
+        } />
         </KhungChon>
 
         <Suspense>

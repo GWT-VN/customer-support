@@ -20,11 +20,11 @@ const COT: CotDef<Machine>[] = [
 ]
 const MAC_DINH = ['serial', 'product_name', 'customer', 'primary_phone', 'install_date', 'warranty']
 
-export function BangMay({ rows, admin, views }: { rows: Machine[]; admin: boolean; views: BangView[] }) {
+export function BangMay({ rows, admin, views, congCu }: { rows: Machine[]; admin: boolean; views: BangView[]; congCu?: React.ReactNode }) {
   return (
     <BangTuyChinh
       rows={rows} keyOf={(m) => m.serial} moTaOf={(m) => `máy ${m.serial}`} nhan="máy"
-      bang="installed_base" cot={COT} macDinh={MAC_DINH} sapMacDinh="install_date" views={views} admin={admin}
+      bang="installed_base" cot={COT} macDinh={MAC_DINH} sapMacDinh="install_date" views={views} admin={admin} congCu={congCu}
     />
   )
 }

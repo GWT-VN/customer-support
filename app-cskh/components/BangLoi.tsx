@@ -48,12 +48,12 @@ const COT: CotDef<CoreDue>[] = [
 ]
 const MAC_DINH = ['khach', 'may', 'loi', 'chu_ky', 'moc_tinh', 'han_som', 'ghi']
 
-export function BangLoi({ rows, admin, views }: { rows: CoreDue[]; admin: boolean; views: BangView[] }) {
+export function BangLoi({ rows, admin, views, congCu }: { rows: CoreDue[]; admin: boolean; views: BangView[]; congCu?: React.ReactNode }) {
   return (
     <BangTuyChinh
       rows={rows} keyOf={(r) => `${r.serial}-${r.filter_code}`}
       moTaOf={(r) => `lõi ${r.filter_code} của máy ${r.serial}`} nhan="dòng lõi"
-      bang="core" cot={COT} macDinh={MAC_DINH} sapMacDinh="han_som" views={views} admin={admin}
+      bang="core" cot={COT} macDinh={MAC_DINH} sapMacDinh="han_som" views={views} admin={admin} congCu={congCu}
     />
   )
 }

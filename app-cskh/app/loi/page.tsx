@@ -5,7 +5,6 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { LocNgay } from '@/bang'
-import { docLocNgay, moTaLocNgay } from '@/lib/danhSach'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportLoiButton } from '@/components/ExportLoiButton'
@@ -21,8 +20,6 @@ export default async function LoiPage({
   const { q = '', tt, trang: trangRaw, cot, chieu, ngtu, ngden } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const { tu: ngTuOk, den: ngDenOk } = docLocNgay({ ngtu, ngden })
-  const moTaNgay = moTaLocNgay(ngTuOk, ngDenOk, 'Đến hạn')
   const [{ rows, tong, soTrang, sapXep }, counts, admin, views] = await Promise.all([
     coreForecast(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     coreCounts(),
@@ -73,15 +70,8 @@ export default async function LoiPage({
           </p>
         )}
 
-        <Suspense>
-          <LocNgay nhan="Đến hạn" />
-        </Suspense>
-
         <ThanhDangLoc
-          dieuKien={[
-            ...(q ? [{ nhan: 'Từ khoá', giaTri: q }] : []),
-            ...(moTaNgay ? [{ nhan: 'Đến hạn', giaTri: moTaNgay.replace(/^Đến hạn\s*[:=]?\s*/, '') }] : []),
-          ]}
+          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
           hienThi={rows.length}
           tong={tong}
           nhan="dòng (máy × lõi)"
@@ -91,7 +81,6 @@ export default async function LoiPage({
         {/* Khoá dòng phải là (serial, filter_code): một máy có NHIỀU lõi nên riêng
             serial KHÔNG định danh được một dòng — trùng khoá là tick một ô sáng
             nhiều ô. Đúng cặp khoá đang dùng cho React key và cho khoá phụ phân trang. */}
-        {admin && <ExportLoiButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
 
         <KhungChon
           khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)}
@@ -103,7 +92,12 @@ export default async function LoiPage({
           layTatCaKhoa={khoaTatCaLoi}
         >
         <ThanhDaChon nhan="dòng lõi" />
-        <BangLoi rows={rows} admin={admin} views={views} />
+        <BangLoi rows={rows} admin={admin} views={views} congCu={
+          <>
+            <Suspense><LocNgay nhan="Đến hạn" /></Suspense>
+            {admin && <ExportLoiButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
+          </>
+        } />
         </KhungChon>
 
         <Suspense>

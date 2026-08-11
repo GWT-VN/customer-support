@@ -126,9 +126,6 @@ export default async function TicketsPage({
               <LocNgay nhan="Ngày tạo" />
             </Suspense>
           </div>
-          {admin && (
-            <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} ngtu={ngtu} ngden={ngden} />
-          )}
         </div>
 
         <ThanhDangLoc
@@ -155,7 +152,8 @@ export default async function TicketsPage({
           layTatCaKhoa={khoaTatCaTicket}
         >
         <ThanhDaChon nhan="ticket" />
-        <BangTicket rows={tickets} admin={admin} views={views} />
+        <BangTicket rows={tickets} admin={admin} views={views}
+          congCu={admin && <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} ngtu={ngtu} ngden={ngden} />} />
         </KhungChon>
 
         <Suspense>

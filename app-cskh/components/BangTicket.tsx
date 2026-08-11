@@ -34,11 +34,11 @@ const COT: CotDef<Ticket>[] = [
 ]
 const MAC_DINH = ['ticket_code', 'created_at', 'ticket_type', 'customer', 'may', 'phu_trach', 'state']
 
-export function BangTicket({ rows, admin, views }: { rows: Ticket[]; admin: boolean; views: BangView[] }) {
+export function BangTicket({ rows, admin, views, congCu }: { rows: Ticket[]; admin: boolean; views: BangView[]; congCu?: React.ReactNode }) {
   return (
     <BangTuyChinh
       rows={rows} keyOf={(t) => t.ticket_code} moTaOf={(t) => `ticket ${t.ticket_code}`} nhan="ticket"
-      bang="tickets" cot={COT} macDinh={MAC_DINH} sapMacDinh="created_at" views={views} admin={admin}
+      bang="tickets" cot={COT} macDinh={MAC_DINH} sapMacDinh="created_at" views={views} admin={admin} congCu={congCu}
     />
   )
 }

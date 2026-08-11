@@ -93,8 +93,6 @@ export default async function Home({
           sapXep={sapXep}
         />
 
-        {admin && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />}
-
         <KhungChon
           khoaTrang={machines.map((m) => m.serial)}
           tong={tong}
@@ -104,7 +102,8 @@ export default async function Home({
           layTatCaKhoa={khoaTatCaMay}
         >
         <ThanhDaChon nhan="máy" />
-        <BangMay rows={machines} admin={admin} views={views} />
+        <BangMay rows={machines} admin={admin} views={views}
+          congCu={admin && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />} />
         </KhungChon>
 
         <Suspense>

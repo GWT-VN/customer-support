@@ -21,7 +21,7 @@ export type CotDef<T> = {
  * Bọc trong <KhungChon> ở trang để có chọn-nhiều-dòng.
  */
 export function BangTuyChinh<T>({
-  rows, keyOf, moTaOf, nhan, bang, cot, macDinh, sapMacDinh, views, admin,
+  rows, keyOf, moTaOf, nhan, bang, cot, macDinh, sapMacDinh, views, admin, congCu,
 }: {
   rows: T[]
   keyOf: (r: T) => string
@@ -33,6 +33,8 @@ export function BangTuyChinh<T>({
   sapMacDinh?: string
   views: BangView[]
   admin: boolean
+  /** Nút/điều khiển thêm (Xuất Excel, Lọc ngày…) gom chung 1 hàng với View + Cột. */
+  congCu?: ReactNode
 }) {
   const router = useRouter()
   const BAT_BUOC = cot.filter((c) => c.batBuoc).map((c) => c.key)
@@ -88,6 +90,7 @@ export function BangTuyChinh<T>({
         </select>
         <button onClick={() => setMoCot((v) => !v)}
           className="rounded-lg border bg-white px-3 py-1.5 text-sm text-slate-700">Cột ▾</button>
+        {congCu}
       </div>
 
       {moCot && (
