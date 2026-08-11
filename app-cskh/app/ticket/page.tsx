@@ -1,18 +1,17 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, type Ticket } from '@/app/actions'
+import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, listBangView, type Ticket } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
-import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
 import { ExportTicketButton } from '@/components/ExportTicketButton'
+import { BangTicket } from '@/components/BangTicket'
 import { laAdmin } from '@/lib/supabase'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
-import { TieuDeCotSapXep } from '@/bang'
 import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { docLocNgay, moTaLocNgay } from '@/lib/danhSach'
-import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { KhungChon, ThanhDaChon } from '@/bang'
 
 export default async function TicketsPage({
   searchParams,
@@ -43,6 +42,7 @@ export default async function TicketsPage({
     ticketTypes(),
     laAdmin(),
   ])
+  const views = await listBangView('tickets')
   const { rows: tickets, tong, soTrang, sapXep } = ketQua
 
   const tabs = [
@@ -155,78 +155,7 @@ export default async function TicketsPage({
           layTatCaKhoa={khoaTatCaTicket}
         >
         <ThanhDaChon nhan="ticket" />
-        <div className="bg-white rounded-xl border overflow-x-auto">
-          <table className="w-full text-sm">
-            <Suspense>
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <OChonTatCa nhan="ticket" />
-                  <TieuDeCotSapXep cot="ticket_code" nhan="Mã" chieuMacDinh="asc" />
-                  <TieuDeCotSapXep cot="created_at" nhan="Ngày" chieuMacDinh="desc" dangMacDinh />
-                  <th className="text-left px-4 py-3 font-medium">Loại</th>
-                  <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
-                  <th className="text-left px-4 py-3 font-medium">Máy</th>
-                  <th className="text-left px-4 py-3 font-medium">Phụ trách</th>
-                  <TieuDeCotSapXep cot="state" nhan="Trạng thái" chieuMacDinh="asc" />
-                </tr>
-              </thead>
-            </Suspense>
-            <tbody className="divide-y">
-              {tickets.map((t) => (
-                <tr key={t.ticket_code} className="hover:bg-slate-50 align-top">
-                  <OChonDong khoa={t.ticket_code} moTa={`ticket ${t.ticket_code}`} />
-                  <td className="px-4 py-3">
-                    <Link href={`/ticket/${t.ticket_code}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
-                      {t.ticket_code}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{vnDateTime(t.created_at)}</td>
-                  <td className="px-4 py-3 text-slate-700 max-w-56">{t.ticket_type ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    {t.customer_id ? (
-                      <Link href={`/khach/${t.customer_id}`} prefetch={false} className="text-slate-900 underline">{t.customer_name}</Link>
-                    ) : (
-                      <span className="text-slate-500">{t.customer_name ?? '—'}</span>
-                    )}
-                    {t.primary_phone && <div className="font-mono text-xs text-slate-500">{t.primary_phone}</div>}
-                  </td>
-                  <td className="px-4 py-3">
-                    {t.serial ? (
-                      <Link href={`/may/${encodeURIComponent(t.serial)}`} prefetch={false} className="text-slate-900 underline">
-                        {t.product_name}
-                      </Link>
-                    ) : t.source_serial ? (
-                      <MayThieuBadge t={t} />
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">
-                    {t.cs_ten || t.ky_thuat_ten ? (
-                      <>
-                        {t.cs_ten && <div>CS: {t.cs_ten}</div>}
-                        {t.ky_thuat_ten && <div>KT: {t.ky_thuat_ten}</div>}
-                      </>
-                    ) : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <KhanBadge khan={t.khan} />
-                      <StateBadge state={t.state} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {tickets.length === 0 && (
-                <tr>
-                  <td colSpan={admin ? 8 : 7} className="px-4 py-10 text-center text-slate-400">
-                    Không tìm thấy ticket nào.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <BangTicket rows={tickets} admin={admin} views={views} />
         </KhungChon>
 
         <Suspense>

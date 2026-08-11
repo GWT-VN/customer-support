@@ -1,17 +1,15 @@
-import Link from 'next/link'
 import { Suspense } from 'react'
-import { searchMachines, machineModels, khoaTatCaMay } from './actions'
-import { WarrantyBadge, vnDate } from '@/components/Badge'
+import { searchMachines, machineModels, khoaTatCaMay, listBangView } from './actions'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
-import { TieuDeCotSapXep } from '@/bang'
 import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
 import { laAdmin } from '@/lib/supabase'
-import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
+import { BangMay } from '@/components/BangMay'
 
 export default async function Home({
   searchParams,
@@ -25,6 +23,7 @@ export default async function Home({
     machineModels(),
     laAdmin(),
   ])
+  const views = await listBangView('installed_base')
 
   const tenSanPham = models.find((m) => m.internal_code === sp)?.product_name ?? sp
   const tenBaoHanh = bh && TINH_TRANG_BH.includes(bh as TinhTrangBH) ? NHAN_TINH_TRANG_BH[bh as TinhTrangBH] : bh
@@ -105,56 +104,7 @@ export default async function Home({
           layTatCaKhoa={khoaTatCaMay}
         >
         <ThanhDaChon nhan="máy" />
-        <div className="bg-white rounded-xl border overflow-x-auto">
-          <table className="w-full text-sm">
-            <Suspense>
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <OChonTatCa nhan="máy" />
-                  <TieuDeCotSapXep cot="serial" nhan="Serial" chieuMacDinh="asc" />
-                  <TieuDeCotSapXep cot="product_name" nhan="Máy" chieuMacDinh="asc" />
-                  <TieuDeCotSapXep cot="customer_name" nhan="Khách" chieuMacDinh="asc" />
-                  <th className="text-left px-4 py-3 font-medium">SĐT</th>
-                  <TieuDeCotSapXep cot="install_date" nhan="Lắp" chieuMacDinh="desc" dangMacDinh />
-                  {/* Sắp theo warranty_full_end (ngày hết BH máy) — tăng dần = sắp hết hạn
-                      lên đầu, đúng thứ tự cần gọi khách. Máy chưa kích hoạt BH có
-                      full_end null nên rơi xuống cuối (nullsFirst: false). */}
-                  <TieuDeCotSapXep cot="warranty_full_end" nhan="Bảo hành" chieuMacDinh="asc" />
-                </tr>
-              </thead>
-            </Suspense>
-            <tbody className="divide-y">
-              {machines.map((m) => (
-                <tr key={m.serial} className="hover:bg-slate-50">
-                  <OChonDong khoa={m.serial} moTa={`máy ${m.serial}`} />
-                  <td className="px-4 py-3">
-                    <Link href={`/may/${encodeURIComponent(m.serial)}`} prefetch={false} className="font-mono text-xs text-slate-900 underline">
-                      {m.serial}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{m.product_name ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    {m.customer_id ? (
-                      <Link href={`/khach/${m.customer_id}`} prefetch={false} className="text-slate-900 underline">{m.customer_name}</Link>
-                    ) : <span className="text-slate-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                    {m.primary_phone ?? <span className="text-amber-600">thiếu</span>}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{vnDate(m.install_date)}</td>
-                  <td className="px-4 py-3"><WarrantyBadge m={m} /></td>
-                </tr>
-              ))}
-              {machines.length === 0 && (
-                <tr>
-                  <td colSpan={admin ? 7 : 6} className="px-4 py-10 text-center text-slate-400">
-                    Không tìm thấy máy nào.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <BangMay rows={machines} admin={admin} views={views} />
         </KhungChon>
 
         <Suspense>

@@ -2312,6 +2312,12 @@ export async function xoaHangLoat(bang: string, ids: string[]) {
 // ── Tuỳ chỉnh CỘT + lưu view (Đợt C — bang_view) ───────────────────────────
 export type BangView = { id: string; ten: string; chu: string; cot: string[] }
 
+/** Khoá bảng -> đường dẫn trang để revalidate cache khi đổi view. */
+const DUONG_DAN_BANG: Record<string, string> = {
+  cs_customers: '/khach-hang', installed_base: '/', tickets: '/ticket',
+  maintenance: '/bao-tri', core: '/loi',
+}
+
 /** View của bảng: view CÁ NHÂN của mình + view CHUNG (mọi người). */
 export async function listBangView(bang: string): Promise<BangView[]> {
   const u = await requireStaff()
@@ -2335,7 +2341,7 @@ export async function luuBangView(bang: string, ten: string, cot: string[], chun
     .insert({ bang, ten: t, chu, cot, tao_boi: u.email ?? null })
   if (error) return { ok: false as const, error: error.message }
   await ghiAudit('luu_bang_view', bang, { ten: t, chung })
-  revalidatePath('/khach-hang')
+  revalidatePath(DUONG_DAN_BANG[bang] ?? '/khach-hang')
   return { ok: true as const }
 }
 
@@ -2343,12 +2349,12 @@ export async function luuBangView(bang: string, ten: string, cot: string[], chun
 export async function xoaBangView(id: string) {
   const u = await requireStaff()
   const db = dataClient()
-  const { data } = await db.from('bang_view').select('chu').eq('id', id).maybeSingle()
-  const chu = (data as { chu: string } | null)?.chu
-  if (chu !== (u.email ?? '') && !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { data } = await db.from('bang_view').select('chu, bang').eq('id', id).maybeSingle()
+  const row = data as { chu: string; bang: string } | null
+  if (row?.chu !== (u.email ?? '') && !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await db.from('bang_view').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
-  revalidatePath('/khach-hang')
+  revalidatePath(DUONG_DAN_BANG[row?.bang ?? ''] ?? '/khach-hang')
   return { ok: true as const }
 }
 
