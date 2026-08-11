@@ -191,6 +191,26 @@ export function laMaBo(internalCode: string | null | undefined): boolean {
   return !!internalCode && (MA_COMBO as readonly string[]).includes(internalCode)
 }
 
+/**
+ * Lọc theo ngày dùng CHUNG cho các bảng có trường ngày (install_date, due_date,
+ * han_som, created_at…). Hai tham số URL `ngtu`/`ngden` suy ra 4 chế độ, KHÔNG cần
+ * param mode: đúng ngày (tu==den) · khoảng (tu..den) · trước (chỉ den) · sau (chỉ tu).
+ * Chỉ nhận YYYY-MM-DD; giá trị lạ bị bỏ (tránh .gte() sai).
+ */
+export function docLocNgay(sp: { ngtu?: string; ngden?: string }): { tu: string | null; den: string | null } {
+  const ok = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null)
+  return { tu: ok(sp.ngtu), den: ok(sp.ngden) }
+}
+
+/** Mô tả điều kiện lọc ngày để hiện chip (vd "Ngày = 01/08/2026", "Từ …", "Đến …"). */
+export function moTaLocNgay(tu: string | null, den: string | null, nhan = 'Ngày'): string | null {
+  const vn = (d: string) => d.split('-').reverse().join('/')
+  if (tu && den) return tu === den ? `${nhan} = ${vn(tu)}` : `${nhan}: ${vn(tu)} → ${vn(den)}`
+  if (tu) return `${nhan}: từ ${vn(tu)}`
+  if (den) return `${nhan}: đến ${vn(den)}`
+  return null
+}
+
 export const NGHIA_SAP_XEP: Record<string, { asc: string; desc: string }> = {
   // Ngày tháng — nói rõ đầu nào lên trước, đây là chỗ mũi tên gây hiểu lầm nhất
   install_date: { asc: 'lắp lâu nhất trước', desc: 'lắp gần đây nhất trước' },

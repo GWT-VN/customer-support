@@ -8,7 +8,7 @@ import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, type TinhTrangBH,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -66,7 +66,7 @@ export type Machine = {
 /** Tra máy theo serial / tên khách / SĐT / địa chỉ (không dấu). Rỗng -> máy lắp gần nhất. */
 export async function searchMachines(
   q: string,
-  tuyChon: TuyChonDanhSach & { maSanPham?: string; tinhTrangBH?: string } = {}
+  tuyChon: TuyChonDanhSach & { maSanPham?: string; tinhTrangBH?: string; ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<Machine>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_MAY, {
@@ -122,6 +122,11 @@ export async function searchMachines(
         break
     }
   }
+
+  // Lọc theo ngày lắp (install_date) — 2 tham số ngtu/ngden, xem docLocNgay.
+  const { tu: ngTu, den: ngDen } = docLocNgay(tuyChon)
+  if (ngTu) truyVan = truyVan.gte('install_date', ngTu)
+  if (ngDen) truyVan = truyVan.lte('install_date', ngDen)
 
   // serial là khoá chính của v_installed_base -> khoá phụ đủ để .range() không
   // nhảy/lặp dòng giữa các trang khi cột sắp xếp chính có nhiều dòng bằng nhau
@@ -652,7 +657,7 @@ export type CoreDue = {
 export async function coreForecast(
   tinhTrang: string,
   q: string,
-  tuyChon: TuyChonDanhSach & { tatPhanTrang?: boolean } = {}
+  tuyChon: TuyChonDanhSach & { tatPhanTrang?: boolean; ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<CoreDue>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_LOI, {
@@ -676,6 +681,10 @@ export async function coreForecast(
         `filter_code.ilike.%${safe}%,product_name.ilike.%${safe}%`
     )
   }
+  // Lọc theo ngày đến hạn sớm nhất (han_som là date).
+  const { tu: loiTu, den: loiDen } = docLocNgay(tuyChon)
+  if (loiTu) truyVan = truyVan.gte('han_som', loiTu)
+  if (loiDen) truyVan = truyVan.lte('han_som', loiDen)
 
   // Một máy có NHIỀU lõi -> khoá phụ chỉ mình serial chưa đủ để định danh 1 dòng,
   // phải thêm filter_code -> (serial, filter_code) mới duy nhất, .range() mới ổn định.
@@ -733,7 +742,7 @@ export type MaintenanceDue = {
 export async function maintenanceDue(
   tinhTrang: string,
   q: string,
-  tuyChon: TuyChonDanhSach = {}
+  tuyChon: TuyChonDanhSach & { ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<MaintenanceDue>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_BAO_TRI, {
@@ -758,6 +767,11 @@ export async function maintenanceDue(
         `primary_phone.ilike.%${kw}%,bo_may_kd.ilike.%${kw}%`
     )
   }
+  // Lọc theo ngày đến hạn bảo trì (due_date là date).
+  const { tu: btTu, den: btDen } = docLocNgay(tuyChon)
+  if (btTu) query = query.gte('due_date', btTu)
+  if (btDen) query = query.lte('due_date', btDen)
+
   // visit_id là khoá chính -> khoá phụ đủ để 100 dòng lấy ra luôn cùng một thứ tự
   // giữa hai lần tải (due_date trùng nhau rất nhiều: cả cụm cùng đến hạn một ngày).
   const { data, error, count } = await query
@@ -903,7 +917,7 @@ export async function searchTickets(
   state?: string,
   onlyKhan?: boolean,
   mineStaffId?: string,
-  tuyChon: TuyChonDanhSach & { loaiTicket?: string } = {}
+  tuyChon: TuyChonDanhSach & { loaiTicket?: string; ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<Ticket>> {
   await requireStaff()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_TICKET, {
@@ -936,6 +950,10 @@ export async function searchTickets(
   // hợp lệ; vẫn .eq() thẳng (không whitelist tĩnh) vì loại ticket là dữ liệu mở, không
   // cố định như cột sắp xếp.
   if (tuyChon.loaiTicket) truyVan = truyVan.eq('ticket_type', tuyChon.loaiTicket)
+  // Lọc theo ngày tạo (created_at là timestamp → 'đến ngày' phải ôm hết trong ngày).
+  const { tu: tkTu, den: tkDen } = docLocNgay(tuyChon)
+  if (tkTu) truyVan = truyVan.gte('created_at', tkTu)
+  if (tkDen) truyVan = truyVan.lte('created_at', tkDen + 'T23:59:59.999')
 
   // Khẩn lên đầu, rồi theo cột sắp xếp đã kiểm tra, rồi ticket_code (khoá chính,
   // duy nhất) làm khoá phụ -> .range() không nhảy/lặp dòng giữa các trang.
@@ -1882,12 +1900,12 @@ export async function ticketsCsv(
 
 /** Xuất ticket theo CÁC CỘT được chọn (CHỈ ADMIN). Trả CSV (không BOM — client UTF-16LE). */
 export async function xuatTicket(
-  q: string, state: string | undefined, onlyKhan: boolean, mine: boolean, cot: string[]
+  q: string, state: string | undefined, onlyKhan: boolean, mine: boolean, cot: string[], ngtu?: string, ngden?: string
 ): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
   const mineId = mine ? (await currentStaff())?.id : undefined
-  const { rows } = await searchTickets(q, state, onlyKhan, mineId)
+  const rows = await gomTatCa((trang, moiTrang) => searchTickets(q, state, onlyKhan, mineId, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_TICKET_COT.filter((c) => cot.includes(c.key))
   const gt = (t: Record<string, unknown>, key: string): string => {
     if (key === 'created_at') return String(t.created_at ?? '').slice(0, 10)
@@ -1926,28 +1944,28 @@ function noiDungCsvBang(rows: Record<string, unknown>[], cols: readonly { key: s
   return lines.join('\r\n')
 }
 
-export async function xuatMay(q: string, sp: string | undefined, bh: string | undefined, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+export async function xuatMay(q: string, sp: string | undefined, bh: string | undefined, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
-  const rows = await gomTatCa((trang, moiTrang) => searchMachines(q, { trang, moiTrang, maSanPham: sp, tinhTrangBH: bh }))
+  const rows = await gomTatCa((trang, moiTrang) => searchMachines(q, { trang, moiTrang, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }))
   const cols = XUAT_MAY_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_may', 'installed_base', { q, so_dong: rows.length })
   return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
 }
 
-export async function xuatBaoTri(tt: string | undefined, q: string, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+export async function xuatBaoTri(tt: string | undefined, q: string, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
-  const rows = await gomTatCa((trang, moiTrang) => maintenanceDue(tt ?? '', q, { trang, moiTrang }))
+  const rows = await gomTatCa((trang, moiTrang) => maintenanceDue(tt ?? '', q, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_BAOTRI_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_bao_tri', 'maintenance_visit', { q, so_dong: rows.length })
   return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
 }
 
-export async function xuatLoi(tt: string | undefined, q: string, cot: string[]): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+export async function xuatLoi(tt: string | undefined, q: string, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
-  const rows = await gomTatCa((trang, moiTrang) => coreForecast(tt ?? '', q, { trang, moiTrang }))
+  const rows = await gomTatCa((trang, moiTrang) => coreForecast(tt ?? '', q, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_LOI_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_loi', 'filter_replacement', { q, so_dong: rows.length })
   return { ok: true, csv: noiDungCsvBang(rows as unknown as Record<string, unknown>[], cols) }
@@ -2390,6 +2408,7 @@ export async function khoaTatCaMay(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
     (trang, moiTrang) => searchMachines(t.q ?? '', {
       trang, moiTrang, cot: t.cot, chieu: t.chieu, maSanPham: t.sp, tinhTrangBH: t.bh,
+      ngtu: t.ngtu, ngden: t.ngden,
     }),
     (r) => r.serial,
     TOI_DA_CHON
@@ -2409,7 +2428,7 @@ export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
       onlyKhan ? undefined : t.state || undefined,
       onlyKhan,
       me?.id,
-      { trang, moiTrang, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined }
+      { trang, moiTrang, cot: t.cot, chieu: t.chieu, loaiTicket: t.loai || undefined, ngtu: t.ngtu, ngden: t.ngden }
     ),
     (r) => r.ticket_code,
     TOI_DA_CHON
@@ -2418,7 +2437,7 @@ export async function khoaTatCaTicket(t: ThamSoLoc): Promise<string[]> {
 
 export async function khoaTatCaLoi(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
-    (trang, moiTrang) => coreForecast(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    (trang, moiTrang) => coreForecast(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu, ngtu: t.ngtu, ngden: t.ngden }),
     // Khoá ghép: một máy có nhiều lõi nên riêng serial không định danh được 1 dòng.
     (r) => `${r.serial}-${r.filter_code}`,
     TOI_DA_CHON
@@ -2435,7 +2454,7 @@ export async function khoaTatCaKhach(t: ThamSoLoc): Promise<string[]> {
 
 export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
-    (trang, moiTrang) => maintenanceDue(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu }),
+    (trang, moiTrang) => maintenanceDue(t.tt ?? '', t.q ?? '', { trang, moiTrang, cot: t.cot, chieu: t.chieu, ngtu: t.ngtu, ngden: t.ngden }),
     (r) => r.visit_id,
     TOI_DA_CHON
   )

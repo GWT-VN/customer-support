@@ -7,7 +7,8 @@ import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
 import { BoLocChon } from '@/bang'
-import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, type TinhTrangBH } from '@/lib/danhSach'
+import { LocNgay } from '@/bang'
+import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
 import { laAdmin } from '@/lib/supabase'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
@@ -15,12 +16,12 @@ import { ExportMayButton } from '@/components/ExportMayButton'
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; sp?: string; bh?: string }>
+  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; sp?: string; bh?: string; ngtu?: string; ngden?: string }>
 }) {
-  const { q = '', trang: trangRaw, cot, chieu, sp, bh } = await searchParams
+  const { q = '', trang: trangRaw, cot, chieu, sp, bh, ngtu, ngden } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([
-    searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh }),
+    searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }),
     machineModels(),
     laAdmin(),
   ])
@@ -36,11 +37,16 @@ export default async function Home({
     if (q && bo !== 'q') params.set('q', q)
     if (sp && bo !== 'sp') params.set('sp', sp)
     if (bh && bo !== 'bh') params.set('bh', bh)
+    if (ngtu && bo !== 'ngay') params.set('ngtu', ngtu)
+    if (ngden && bo !== 'ngay') params.set('ngden', ngden)
     if (cot) params.set('cot', cot)
     if (chieu) params.set('chieu', chieu)
     const qs = params.toString()
     return qs ? `/?${qs}` : '/'
   }
+
+  const { tu: ngtuOk, den: ngdenOk } = docLocNgay({ ngtu, ngden })
+  const moTaNgay = moTaLocNgay(ngtuOk, ngdenOk, 'Ngày lắp')
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -71,6 +77,7 @@ export default async function Home({
               nhan="Bảo hành"
               tuyChon={TINH_TRANG_BH.map((k) => ({ giaTri: k, nhan: NHAN_TINH_TRANG_BH[k] }))}
             />
+            <LocNgay nhan="Ngày lắp" />
           </div>
         </Suspense>
 
@@ -79,6 +86,7 @@ export default async function Home({
             ...(q ? [{ nhan: 'Từ khoá', giaTri: q, href: hrefBoDieuKien('q') }] : []),
             ...(sp ? [{ nhan: 'Sản phẩm', giaTri: tenSanPham ?? sp, href: hrefBoDieuKien('sp') }] : []),
             ...(bh ? [{ nhan: 'Bảo hành', giaTri: tenBaoHanh ?? bh, href: hrefBoDieuKien('bh') }] : []),
+            ...(moTaNgay ? [{ nhan: 'Ngày lắp', giaTri: moTaNgay.replace(/^Ngày lắp\s*[:=]?\s*/, ''), href: hrefBoDieuKien('ngay') }] : []),
           ]}
           hienThi={machines.length}
           tong={tong}
@@ -86,14 +94,14 @@ export default async function Home({
           sapXep={sapXep}
         />
 
-        {admin && <ExportMayButton q={q} sp={sp} bh={bh} />}
+        {admin && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />}
 
         <KhungChon
           khoaTrang={machines.map((m) => m.serial)}
           tong={tong}
           bat={admin}
           // KHÔNG có `trang`: lật trang không được coi là đổi bộ lọc, xem ChonDong.tsx
-          thamSo={{ q, sp, bh, cot, chieu }}
+          thamSo={{ q, sp, bh, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaMay}
         >
         <ThanhDaChon nhan="máy" />

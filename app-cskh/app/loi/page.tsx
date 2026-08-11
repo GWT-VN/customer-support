@@ -7,6 +7,8 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
+import { LocNgay } from '@/bang'
+import { docLocNgay, moTaLocNgay } from '@/lib/danhSach'
 import { laAdmin } from '@/lib/supabase'
 import { khoaTatCaLoi } from '@/app/actions'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
@@ -33,13 +35,15 @@ function HanBadge({ tt, ngay }: { tt: string; ngay: number | null }) {
 export default async function LoiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string; trang?: string; cot?: string; chieu?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; trang?: string; cot?: string; chieu?: string; ngtu?: string; ngden?: string }>
 }) {
-  const { q = '', tt, trang: trangRaw, cot, chieu } = await searchParams
+  const { q = '', tt, trang: trangRaw, cot, chieu, ngtu, ngden } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
+  const { tu: ngTuOk, den: ngDenOk } = docLocNgay({ ngtu, ngden })
+  const moTaNgay = moTaLocNgay(ngTuOk, ngDenOk, 'Đến hạn')
   const [{ rows, tong, soTrang, sapXep }, counts, admin] = await Promise.all([
-    coreForecast(tinhTrang, q, { trang, cot, chieu }),
+    coreForecast(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     coreCounts(),
     laAdmin(),
   ])
@@ -87,8 +91,15 @@ export default async function LoiPage({
           </p>
         )}
 
+        <Suspense>
+          <LocNgay nhan="Đến hạn" />
+        </Suspense>
+
         <ThanhDangLoc
-          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          dieuKien={[
+            ...(q ? [{ nhan: 'Từ khoá', giaTri: q }] : []),
+            ...(moTaNgay ? [{ nhan: 'Đến hạn', giaTri: moTaNgay.replace(/^Đến hạn\s*[:=]?\s*/, '') }] : []),
+          ]}
           hienThi={rows.length}
           tong={tong}
           nhan="dòng (máy × lõi)"
@@ -98,7 +109,7 @@ export default async function LoiPage({
         {/* Khoá dòng phải là (serial, filter_code): một máy có NHIỀU lõi nên riêng
             serial KHÔNG định danh được một dòng — trùng khoá là tick một ô sáng
             nhiều ô. Đúng cặp khoá đang dùng cho React key và cho khoá phụ phân trang. */}
-        {admin && <ExportLoiButton tt={tt} q={q} />}
+        {admin && <ExportLoiButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
 
         <KhungChon
           khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)}
@@ -106,7 +117,7 @@ export default async function LoiPage({
           bat={admin}
           // `tt` phải là tinhTrang ĐÃ GIẢI (mặc định SAP khi URL trống), không phải
           // `tt` thô — nếu không, "chọn tất cả" sẽ ôm cả tab khác tab đang xem.
-          thamSo={{ q, tt: tinhTrang, cot, chieu }}
+          thamSo={{ q, tt: tinhTrang, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaLoi}
         >
         <ThanhDaChon nhan="dòng lõi" />

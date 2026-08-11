@@ -10,6 +10,8 @@ import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
 import { BoLocChon } from '@/bang'
+import { LocNgay } from '@/bang'
+import { docLocNgay, moTaLocNgay } from '@/lib/danhSach'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function TicketsPage({
@@ -17,10 +19,10 @@ export default async function TicketsPage({
 }: {
   searchParams: Promise<{
     q?: string; state?: string; khan?: string; mine?: string; trang?: string
-    cot?: string; chieu?: string; loai?: string
+    cot?: string; chieu?: string; loai?: string; ngtu?: string; ngden?: string
   }>
 }) {
-  const { q = '', state = '', khan = '', mine = '', trang: trangRaw, cot, chieu, loai = '' } = await searchParams
+  const { q = '', state = '', khan = '', mine = '', trang: trangRaw, cot, chieu, loai = '', ngtu, ngden } = await searchParams
   const onlyKhan = khan === '1'
   const isMine = mine === '1'
   const trang = Math.max(1, Number(trangRaw) || 1)
@@ -36,7 +38,7 @@ export default async function TicketsPage({
           sapXep: { cot: 'created_at', tang: false, macDinh: true },
         })
       : searchTickets(q, onlyKhan ? undefined : state || undefined, onlyKhan, me?.id, {
-          trang, cot, chieu, loaiTicket: loai || undefined,
+          trang, cot, chieu, loaiTicket: loai || undefined, ngtu, ngden,
         })),
     ticketTypes(),
     laAdmin(),
@@ -53,18 +55,23 @@ export default async function TicketsPage({
   // Link bỏ RIÊNG một điều kiện, giữ nguyên điều kiện khác (kể cả cột/chiều đang sắp).
   // state/khan/mine là tab điều hướng riêng (không phải chip ở ThanhDangLoc) nên vẫn
   // giữ nguyên — bỏ "Từ khoá" hay "Loại lỗi" không có nghĩa là rời khỏi tab đang chọn.
-  function hrefBoDieuKien(bo: 'q' | 'loai') {
+  function hrefBoDieuKien(bo: 'q' | 'loai' | 'ngay') {
     const params = new URLSearchParams()
     if (q && bo !== 'q') params.set('q', q)
     if (state) params.set('state', state)
     if (khan) params.set('khan', khan)
     if (mine) params.set('mine', mine)
     if (loai && bo !== 'loai') params.set('loai', loai)
+    if (ngtu && bo !== 'ngay') params.set('ngtu', ngtu)
+    if (ngden && bo !== 'ngay') params.set('ngden', ngden)
     if (cot) params.set('cot', cot)
     if (chieu) params.set('chieu', chieu)
     const qs = params.toString()
     return qs ? `/ticket?${qs}` : '/ticket'
   }
+
+  const { tu: ngTuOk, den: ngDenOk } = docLocNgay({ ngtu, ngden })
+  const moTaNgay = moTaLocNgay(ngTuOk, ngDenOk, 'Ngày tạo')
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -115,9 +122,12 @@ export default async function TicketsPage({
                   trong cột ticket_type, không hardcode. */}
               <BoLocChon param="loai" nhan="Loại lỗi" tuyChon={loaiList.map((l) => ({ giaTri: l, nhan: l }))} />
             </Suspense>
+            <Suspense>
+              <LocNgay nhan="Ngày tạo" />
+            </Suspense>
           </div>
           {admin && (
-            <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
+            <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} ngtu={ngtu} ngden={ngden} />
           )}
         </div>
 
@@ -125,6 +135,7 @@ export default async function TicketsPage({
           dieuKien={[
             ...(q ? [{ nhan: 'Từ khoá', giaTri: q, href: hrefBoDieuKien('q') }] : []),
             ...(loai ? [{ nhan: 'Loại lỗi', giaTri: loai, href: hrefBoDieuKien('loai') }] : []),
+            ...(moTaNgay ? [{ nhan: 'Ngày tạo', giaTri: moTaNgay.replace(/^Ngày tạo\s*[:=]?\s*/, ''), href: hrefBoDieuKien('ngay') }] : []),
           ]}
           hienThi={tickets.length}
           tong={tong}
@@ -140,7 +151,7 @@ export default async function TicketsPage({
           khoaTrang={tickets.map((t) => t.ticket_code)}
           tong={tong}
           bat={admin}
-          thamSo={{ q, state, khan, mine, loai, cot, chieu }}
+          thamSo={{ q, state, khan, mine, loai, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaTicket}
         >
         <ThanhDaChon nhan="ticket" />
