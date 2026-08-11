@@ -1,11 +1,11 @@
-import Link from 'next/link'
 import { Suspense } from 'react'
-import { listKhachHang, khoaTatCaKhachHang, exportCuaToi } from '@/app/actions'
+import { listKhachHang, khoaTatCaKhachHang, exportCuaToi, listBangView } from '@/app/actions'
 import { ExportKhachButton } from '@/components/ExportKhachButton'
 import { ThaoTacHangLoat } from '@/components/ThaoTacHangLoat'
+import { BangKhach } from '@/components/BangKhach'
 import { SUA_HL_KHACH } from '@/lib/danhSach'
-import { OTimKiem, ThanhDangLoc, PhanTrang, TieuDeCotSapXep } from '@/bang'
-import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
+import { OTimKiem, ThanhDangLoc, PhanTrang } from '@/bang'
+import { KhungChon, ThanhDaChon } from '@/bang'
 import { laAdmin } from '@/lib/supabase'
 
 export default async function KhachHangPage({
@@ -15,10 +15,11 @@ export default async function KhachHangPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: list, tong, soTrang, sapXep }, admin, exportDuyet] = await Promise.all([
+  const [{ rows: list, tong, soTrang, sapXep }, admin, exportDuyet, views] = await Promise.all([
     listKhachHang(q, { trang, cot, chieu }),
     laAdmin(),
     exportCuaToi(),
+    listBangView('cs_customers'),
   ])
 
   return (
@@ -52,43 +53,9 @@ export default async function KhachHangPage({
           <ThanhDaChon nhan="khách">
             <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} />
           </ThanhDaChon>
-          <div className="bg-white rounded-xl border overflow-x-auto">
-            <table className="w-full text-sm">
-              <Suspense>
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <OChonTatCa nhan="khách" />
-                    <TieuDeCotSapXep cot="full_name" nhan="Khách" chieuMacDinh="asc" dangMacDinh />
-                    <th className="text-left px-4 py-3 font-medium">SĐT</th>
-                    <th className="text-left px-4 py-3 font-medium">Địa chỉ</th>
-                    <TieuDeCotSapXep cot="province" nhan="Tỉnh/TP" chieuMacDinh="asc" />
-                    <th className="text-right px-4 py-3 font-medium">Máy</th>
-                  </tr>
-                </thead>
-              </Suspense>
-              <tbody className="divide-y">
-                {list.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50 align-top">
-                    <OChonDong khoa={c.id} moTa={`khách ${c.full_name}`} />
-                    <td className="px-4 py-3">
-                      <Link href={`/khach/${c.id}`} prefetch={false} className="text-slate-900 underline font-medium">
-                        {c.full_name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                      {c.primary_phone ?? <span className="text-amber-600">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{c.address ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{c.province ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{c.machines}</td>
-                  </tr>
-                ))}
-                {list.length === 0 && (
-                  <tr><td colSpan={admin ? 6 : 5} className="px-4 py-10 text-center text-slate-400">Không tìm thấy khách nào.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Suspense>
+            <BangKhach rows={list} admin={admin} views={views} />
+          </Suspense>
         </KhungChon>
 
         <Suspense>

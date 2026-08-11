@@ -1886,6 +1886,49 @@ export async function xoaHangLoat(bang: string, ids: string[]) {
   return { ok: true as const, soDong: ids.length }
 }
 
+// ── Tuỳ chỉnh CỘT + lưu view (Đợt C — bang_view) ───────────────────────────
+export type BangView = { id: string; ten: string; chu: string; cot: string[] }
+
+/** View của bảng: view CÁ NHÂN của mình + view CHUNG (mọi người). */
+export async function listBangView(bang: string): Promise<BangView[]> {
+  const u = await requireStaff()
+  const email = u.email ?? ''
+  const { data, error } = await dataClient().from('bang_view')
+    .select('id, ten, chu, cot').eq('bang', bang)
+    .or(`chu.eq.chung,chu.eq.${email}`).order('ten')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as BangView[]
+}
+
+/** Lưu view. chung=true (mọi người thấy) chỉ ADMIN được lưu. */
+export async function luuBangView(bang: string, ten: string, cot: string[], chung: boolean) {
+  const u = await requireStaff()
+  const t = ten.trim()
+  if (!t) return { ok: false as const, error: 'Nhập tên view.' }
+  if (!cot.length) return { ok: false as const, error: 'View phải có ít nhất 1 cột.' }
+  if (chung && !(await laAdmin())) return { ok: false as const, error: 'Chỉ admin lưu view chung.' }
+  const chu = chung ? 'chung' : (u.email ?? '')
+  const { error } = await dataClient().from('bang_view')
+    .insert({ bang, ten: t, chu, cot, tao_boi: u.email ?? null })
+  if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('luu_bang_view', bang, { ten: t, chung })
+  revalidatePath('/khach-hang')
+  return { ok: true as const }
+}
+
+/** Xoá view — chủ view hoặc admin. */
+export async function xoaBangView(id: string) {
+  const u = await requireStaff()
+  const db = dataClient()
+  const { data } = await db.from('bang_view').select('chu').eq('id', id).maybeSingle()
+  const chu = (data as { chu: string } | null)?.chu
+  if (chu !== (u.email ?? '') && !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const { error } = await db.from('bang_view').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/khach-hang')
+  return { ok: true as const }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 2 — nhóm lỗi + báo cáo lãnh đạo / công ty mẹ
 // ─────────────────────────────────────────────────────────────────────────────
