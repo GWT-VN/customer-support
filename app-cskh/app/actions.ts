@@ -8,7 +8,7 @@ import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, type TinhTrangBH,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -1388,6 +1388,86 @@ export async function nhapSerialLo(input: {
   await ghiAudit('nhap_serial_lo', 'serial_registry', { internal_code: ic, tong, them, bo_qua: boQua.length })
   revalidatePath('/serial')
   return { ok: true, kq: { tong, them, boQua } }
+}
+
+// ── Lắp bộ combo (E1): sinh mã bộ + mẹ/con + kích hoạt BH từng con ───────────
+export type LinhKienCombo = { internal_code: string; ten: string | null }
+
+/** Danh sách combo cho ô chọn (đợt đầu chỉ WH15A/WH30A). */
+export async function comboChon(): Promise<{ combo: string; ten: string | null }[]> {
+  await requireStaff()
+  const { data } = await dataClient()
+    .from('product_bundle')
+    .select('"Mã thành phẩm","Tên thành phẩm"')
+    .in('Mã thành phẩm', MA_COMBO as unknown as string[])
+  const rows = (data ?? []) as Record<string, string | null>[]
+  const theo = new Map<string, string | null>()
+  for (const r of rows) {
+    const c = (r['Mã thành phẩm'] ?? '').trim()
+    if (c && !theo.has(c)) theo.set(c, r['Tên thành phẩm'])
+  }
+  return (MA_COMBO as readonly string[])
+    .filter((c) => theo.has(c))
+    .map((combo) => ({ combo, ten: theo.get(combo) ?? null }))
+}
+
+/** Linh kiện THIẾT BỊ của 1 combo (bỏ lõi PP/PAC — không kích hoạt BH). */
+export async function linhKienCombo(combo: string): Promise<LinhKienCombo[]> {
+  await requireStaff()
+  if (!(MA_COMBO as readonly string[]).includes(combo)) return []
+  const { data, error } = await dataClient()
+    .from('product_bundle')
+    .select('"Mã thành phần","Tên thành phần"')
+    .eq('Mã thành phẩm', combo)
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as Record<string, string | null>[]
+  const theo = new Map<string, string | null>()
+  for (const r of rows) {
+    const ic = (r['Mã thành phần'] ?? '').trim()
+    // Lõi PP/PAC (LX-PP-*, LX-PAC-*) là vật tư tiêu hao — không tạo dòng, không BH.
+    if (!ic || /^LX-(PP|PAC)/i.test(ic) || theo.has(ic)) continue
+    theo.set(ic, r['Tên thành phần'])
+  }
+  return [...theo.entries()].map(([internal_code, ten]) => ({ internal_code, ten }))
+}
+
+/**
+ * Lắp bộ combo cho 1 khách (CHỈ ADMIN). Gọi RPC nguyên tử lap_bo_combo:
+ * sinh mã bộ mới + tạo mẹ (nhóm) và con (thiết bị) + kích hoạt BH TỪNG con.
+ */
+export async function lapBoCombo(input: {
+  combo: string
+  customer_id: string
+  install_date: string
+  install_address?: string
+  serials: { internal_code: string; serial: string }[]
+}): Promise<{ ok: true; ma_bo: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(MA_COMBO as readonly string[]).includes(input.combo))
+    return { ok: false, error: 'Combo không hợp lệ (đợt đầu chỉ WH15A/WH30A).' }
+  if (!input.customer_id) return { ok: false, error: 'Chọn khách.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false, error: 'Ngày không hợp lệ.' }
+  const dv = (input.serials ?? []).filter((s) => s.serial?.trim())
+  if (!dv.length) return { ok: false, error: 'Chọn serial cho các thiết bị.' }
+  const set = new Set(dv.map((s) => s.serial.trim()))
+  if (set.size !== dv.length) return { ok: false, error: 'Serial thiết bị bị trùng nhau.' }
+
+  const { data, error } = await dataClient().rpc('lap_bo_combo', {
+    p_combo: input.combo,
+    p_customer: input.customer_id,
+    p_install_date: input.install_date,
+    p_install_address: input.install_address?.trim() || null,
+    p_serials: dv.map((s) => ({ internal_code: s.internal_code, serial: s.serial.trim() })),
+  })
+  if (error) return { ok: false, error: error.message }
+  const maBo = data as string
+  await ghiAudit('lap_bo_combo', `bo:${maBo}`, {
+    combo: input.combo, customer_id: input.customer_id, so_thiet_bi: dv.length,
+  })
+  revalidatePath('/')
+  revalidatePath(`/khach/${input.customer_id}`)
+  return { ok: true, ma_bo: maBo }
 }
 
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────

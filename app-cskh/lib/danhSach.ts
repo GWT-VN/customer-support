@@ -180,6 +180,17 @@ export function tenModel(tenDayDu: string | null, maNoiBo: string): string {
   return duoi || tenDayDu
 }
 
+/**
+ * Mã combo hệ thống lọc tổng (đợt đầu chỉ WH15A/WH30A). Một "bộ" = 1 dòng MẸ
+ * internal_code = combo, các thiết bị là con (parent_serial trỏ về mẹ). BH kích
+ * hoạt ở TỪNG con; mẹ chỉ là dòng nhóm → badge hiện "Bộ" thay vì "Chưa kích hoạt".
+ */
+export const MA_COMBO = ['WH15A', 'WH30A'] as const
+export type MaCombo = (typeof MA_COMBO)[number]
+export function laMaBo(internalCode: string | null | undefined): boolean {
+  return !!internalCode && (MA_COMBO as readonly string[]).includes(internalCode)
+}
+
 export const NGHIA_SAP_XEP: Record<string, { asc: string; desc: string }> = {
   // Ngày tháng — nói rõ đầu nào lên trước, đây là chỗ mũi tên gây hiểu lầm nhất
   install_date: { asc: 'lắp lâu nhất trước', desc: 'lắp gần đây nhất trước' },
