@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { datTrangThaiSerial, thuHoiMay, type SuDungSerial } from '@/app/actions'
+import { datTrangThaiSerial, thuHoiMay, doiMayChoKhach, serialsTheoMay, type SuDungSerial, type SerialKho } from '@/app/actions'
 import { NHAN_TRANG_THAI_SERIAL, TRANG_THAI_KHO_DAT_TAY } from '@/lib/danhSach'
 import { vnDateTime } from '@/components/TicketBadge'
 
@@ -13,15 +13,32 @@ const MAU: Record<string, string> = {
 }
 
 export function VongDoiMay({
-  serial, trangThai, suKien, dangLap, laAdmin,
+  serial, internalCode, trangThai, suKien, dangLap, laAdmin,
 }: {
-  serial: string; trangThai: string | null; suKien: SuDungSerial[]; dangLap: boolean; laAdmin: boolean
+  serial: string; internalCode: string | null; trangThai: string | null
+  suKien: SuDungSerial[]; dangLap: boolean; laAdmin: boolean
 }) {
   const router = useRouter()
   const [den, setDen] = useState('')
   const [ghiChu, setGhiChu] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [moDoi, setMoDoi] = useState(false)
+  const [dsMoi, setDsMoi] = useState<SerialKho[]>([])
+  const [serialMoi, setSerialMoi] = useState('')
+
+  function moDoiMay() {
+    setMoDoi(true); setErr(null)
+    if (internalCode) serialsTheoMay(internalCode).then((r) => setDsMoi(r.filter((s) => s.serial !== serial)))
+  }
+  async function doiMay() {
+    if (!window.confirm(`Đổi máy ${serial} → ${serialMoi} cho khách (máy cũ về bảo trì, BH kế thừa mốc cũ)?`)) return
+    setBusy(true); setErr(null)
+    const r = await doiMayChoKhach(serial, serialMoi, ghiChu || undefined)
+    setBusy(false)
+    if (!r.ok) setErr(r.error)
+    else { setMoDoi(false); setSerialMoi(''); setGhiChu(''); router.refresh() }
+  }
 
   async function datKho() {
     if (!den) return
@@ -53,12 +70,35 @@ export function VongDoiMay({
       {laAdmin && (
         <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
           {dangLap ? (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-sm text-slate-700">Đổi máy khác cho khách → thu hồi máy này về bảo trì</span>
-              <button onClick={thuHoi} disabled={busy}
-                className="rounded-lg border border-amber-300 text-amber-700 px-3 py-1.5 text-sm hover:bg-amber-50 disabled:opacity-50">
-                Thu hồi máy
-              </button>
+            <div className="space-y-2">
+              {!moDoi ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={moDoiMay} disabled={busy}
+                    className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">
+                    Đổi máy cho khách
+                  </button>
+                  <button onClick={thuHoi} disabled={busy}
+                    className="rounded-lg border border-amber-300 text-amber-700 px-3 py-1.5 text-sm hover:bg-amber-50 disabled:opacity-50">
+                    Chỉ thu hồi (không thay máy)
+                  </button>
+                  <span className="text-xs text-slate-400">Máy cũ → bảo trì; BH kế thừa mốc cũ.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {dsMoi.length ? (
+                    <>
+                      <select value={serialMoi} onChange={(e) => setSerialMoi(e.target.value)}
+                        className="rounded-lg border px-3 py-1.5 text-sm bg-white font-mono text-slate-900">
+                        <option value="">— Chọn serial máy MỚI (tồn kho, cùng loại) —</option>
+                        {dsMoi.map((s) => <option key={s.serial} value={s.serial}>{s.serial}</option>)}
+                      </select>
+                      <button onClick={doiMay} disabled={busy || !serialMoi}
+                        className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">Đổi</button>
+                    </>
+                  ) : <span className="text-sm text-amber-700">Không còn serial tồn kho cùng loại để đổi.</span>}
+                  <button onClick={() => setMoDoi(false)} className="text-sm text-slate-500 underline">Huỷ</button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">

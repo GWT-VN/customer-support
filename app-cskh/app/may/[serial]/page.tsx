@@ -90,7 +90,7 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Vòng đời máy</h2>
-          <VongDoiMay serial={m.serial} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
+          <VongDoiMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
             dangLap={!!m.customer_id} laAdmin={admin} />
         </section>
 

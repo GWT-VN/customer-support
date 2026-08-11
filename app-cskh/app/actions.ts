@@ -1621,6 +1621,57 @@ export async function thuHoiMay(serial: string, ghiChu?: string) {
   return { ok: true as const }
 }
 
+/**
+ * Đổi máy khác cho khách (máy cũ lỗi): thu hồi máy CŨ về "bảo trì" + lắp máy MỚI cho
+ * cùng khách, BH **kế thừa mốc cũ** (đổi do lỗi, không mua mới). Một thao tác. CHỈ ADMIN.
+ */
+export async function doiMayChoKhach(serialCu: string, serialMoi: string, ghiChu?: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const cu = serialCu?.trim(); const moi = serialMoi?.trim()
+  if (!moi) return { ok: false as const, error: 'Chọn serial máy mới.' }
+  if (moi === cu) return { ok: false as const, error: 'Serial mới trùng máy cũ.' }
+  const db = dataClient()
+  const { data: ib } = await db.from('installed_base')
+    .select('customer_id, install_address, install_date, internal_code').eq('serial', cu).maybeSingle()
+  const c = ib as { customer_id: string | null; install_address: string | null; install_date: string | null; internal_code: string | null } | null
+  if (!c) return { ok: false as const, error: 'Không thấy máy cũ đã lắp.' }
+  if (!c.customer_id) return { ok: false as const, error: 'Máy cũ chưa gắn khách — dùng "đặt trạng thái kho".' }
+  const { count } = await db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('parent_serial', cu)
+  if ((count ?? 0) > 0) return { ok: false as const, error: `Máy cũ là bộ MẸ của ${count} thiết bị — xử lý con trước.` }
+  const { data: reg } = await db.from('serial_registry').select('internal_code, model').eq('serial', moi).maybeSingle()
+  const r = reg as { internal_code: string | null; model: string | null } | null
+  if (!r) return { ok: false as const, error: `Serial ${moi} không có trong kho.` }
+  const { data: daLap } = await db.from('installed_base').select('customer_id').eq('serial', moi).maybeSingle()
+  if ((daLap as { customer_id: string | null } | null)?.customer_id) return { ok: false as const, error: `Serial ${moi} đã lắp cho khách khác.` }
+
+  const { data: bhCu } = await db.from('warranty').select('start_date').eq('serial', cu).maybeSingle()
+  const mocBH = (bhCu as { start_date: string | null } | null)?.start_date ?? c.install_date   // kế thừa mốc BH cũ
+  const khach = c.customer_id
+
+  // 1) Thu hồi máy cũ -> bảo trì (gỡ khách, KHÔNG xoá để giữ ticket/lịch sử)
+  const { error: e1 } = await db.from('installed_base')
+    .update({ customer_id: null, status: 'thu_hoi', updated_at: new Date().toISOString() }).eq('serial', cu)
+  if (e1) return { ok: false as const, error: e1.message }
+  await ghiSuDung(db, { serial: cu, su_kien: 'doi_may_thu_hoi', tu: 'da_lap', den: 'bao_tri', customer_id: khach, ghi_chu: `Đổi sang ${moi}. ${ghiChu ?? ''}`.trim() })
+
+  // 2) Lắp máy mới cho khách, BH kế thừa mốc cũ
+  const { error: e2 } = await db.from('installed_base').upsert({
+    serial: moi, internal_code: r.internal_code, model_freetext: r.model,
+    customer_id: khach, install_date: mocBH, install_address: c.install_address,
+    channel_source: 'CSKH đổi máy', status: 'active',
+  }, { onConflict: 'serial' })
+  if (e2) return { ok: false as const, error: e2.message }
+  if (mocBH) await db.rpc('activate_warranty', { p_serial: moi, p_start: mocBH })
+  await ghiSuDung(db, { serial: moi, su_kien: 'doi_may_lap_moi', tu: 'ton_kho', den: 'da_lap', customer_id: khach, ghi_chu: `Thay cho ${cu}, kế thừa BH ${mocBH ?? '—'}` })
+  await ghiAudit('doi_may', `serial:${cu}->${moi}`, { khach, moc_bh: mocBH })
+  revalidatePath('/')
+  revalidatePath(`/may/${encodeURIComponent(cu)}`)
+  revalidatePath(`/may/${encodeURIComponent(moi)}`)
+  revalidatePath(`/khach/${khach}`)
+  return { ok: true as const, ma_moi: moi }
+}
+
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────
 export type KhachTom = {
   id: string; full_name: string; primary_phone: string | null; trang_thai: string
