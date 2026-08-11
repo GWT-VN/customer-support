@@ -185,6 +185,14 @@ export function tenModel(tenDayDu: string | null, maNoiBo: string): string {
  * internal_code = combo, các thiết bị là con (parent_serial trỏ về mẹ). BH kích
  * hoạt ở TỪNG con; mẹ chỉ là dòng nhóm → badge hiện "Bộ" thay vì "Chưa kích hoạt".
  */
+/** Trạng thái sử dụng của 1 serial (vòng đời máy). */
+export const NHAN_TRANG_THAI_SERIAL: Record<string, string> = {
+  ton_kho: 'Tồn kho', da_lap: 'Đã lắp (khách)', trung_bay: 'Trưng bày',
+  mkt: 'Marketing/Quay', bao_tri: 'Thu hồi bảo trì', thanh_ly: 'Thanh lý',
+}
+/** Các trạng thái KHO có thể đặt tay cho máy chưa gắn khách (không gồm da_lap). */
+export const TRANG_THAI_KHO_DAT_TAY = ['ton_kho', 'trung_bay', 'mkt', 'bao_tri', 'thanh_ly'] as const
+
 export const MA_COMBO = ['WH15A', 'WH30A'] as const
 export type MaCombo = (typeof MA_COMBO)[number]
 export function laMaBo(internalCode: string | null | undefined): boolean {

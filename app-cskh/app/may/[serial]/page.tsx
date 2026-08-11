@@ -1,18 +1,22 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
-import { getMachine, ticketsOfSerial } from '@/app/actions'
+import { getMachine, ticketsOfSerial, lichSuSerial } from '@/app/actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
 import { SuaMayDaLap } from '@/components/SuaMayDaLap'
+import { VongDoiMay } from '@/components/VongDoiMay'
+import { laAdmin } from '@/lib/supabase'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
-  const tickets = await ticketsOfSerial(m.serial)
+  const [tickets, vongDoi, admin] = await Promise.all([
+    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laAdmin(),
+  ])
 
   // Chỉ chứa DỮ LIỆU, không chứa JSX — cách hiển thị do chỗ render quyết định.
   // (Để JSX trong mảng thì eslint react/jsx-key báo lỗi, dù ở đây không cần key.)
@@ -82,6 +86,12 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
             activated={m.warranty_activated}
             hasPolicy={m.co_chinh_sach_bh}
           />
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Vòng đời máy</h2>
+          <VongDoiMay serial={m.serial} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
+            dangLap={!!m.customer_id} laAdmin={admin} />
         </section>
 
         <section className="bg-white rounded-xl border p-5">
