@@ -2243,6 +2243,47 @@ export async function ticketTypes(): Promise<string[]> {
   return [...new Set((data ?? []).map((r) => (r as { ticket_type: string }).ticket_type))].sort()
 }
 
+// ── Data cần dọn (gộp: ticket thiếu máy/khách · khách cần dọn · bộ thiếu con) ──
+export type TicketThieu = {
+  ticket_code: string; created_at: string; customer_id: string | null
+  customer_name: string | null; serial: string | null; source_serial: string | null; thieu: string
+}
+export type BoThieuCon = { ma_bo: string; combo: string | null; customer_name: string | null; so_con: number }
+
+/** Ticket thiếu MÁY (không serial trong hệ) hoặc thiếu KHÁCH — cần bổ sung. */
+export async function ticketThieuData(limit = 300): Promise<TicketThieu[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('v_tickets').select('ticket_code, created_at, customer_id, customer_name, serial, source_serial')
+    .or('serial.is.null,customer_id.is.null')
+    .order('created_at', { ascending: false }).limit(limit)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as Record<string, unknown>[]).map((t) => ({
+    ticket_code: t.ticket_code as string, created_at: t.created_at as string,
+    customer_id: (t.customer_id as string) ?? null, customer_name: (t.customer_name as string) ?? null,
+    serial: (t.serial as string) ?? null, source_serial: (t.source_serial as string) ?? null,
+    thieu: [!t.customer_id ? 'khách' : null, !t.serial ? 'máy' : null].filter(Boolean).join(' + '),
+  }))
+}
+
+/** Bộ combo (WH15A/WH30A/ECO) chưa đủ 3 thiết bị con — cần bổ sung serial thiết bị. */
+export async function boComboThieuCon(): Promise<BoThieuCon[]> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: ib }, { data: me }] = await Promise.all([
+    db.from('installed_base').select('parent_serial'),
+    db.from('v_installed_base').select('serial, internal_code, customer_name'),
+  ])
+  const demCon = new Map<string, number>()
+  for (const r of (ib ?? []) as { parent_serial: string | null }[]) {
+    if (r.parent_serial) demCon.set(r.parent_serial, (demCon.get(r.parent_serial) ?? 0) + 1)
+  }
+  return ((me ?? []) as { serial: string; internal_code: string | null; customer_name: string | null }[])
+    .filter((m) => demCon.has(m.serial) && (demCon.get(m.serial) ?? 0) < 3)
+    .map((m) => ({ ma_bo: m.serial, combo: m.internal_code, customer_name: m.customer_name, so_con: demCon.get(m.serial) ?? 0 }))
+    .sort((a, b) => a.so_con - b.so_con)
+}
+
 /** Khách cần dọn: thiếu/lỗi SĐT HOẶC thiếu địa chỉ. Di trú Odoo không lấp được, phải sửa tay. */
 export async function listToFix(
   q = '',
