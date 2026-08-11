@@ -55,6 +55,7 @@ def doc_het(url, key, res):
 
 HEAD = PatternFill("solid", fgColor="1F4E79")
 XANH = PatternFill("solid", fgColor="E2EFDA")   # bộ mới
+DO = PatternFill("solid", fgColor="FFC7CE")     # bộ thiếu con
 
 
 def bang(ws, headers, widths, rows, to_mau=None):
@@ -92,13 +93,18 @@ def main():
         if r.get("parent_serial"):
             con_theo_me.setdefault(r["parent_serial"], []).append(r)
 
-    rows, tomtat = [], {}
+    DU_CON = 3   # bộ combo cần đủ 3 thiết bị con (WH15A/WH30A: 3 máy · ECO: mềm + 2×UPF10)
+
+    rows, tomtat, thieu = [], {}, []
     for me in sorted((r for r in ib if r["serial"] in cha), key=lambda x: x["serial"]):
         kieu = "mới" if RE_MOI.match(me["serial"]) else "cũ"
         combo = me.get("internal_code") or "—"
         tomtat[(combo, kieu)] = tomtat.get((combo, kieu), 0) + 1
         k = kh.get(me.get("customer_id")) or {}
-        for c in sorted(con_theo_me.get(me["serial"], []), key=lambda x: x.get("internal_code") or ""):
+        cons = sorted(con_theo_me.get(me["serial"], []), key=lambda x: x.get("internal_code") or "")
+        so_con = len(cons)
+        du = so_con >= DU_CON
+        for c in cons:
             w = wr.get(c["serial"]) or {}
             rows.append([
                 me["serial"], kieu, combo,
@@ -106,20 +112,30 @@ def main():
                 c.get("internal_code"), c["serial"],
                 w.get("full_end"), w.get("core_end"),
                 "có" if w.get("activated") else "KHÔNG",
+                "" if du else f"THIẾU ({so_con}/{DU_CON})",
+            ])
+        if not du:
+            thieu.append([
+                me["serial"], combo, k.get("full_name"), k.get("primary_phone"),
+                so_con, ", ".join(c.get("internal_code") or "?" for c in cons) or "—",
             ])
 
     wb = Workbook(); wb.remove(wb.active)
     bang(wb.create_sheet("Bộ (mẹ+con)"),
          ["Mã bộ", "Kiểu", "Combo", "Khách", "SĐT", "Ngày lắp",
-          "Thiết bị (mã)", "Serial con", "BH máy hết", "BH lõi hết", "Con có BH?"],
-         [20, 7, 10, 26, 14, 12, 16, 22, 12, 12, 10], rows,
-         to_mau=lambda r: XANH if r[1] == "mới" else None)
+          "Thiết bị (mã)", "Serial con", "BH máy hết", "BH lõi hết", "Con có BH?", "Thiếu con?"],
+         [20, 7, 10, 26, 14, 12, 16, 22, 12, 12, 10, 14], rows,
+         to_mau=lambda r: DO if r[11] else (XANH if r[1] == "mới" else None))
+    bang(wb.create_sheet("Bộ THIẾU con"),
+         ["Mã bộ", "Combo", "Khách", "SĐT", "Số con", "Thiết bị đang có (bổ sung phần thiếu)"],
+         [20, 10, 26, 14, 8, 40], sorted(thieu, key=lambda r: (r[2] or "")),
+         to_mau=lambda r: DO)
     tt_rows = sorted([[c, k, n] for (c, k), n in tomtat.items()], key=lambda r: (r[0], r[1]))
     bang(wb.create_sheet("Tóm tắt"), ["Combo", "Kiểu", "Số bộ"], [12, 8, 10], tt_rows)
     wb.save(out)
 
     n_bo = len(cha); n_moi = sum(1 for s in cha if RE_MOI.match(s))
-    print(f"Tổng bộ: {n_bo} (mới: {n_moi} · cũ: {n_bo - n_moi}) · dòng thiết bị: {len(rows)}")
+    print(f"Tổng bộ: {n_bo} (mới: {n_moi} · cũ: {n_bo - n_moi}) · dòng thiết bị: {len(rows)} · BỘ THIẾU con: {len(thieu)}")
     print(f"-> {out}")
 
 
