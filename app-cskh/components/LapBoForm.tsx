@@ -14,19 +14,19 @@ const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 /** Ô chọn serial tồn kho cho 1 thiết bị của bộ (lọc theo mã nội bộ, chưa kích hoạt BH).
  *  Chọn từ danh sách HOẶC gõ số CUỐI để tìm (gõ 123 -> ưu tiên serial kết thúc 123). */
 function ChonSerialThietBi({
-  lk, value, onChange,
-}: { lk: LinhKienCombo; value: string; onChange: (serial: string) => void }) {
+  internalCode, ten, value, onChange,
+}: { internalCode: string; ten: string | null; value: string; onChange: (serial: string) => void }) {
   const [ds, setDs] = useState<SerialKho[]>([])
   const [tai, setTai] = useState(true)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-  // Keyed theo internal_code ở parent -> mỗi thiết bị là một instance riêng, effect
-  // chỉ chạy 1 lần lúc mount. Không setState đồng bộ trong thân effect (eslint chặn).
+  // Keyed theo slot ở parent -> mỗi thiết bị là một instance riêng, effect chỉ chạy 1
+  // lần lúc mount. Không setState đồng bộ trong thân effect (eslint chặn).
   useEffect(() => {
     let song = true
-    serialsTheoMay(lk.internal_code).then((r) => { if (song) { setDs(r); setTai(false) } })
+    serialsTheoMay(internalCode).then((r) => { if (song) { setDs(r); setTai(false) } })
     return () => { song = false }
-  }, [lk.internal_code])
+  }, [internalCode])
 
   const kq = q.trim().toLowerCase()
   const loc = (kq
@@ -46,8 +46,8 @@ function ChonSerialThietBi({
 
   return (
     <div className="rounded-lg border p-3 bg-white space-y-1">
-      <div className="text-sm font-medium text-slate-800">{lk.ten ?? lk.internal_code}</div>
-      <div className="font-mono text-[11px] text-slate-400">{lk.internal_code}</div>
+      <div className="text-sm font-medium text-slate-800">{ten ?? internalCode}</div>
+      <div className="font-mono text-[11px] text-slate-400">{internalCode}</div>
       {tai ? (
         <p className="text-xs text-slate-400">Đang tải serial…</p>
       ) : ds.length === 0 ? (
@@ -104,8 +104,16 @@ export function LapBoForm() {
     setKhachId(id); setKhachAddr(k?.address ?? null)
   }
 
+  // Mở rộng linh kiện thành SLOT theo số lượng (ECO có 2× UPF10 -> 2 slot cùng mã).
+  const slots = useMemo(() => linhKien.flatMap((lk) =>
+    Array.from({ length: lk.so_luong }, (_, i) => ({
+      key: `${lk.internal_code}#${i}`,
+      internal_code: lk.internal_code,
+      ten: lk.so_luong > 1 ? `${lk.ten ?? lk.internal_code} (${i + 1}/${lk.so_luong})` : lk.ten,
+    }))), [linhKien])
+
   const dcLapCuoi = dungDcKhach ? (khachAddr ?? '') : dcLap
-  const duSerial = linhKien.length > 0 && linhKien.every((lk) => (chon[lk.internal_code] ?? '').trim())
+  const duSerial = slots.length > 0 && slots.every((s) => (chon[s.key] ?? '').trim())
   const sanSang = !!combo && !!khachId && duSerial && /^\d{4}-\d{2}-\d{2}$/.test(ngay)
 
   const tienMa = useMemo(() => {
@@ -119,7 +127,7 @@ export function LapBoForm() {
     const r = await lapBoCombo({
       combo, customer_id: khachId, install_date: ngay,
       install_address: dcLapCuoi.trim() || undefined,
-      serials: linhKien.map((lk) => ({ internal_code: lk.internal_code, serial: chon[lk.internal_code] })),
+      serials: slots.map((s) => ({ internal_code: s.internal_code, serial: chon[s.key] })),
     })
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
@@ -144,14 +152,14 @@ export function LapBoForm() {
         {tienMa && <p className="text-xs text-slate-400 mt-1">Mã bộ sẽ sinh dạng <span className="font-mono">{tienMa.replace('###', 'xxx')}</span></p>}
       </div>
 
-      {/* 2. Serial từng thiết bị */}
-      {linhKien.length > 0 && (
+      {/* 2. Serial từng thiết bị (mỗi slot 1 serial; ECO có 2× UPF10) */}
+      {slots.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700">2. Serial thiết bị ({linhKien.length})</label>
-          {linhKien.map((lk) => (
-            <ChonSerialThietBi key={lk.internal_code} lk={lk}
-              value={chon[lk.internal_code] ?? ''}
-              onChange={(s) => setChon((p) => ({ ...p, [lk.internal_code]: s }))} />
+          <label className="text-sm font-medium text-slate-700">2. Serial thiết bị ({slots.length})</label>
+          {slots.map((s) => (
+            <ChonSerialThietBi key={s.key} internalCode={s.internal_code} ten={s.ten}
+              value={chon[s.key] ?? ''}
+              onChange={(v) => setChon((p) => ({ ...p, [s.key]: v }))} />
           ))}
         </div>
       )}

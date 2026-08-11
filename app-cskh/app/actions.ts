@@ -1413,7 +1413,7 @@ export async function nhapSerialBang(input: {
 }
 
 // ── Lắp bộ combo (E1): sinh mã bộ + mẹ/con + kích hoạt BH từng con ───────────
-export type LinhKienCombo = { internal_code: string; ten: string | null }
+export type LinhKienCombo = { internal_code: string; ten: string | null; so_luong: number }
 
 /** Danh sách combo cho ô chọn (đợt đầu chỉ WH15A/WH30A). */
 export async function comboChon(): Promise<{ combo: string; ten: string | null }[]> {
@@ -1433,24 +1433,28 @@ export async function comboChon(): Promise<{ combo: string; ten: string | null }
     .map((combo) => ({ combo, ten: theo.get(combo) ?? null }))
 }
 
-/** Linh kiện THIẾT BỊ của 1 combo (bỏ lõi PP/PAC — không kích hoạt BH). */
+/** Linh kiện THIẾT BỊ của 1 combo (bỏ lõi PP/PAC — không kích hoạt BH). Kèm số lượng
+ *  (ECO có 2× UPF10 -> cần 2 serial). */
 export async function linhKienCombo(combo: string): Promise<LinhKienCombo[]> {
   await requireStaff()
   if (!(MA_COMBO as readonly string[]).includes(combo)) return []
   const { data, error } = await dataClient()
     .from('product_bundle')
-    .select('"Mã thành phần","Tên thành phần"')
+    .select('"Mã thành phần","Tên thành phần","Số lượng"')
     .eq('Mã thành phẩm', combo)
   if (error) throw new Error(error.message)
   const rows = (data ?? []) as Record<string, string | null>[]
-  const theo = new Map<string, string | null>()
+  const theo = new Map<string, { ten: string | null; sl: number }>()
   for (const r of rows) {
     const ic = (r['Mã thành phần'] ?? '').trim()
     // Lõi PP/PAC (LX-PP-*, LX-PAC-*) là vật tư tiêu hao — không tạo dòng, không BH.
-    if (!ic || /^LX-(PP|PAC)/i.test(ic) || theo.has(ic)) continue
-    theo.set(ic, r['Tên thành phần'])
+    if (!ic || /^LX-(PP|PAC)/i.test(ic)) continue
+    const sl = Math.max(1, Math.round(Number(r['Số lượng']) || 1))
+    const cu = theo.get(ic)
+    if (cu) cu.sl += sl
+    else theo.set(ic, { ten: r['Tên thành phần'], sl })
   }
-  return [...theo.entries()].map(([internal_code, ten]) => ({ internal_code, ten }))
+  return [...theo.entries()].map(([internal_code, v]) => ({ internal_code, ten: v.ten, so_luong: v.sl }))
 }
 
 /**
@@ -1467,7 +1471,7 @@ export async function lapBoCombo(input: {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
   if (!(MA_COMBO as readonly string[]).includes(input.combo))
-    return { ok: false, error: 'Combo không hợp lệ (đợt đầu chỉ WH15A/WH30A).' }
+    return { ok: false, error: 'Combo không hợp lệ.' }
   if (!input.customer_id) return { ok: false, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false, error: 'Ngày không hợp lệ.' }
   const dv = (input.serials ?? []).filter((s) => s.serial?.trim())

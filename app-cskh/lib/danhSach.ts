@@ -193,7 +193,7 @@ export const NHAN_TRANG_THAI_SERIAL: Record<string, string> = {
 /** Các trạng thái KHO có thể đặt tay cho máy chưa gắn khách (không gồm da_lap). */
 export const TRANG_THAI_KHO_DAT_TAY = ['ton_kho', 'trung_bay', 'mkt', 'bao_tri', 'thanh_ly'] as const
 
-export const MA_COMBO = ['WH15A', 'WH30A'] as const
+export const MA_COMBO = ['WH15A', 'WH30A', 'WH15AECO', 'WH30AECO'] as const
 export type MaCombo = (typeof MA_COMBO)[number]
 export function laMaBo(internalCode: string | null | undefined): boolean {
   return !!internalCode && (MA_COMBO as readonly string[]).includes(internalCode)
