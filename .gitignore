@@ -79,3 +79,6 @@ Phiếu theo dõi/GWT_*.xlsx
 
 # File theo dõi nội bộ — chứa PII khách, KHÔNG commit
 docs/CHECKLIST.md
+
+# Output đối chiếu khách (có PII) — không commit
+migrate/_out/
