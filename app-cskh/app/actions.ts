@@ -1012,13 +1012,23 @@ export async function updateTicket(
   patch: {
     state?: string; last_note?: string; khan?: boolean
     cs_phu_trach?: string | null; ky_thuat?: string | null
+    ticket_type?: string; description?: string
   }
 ) {
   await requireStaff()
   if (patch.state && !['Open', 'Done', 'Cancel'].includes(patch.state)) {
     return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
   }
-  const { error } = await dataClient().from('tickets').update(patch).eq('ticket_code', code)
+  if (patch.ticket_type !== undefined && !patch.ticket_type.trim()) {
+    return { ok: false as const, error: 'Phân loại không được trống.' }
+  }
+  if (patch.description !== undefined && !patch.description.trim()) {
+    return { ok: false as const, error: 'Mô tả không được trống.' }
+  }
+  const p = { ...patch }
+  if (p.ticket_type !== undefined) p.ticket_type = p.ticket_type.trim()
+  if (p.description !== undefined) p.description = p.description.trim()
+  const { error } = await dataClient().from('tickets').update(p).eq('ticket_code', code)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath('/ticket')
   revalidatePath(`/ticket/${code}`)
@@ -2180,6 +2190,8 @@ export async function createTicket(input: {
   ky_thuat?: string | null
 }) {
   await requireStaff()
+  if (!input.customer_id?.trim()) return { ok: false as const, error: 'Bắt buộc chọn khách.' }
+  if (!input.serial?.trim()) return { ok: false as const, error: 'Bắt buộc chọn serial máy báo lỗi (máy của khách).' }
   if (!input.ticket_type?.trim()) return { ok: false as const, error: 'Chọn loại ticket.' }
   if (!input.description?.trim()) return { ok: false as const, error: 'Nhập mô tả sự cố.' }
   if (input.state && !['Open', 'Done', 'Cancel'].includes(input.state)) {
@@ -2187,17 +2199,19 @@ export async function createTicket(input: {
   }
 
   const db = dataClient()
-  const yy = String(new Date().getFullYear()).slice(2)
-
-  // lấy số lớn nhất của năm nay rồi +1 (mã GWT-YYnnnn)
+  // Mã MỚI: TK-YYMM-NNN (STT 3 số reset theo tháng). Mã cũ GWT-… giữ nguyên.
+  // Dùng ngày tạo (ca backdate) để mã đúng tháng; parse chuỗi tránh lệch múi giờ.
+  const isoNgay = input.created_at?.trim() ? input.created_at.trim().slice(0, 10) : new Date().toISOString().slice(0, 10)
+  const [yFull, mm] = isoNgay.split('-')
+  const prefix = `TK-${yFull.slice(2)}${mm}-`
   const { data: last, error: e1 } = await db
     .from('tickets').select('ticket_code')
-    .like('ticket_code', `GWT-${yy}%`)
+    .like('ticket_code', `${prefix}%`)
     .order('ticket_code', { ascending: false }).limit(1)
   if (e1) return { ok: false as const, error: e1.message }
 
-  const next = last?.length ? parseInt(last[0].ticket_code.slice(-4), 10) + 1 : 1
-  const code = `GWT-${yy}${String(next).padStart(4, '0')}`
+  const next = last?.length ? parseInt(last[0].ticket_code.slice(prefix.length), 10) + 1 : 1
+  const code = `${prefix}${String(next).padStart(3, '0')}`
 
   const row: Record<string, unknown> = {
     ticket_code: code,

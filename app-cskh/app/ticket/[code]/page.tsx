@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
@@ -13,9 +13,9 @@ import { vnDate } from '@/components/Badge'
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items, me, catalog] = await Promise.all([
+  const [t, nhom, notes, staff, items, me, catalog, loaiList] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
-    listCatalogItems(),
+    listCatalogItems(), ticketTypes(),
   ])
   if (!t) notFound()
 
@@ -139,6 +139,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           <h2 className="font-medium text-slate-900 mb-3">Xử lý</h2>
           <TicketEditor
             code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note}
+            ticketType={t.ticket_type} description={t.description} loaiList={loaiList}
             staff={staff} csId={t.cs_phu_trach} ktId={t.ky_thuat}
             defaultCsId={defaultCsId} defaultKtId={defaultKtId}
           />

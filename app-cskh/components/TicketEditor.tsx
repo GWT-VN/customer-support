@@ -15,6 +15,9 @@ export function TicketEditor({
   state,
   khan,
   lastNote,
+  ticketType,
+  description,
+  loaiList = [],
   staff,
   csId,
   ktId,
@@ -25,6 +28,9 @@ export function TicketEditor({
   state: string
   khan: boolean
   lastNote: string | null
+  ticketType: string | null
+  description: string | null
+  loaiList?: string[]
   staff: Staff[]
   csId: string | null
   ktId: string | null
@@ -35,6 +41,8 @@ export function TicketEditor({
   const [st, setSt] = useState(state)
   const [kh, setKh] = useState(khan)
   const [note, setNote] = useState(lastNote ?? '')
+  const [loai, setLoai] = useState(ticketType ?? '')
+  const [moTa, setMoTa] = useState(description ?? '')
   const [cs, setCs] = useState(csId ?? defaultCsId ?? '')
   const [kt, setKt] = useState(ktId ?? defaultKtId ?? '')
   const [busy, setBusy] = useState(false)
@@ -43,9 +51,10 @@ export function TicketEditor({
   const router = useRouter()
 
   async function save() {
+    if (!loai.trim() || !moTa.trim()) { setErr('Phân loại và Mô tả không được trống.'); return }
     setBusy(true); setErr(null); setMsg(null)
     const r = await updateTicket(code, {
-      state: st, khan: kh, last_note: note,
+      state: st, khan: kh, last_note: note, ticket_type: loai, description: moTa,
       cs_phu_trach: cs || null, ky_thuat: kt || null,
     })
     setBusy(false)
@@ -55,6 +64,20 @@ export function TicketEditor({
 
   return (
     <div className="space-y-3">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="block">
+          <span className="text-sm text-slate-700">Phân loại *</span>
+          <input value={loai} onChange={(e) => setLoai(e.target.value)} list="loai-ticket-edit"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+          <datalist id="loai-ticket-edit">{loaiList.map((l) => <option key={l} value={l} />)}</datalist>
+        </label>
+      </div>
+      <label className="block">
+        <span className="text-sm text-slate-700">Mô tả khách báo *</span>
+        <textarea value={moTa} onChange={(e) => setMoTa(e.target.value)} rows={3}
+          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+      </label>
+
       <div>
         <span className="text-sm text-slate-700">Trạng thái</span>
         <div className="mt-1 flex gap-2">

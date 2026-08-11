@@ -59,7 +59,7 @@ export function TaoTicketForm({ loaiList, staff }: { loaiList: string[]; staff: 
       </div>
 
       <div>
-        <label className="text-sm font-medium text-slate-700">2. Máy của khách (serial)</label>
+        <label className="text-sm font-medium text-slate-700">2. Máy của khách (serial) *</label>
         {may === null ? (
           <p className="text-xs text-slate-400 mt-1">
             {dangTaiMay ? 'Đang tải máy của khách…' : 'Chọn khách trước để hiện máy của họ.'}
@@ -73,7 +73,7 @@ export function TaoTicketForm({ loaiList, staff }: { loaiList: string[]; staff: 
         ) : (
           <select value={serial} onChange={(e) => setSerial(e.target.value)}
             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 bg-white">
-            <option value="">— Chọn máy (tuỳ chọn) —</option>
+            <option value="">— Chọn máy báo lỗi (bắt buộc) —</option>
             {may.map((m) => (
               <option key={m.serial} value={m.serial}>
                 {m.product_name ?? m.internal_code} · {m.serial}{m.warranty_activated ? '' : ' (chưa kích hoạt)'}
@@ -149,7 +149,7 @@ export function TaoTicketForm({ loaiList, staff }: { loaiList: string[]; staff: 
       </label>
 
       <div className="flex items-center gap-3">
-        <button onClick={luu} disabled={busy || !khachId || !loai.trim() || !moTa.trim()}
+        <button onClick={luu} disabled={busy || !khachId || !serial.trim() || !loai.trim() || !moTa.trim()}
           className="rounded-lg bg-slate-900 text-white px-5 py-2.5 font-medium disabled:opacity-50">
           {busy ? 'Đang tạo…' : 'Tạo ticket'}
         </button>
