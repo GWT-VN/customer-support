@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, type Ticket } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { StateBadge, KhanBadge, MayThieuBadge, vnDateTime } from '@/components/TicketBadge'
-import { ExportButton } from '@/components/ExportButton'
+import { ExportTicketButton } from '@/components/ExportTicketButton'
 import { laAdmin } from '@/lib/supabase'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
@@ -117,7 +117,7 @@ export default async function TicketsPage({
             </Suspense>
           </div>
           {admin && (
-            <ExportButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
+            <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} />
           )}
         </div>
 

@@ -7,7 +7,7 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
-  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, type TinhTrangBH,
+  TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, type TinhTrangBH,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -1654,6 +1654,28 @@ export async function ticketsCsv(
     t.product_name, t.cs_ten, t.ky_thuat_ten, t.description,
   ].map(esc).join(','))
   return '﻿' + [head.join(','), ...lines].join('\n')  // BOM để Excel đọc đúng UTF-8
+}
+
+/** Xuất ticket theo CÁC CỘT được chọn (CHỈ ADMIN). Trả CSV (không BOM — client UTF-16LE). */
+export async function xuatTicket(
+  q: string, state: string | undefined, onlyKhan: boolean, mine: boolean, cot: string[]
+): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const mineId = mine ? (await currentStaff())?.id : undefined
+  const { rows } = await searchTickets(q, state, onlyKhan, mineId)
+  const cols = XUAT_TICKET_COT.filter((c) => cot.includes(c.key))
+  const gt = (t: Record<string, unknown>, key: string): string => {
+    if (key === 'created_at') return String(t.created_at ?? '').slice(0, 10)
+    if (key === 'khan') return t.khan ? 'Khẩn' : ''
+    if (key === 'serial') return String(t.serial ?? t.source_serial ?? '')
+    const v = t[key]
+    return v == null ? '' : String(v)
+  }
+  const lines = [cols.map((c) => oCsv(c.nhan)).join(',')]
+  for (const t of rows) lines.push(cols.map((c) => oCsv(gt(t as unknown as Record<string, unknown>, c.key))).join(','))
+  await ghiAudit('export_ticket', 'tickets', { q, cot: cols.map((c) => c.key), so_dong: rows.length })
+  return { ok: true, csv: lines.join('\r\n') }
 }
 
 /** Tạo ticket mới. Mã tự sinh GWT-YYnnnn theo năm hiện tại. */

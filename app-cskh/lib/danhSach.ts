@@ -51,6 +51,23 @@ export const XUAT_KHACH_COT: readonly { key: string; nhan: string; pii: boolean 
 ]
 /** Trường bật sẵn khi mở ô chọn export. */
 export const XUAT_KHACH_MAC_DINH = ['full_name', 'primary_phone', 'province']
+
+/** Cột xuất của bảng TICKET (export chỉ admin nên không gate PII riêng). */
+export const XUAT_TICKET_COT: readonly { key: string; nhan: string; pii?: boolean }[] = [
+  { key: 'ticket_code', nhan: 'Mã' },
+  { key: 'created_at', nhan: 'Ngày' },
+  { key: 'state', nhan: 'Trạng thái' },
+  { key: 'khan', nhan: 'Khẩn' },
+  { key: 'ticket_type', nhan: 'Loại' },
+  { key: 'customer_name', nhan: 'Khách' },
+  { key: 'primary_phone', nhan: 'SĐT' },
+  { key: 'serial', nhan: 'Serial' },
+  { key: 'product_name', nhan: 'Máy' },
+  { key: 'cs_ten', nhan: 'CS' },
+  { key: 'ky_thuat_ten', nhan: 'Kỹ thuật' },
+  { key: 'description', nhan: 'Mô tả' },
+]
+export const XUAT_TICKET_MAC_DINH = ['ticket_code', 'created_at', 'state', 'ticket_type', 'customer_name', 'serial', 'product_name']
 export const COT_BAO_TRI = ['due_date', 'customer_name'] as const
 
 /**
