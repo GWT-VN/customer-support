@@ -6,6 +6,7 @@ import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe, type V
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
+import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -843,6 +844,145 @@ export async function unmarkMaintenanceDone(visitId: string) {
   if (error) return { ok: false as const, error: error.message }
   revalidatePath('/bao-tri')
   return { ok: true as const }
+}
+
+// ── Đợt 1: nền lịch bảo trì tự động + map khách bảo trì với khách kích hoạt máy ──
+
+/** 9 số cuối để so SĐT (bỏ mã vùng/0 đầu, mọi ký tự không phải số). */
+function soDienThoaiChuan(s: string | null | undefined): string {
+  const d = (s ?? '').replace(/\D/g, '')
+  return d.length >= 9 ? d.slice(-9) : d
+}
+
+export type PlanChuaMap = {
+  id: string; bo_may: string | null; loai_goi: string | null
+  tong_lan: number | null; chu_ky_thang: number | null
+  source_customer_name: string | null; source_phone: string | null
+  goi_y_id: string | null; goi_y_ten: string | null; goi_y_sdt: string | null
+}
+
+/** Plan bảo trì CHƯA map khách + gợi ý khách khớp SĐT (9 số cuối). */
+export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: plans }, { data: khach }] = await Promise.all([
+    db.from('maintenance_plan')
+      .select('id, bo_may, loai_goi, tong_lan, chu_ky_thang, source_customer_name, source_phone')
+      .is('customer_id', null).order('source_customer_name'),
+    db.from('cs_customers').select('id, full_name, primary_phone'),
+  ])
+  const theoSdt = new Map<string, { id: string; ten: string; sdt: string }>()
+  for (const k of (khach ?? []) as { id: string; full_name: string; primary_phone: string | null }[]) {
+    const key = soDienThoaiChuan(k.primary_phone)
+    if (key && !theoSdt.has(key)) theoSdt.set(key, { id: k.id, ten: k.full_name, sdt: k.primary_phone ?? '' })
+  }
+  type PlanRow = Omit<PlanChuaMap, 'goi_y_id' | 'goi_y_ten' | 'goi_y_sdt'>
+  return ((plans ?? []) as PlanRow[]).map((p) => {
+    const g = theoSdt.get(soDienThoaiChuan(p.source_phone))
+    return { ...p, goi_y_id: g?.id ?? null, goi_y_ten: g?.ten ?? null, goi_y_sdt: g?.sdt ?? null }
+  })
+}
+
+/** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */
+export async function ganKhachBaoTri(planId: string, customerId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!customerId) return { ok: false, error: 'Chọn khách.' }
+  const { error } = await dataClient().from('maintenance_plan')
+    .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId })
+  revalidatePath('/bao-tri')
+  return { ok: true }
+}
+
+export type PlanDaMap = {
+  id: string; customer_id: string; ten_khach: string | null; province: string | null
+  bo_may: string | null; loai_goi: string | null; tong_lan: number | null
+  chu_ky_thang: number | null; ngay_bat_dau: string | null; vung: string | null
+  so_visit: number; so_xong: number
+}
+
+/** Plan bảo trì ĐÃ map khách + số lượt đã lên / đã xong (để lên lịch). */
+export async function baoTriDaMap(): Promise<PlanDaMap[]> {
+  await requireStaff()
+  const db = dataClient()
+  const { data: plans } = await db.from('maintenance_plan')
+    .select('id, customer_id, bo_may, loai_goi, tong_lan, chu_ky_thang, ngay_bat_dau, vung')
+    .not('customer_id', 'is', null).order('updated_at', { ascending: false })
+  const ds = (plans ?? []) as Omit<PlanDaMap, 'ten_khach' | 'province' | 'so_visit' | 'so_xong'>[]
+  if (!ds.length) return []
+  const ids = ds.map((p) => p.id)
+  const cusIds = [...new Set(ds.map((p) => p.customer_id))]
+  const [{ data: visits }, { data: khach }] = await Promise.all([
+    db.from('maintenance_visit').select('plan_id, completed_at').in('plan_id', ids),
+    db.from('cs_customers').select('id, full_name, province').in('id', cusIds),
+  ])
+  const dem = new Map<string, { visit: number; xong: number }>()
+  for (const v of (visits ?? []) as { plan_id: string; completed_at: string | null }[]) {
+    const c = dem.get(v.plan_id) ?? { visit: 0, xong: 0 }
+    c.visit++; if (v.completed_at) c.xong++
+    dem.set(v.plan_id, c)
+  }
+  const kh = new Map((((khach ?? []) as { id: string; full_name: string; province: string | null }[])).map((k) => [k.id, k]))
+  return ds.map((p) => {
+    const c = dem.get(p.id) ?? { visit: 0, xong: 0 }
+    const k = kh.get(p.customer_id)
+    return { ...p, ten_khach: k?.full_name ?? null, province: k?.province ?? null, so_visit: c.visit, so_xong: c.xong }
+  })
+}
+
+export type LenLichInput = { ngayBatDau?: string; chuKyThang: number | null; tongLan: number; vung?: Vung }
+
+/** Sinh lịch bảo trì tự động cho 1 plan. Bắt buộc đã map khách + khách có máy đã lắp (BH). CHỈ QUẢN LÝ. */
+export async function lenLichBaoTri(
+  planId: string, input: LenLichInput
+): Promise<{ ok: true; so_lan: number } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: plan } = await db.from('maintenance_plan')
+    .select('customer_id, ngay_bat_dau, chu_ky_thang, tong_lan, vung').eq('id', planId).maybeSingle()
+  const p = plan as { customer_id: string | null; ngay_bat_dau: string | null; chu_ky_thang: number | null; tong_lan: number | null; vung: Vung | null } | null
+  if (!p) return { ok: false, error: 'Không thấy plan.' }
+  if (!p.customer_id) return { ok: false, error: 'Chưa map khách — gán khách trước khi lên lịch.' }
+  // Gate BH: khách phải có ≥1 máy đã lắp (kích hoạt) mới lên lịch.
+  const { count: soMay } = await db.from('installed_base')
+    .select('serial', { count: 'exact', head: true }).eq('customer_id', p.customer_id).eq('status', 'active')
+  if (!soMay) return { ok: false, error: 'Khách chưa có máy đã lắp/kích hoạt bảo hành — kích hoạt BH trước khi lên lịch.' }
+  const { data: kh } = await db.from('cs_customers').select('province').eq('id', p.customer_id).maybeSingle()
+  const vung: Vung = input.vung ?? p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
+  // Ngày bắt đầu: input > plan.ngay_bat_dau > ngày lắp máy sớm nhất > hôm nay.
+  let batDau = input.ngayBatDau?.trim() || p.ngay_bat_dau || null
+  if (!batDau) {
+    const { data: ib } = await db.from('installed_base').select('install_date')
+      .eq('customer_id', p.customer_id).eq('status', 'active').not('install_date', 'is', null)
+      .order('install_date').limit(1).maybeSingle()
+    batDau = (ib as { install_date: string | null } | null)?.install_date ?? new Date().toISOString().slice(0, 10)
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(batDau)) return { ok: false, error: 'Ngày bắt đầu không hợp lệ (YYYY-MM-DD).' }
+  const chuKy = input.chuKyThang ?? p.chu_ky_thang ?? 3
+  const tongLan = Math.max(1, input.tongLan || p.tong_lan || 1)
+  const ngayList = sinhLichBaoTri(batDau, chuKy, tongLan, vung)
+
+  // Giữ lượt ĐÃ LÀM; chỉ thay lượt chưa làm.
+  const { count: daXong } = await db.from('maintenance_visit')
+    .select('id', { count: 'exact', head: true }).eq('plan_id', planId).not('completed_at', 'is', null)
+  const soDaXong = daXong ?? 0
+  await db.from('maintenance_visit').delete().eq('plan_id', planId).is('completed_at', null)
+  const rows = ngayList
+    .map((d, i) => ({ plan_id: planId, lan_thu: i + 1, due_date: d, ten_task: `Bảo trì lần ${i + 1}` }))
+    .filter((r) => r.lan_thu > soDaXong)
+  if (rows.length) {
+    const { error } = await db.from('maintenance_visit').insert(rows)
+    if (error) return { ok: false, error: error.message }
+  }
+  await db.from('maintenance_plan')
+    .update({ ngay_bat_dau: batDau, chu_ky_thang: chuKy, tong_lan: tongLan, vung, updated_at: new Date().toISOString() })
+    .eq('id', planId)
+  await ghiAudit('len_lich_bao_tri', `plan:${planId}`, { bat_dau: batDau, chu_ky: chuKy, tong_lan: tongLan, vung, so_lan: rows.length })
+  revalidatePath('/bao-tri')
+  return { ok: true, so_lan: rows.length }
 }
 
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
