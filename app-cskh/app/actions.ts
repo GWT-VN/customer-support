@@ -1010,10 +1010,8 @@ export async function lenLichBaoTri(
   const p = plan as { customer_id: string | null; ngay_bat_dau: string | null; chu_ky_thang: number | null; tong_lan: number | null; vung: Vung | null } | null
   if (!p) return { ok: false, error: 'Không thấy plan.' }
   if (!p.customer_id) return { ok: false, error: 'Chưa map khách — gán khách trước khi lên lịch.' }
-  // Gate BH: khách phải có ≥1 máy đã lắp (kích hoạt) mới lên lịch.
-  const { count: soMay } = await db.from('installed_base')
-    .select('serial', { count: 'exact', head: true }).eq('customer_id', p.customer_id).eq('status', 'active')
-  if (!soMay) return { ok: false, error: 'Khách chưa có máy đã lắp/kích hoạt bảo hành — kích hoạt BH trước khi lên lịch.' }
+  // Bộ CŨ (plan sẵn có, nhập từ Asana) không chặn BH — vẫn lên lịch được.
+  // Chặn "kích hoạt BH trước" chỉ áp cho plan MỚI tạo trên CS (taoPlanBaoTri).
   const { data: kh } = await db.from('cs_customers').select('province').eq('id', p.customer_id).maybeSingle()
   const vung: Vung = input.vung ?? p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
   // Ngày bắt đầu: input > plan.ngay_bat_dau > ngày lắp máy sớm nhất > hôm nay.
@@ -1047,6 +1045,82 @@ export async function lenLichBaoTri(
   await ghiAudit('len_lich_bao_tri', `plan:${planId}`, { bat_dau: batDau, chu_ky: chuKy, tong_lan: tongLan, vung, so_lan: rows.length })
   revalidatePath('/bao-tri')
   return { ok: true, so_lan: rows.length }
+}
+
+/**
+ * Tạo LỊCH BẢO TRÌ MỚI cho khách (tặng thêm / không qua Sales / gói mua trực tiếp trên CS).
+ * Plan MỚI -> BẮT BUỘC khách đã có máy kích hoạt BH (chặn khách mới chưa kích hoạt). CHỈ QUẢN LÝ.
+ */
+export async function taoPlanBaoTri(
+  customerId: string,
+  input: { boMay?: string; chuKyThang: number | null; tongLan: number; ngayBatDau: string; vung?: Vung; loaiGoi?: string }
+): Promise<{ ok: true; plan_id: string; so_lan: number } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!customerId) return { ok: false, error: 'Chọn khách.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngayBatDau)) return { ok: false, error: 'Ngày bắt đầu không hợp lệ.' }
+  const tongLan = Math.max(1, Math.floor(input.tongLan) || 1)
+  const db = dataClient()
+  // Plan MỚI trên CS -> gate BH: khách phải có ≥1 máy đã lắp/kích hoạt.
+  const { count: soMay } = await db.from('installed_base')
+    .select('serial', { count: 'exact', head: true }).eq('customer_id', customerId).eq('status', 'active')
+  if (!soMay) return { ok: false, error: 'Khách chưa có máy kích hoạt bảo hành — kích hoạt BH trước khi tạo lịch bảo trì.' }
+  const { data: kh } = await db.from('cs_customers').select('province').eq('id', customerId).maybeSingle()
+  const vung: Vung = input.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
+  const { data: created, error: e0 } = await db.from('maintenance_plan').insert({
+    customer_id: customerId, bo_may: input.boMay?.trim() || null,
+    loai_goi: input.loaiGoi === 'hop_dong' ? 'hop_dong' : 'tang_noi_bo',
+    chu_ky_thang: input.chuKyThang, tong_lan: tongLan, ngay_bat_dau: input.ngayBatDau, vung,
+    trang_thai: 'dang_hoat_dong',
+  }).select('id').single()
+  if (e0) return { ok: false, error: e0.message }
+  const planId = (created as { id: string }).id
+  const ngayList = sinhLichBaoTri(input.ngayBatDau, input.chuKyThang, tongLan, vung)
+  const rows = ngayList.map((d, i) => ({ plan_id: planId, lan_thu: i + 1, due_date: d, ten_task: `Bảo trì lần ${i + 1}` }))
+  if (rows.length) {
+    const { error } = await db.from('maintenance_visit').insert(rows)
+    if (error) return { ok: false, error: error.message }
+  }
+  await ghiAudit('tao_plan_bao_tri', `plan:${planId}`, { customer_id: customerId, tong_lan: tongLan, so_lan: rows.length })
+  revalidatePath('/bao-tri'); revalidatePath(`/khach/${customerId}`)
+  return { ok: true, plan_id: planId, so_lan: rows.length }
+}
+
+export type SapHetGoi = {
+  plan_id: string; customer_id: string; ten_khach: string | null; primary_phone: string | null
+  bo_may: string | null; tong_lan: number | null; so_xong: number; con_lai: number; luot_cuoi: string | null
+}
+
+/** Plan bảo trì SẮP HẾT (đã lên lịch + còn ≤1 lượt chưa làm) — nhắc CS chào gói mới. */
+export async function baoTriSapHet(): Promise<SapHetGoi[]> {
+  await requireStaff()
+  const db = dataClient()
+  const { data: plans } = await db.from('maintenance_plan')
+    .select('id, customer_id, bo_may, tong_lan').not('customer_id', 'is', null).eq('trang_thai', 'dang_hoat_dong')
+  const ps = (plans ?? []) as { id: string; customer_id: string; bo_may: string | null; tong_lan: number | null }[]
+  if (!ps.length) return []
+  const ids = ps.map((p) => p.id)
+  const cus = [...new Set(ps.map((p) => p.customer_id))]
+  const [{ data: visits }, { data: khach }] = await Promise.all([
+    db.from('maintenance_visit').select('plan_id, completed_at, due_date').in('plan_id', ids),
+    db.from('cs_customers').select('id, full_name, primary_phone').in('id', cus),
+  ])
+  const stat = new Map<string, { xong: number; chua: number; cuoi: string | null }>()
+  for (const v of (visits ?? []) as { plan_id: string; completed_at: string | null; due_date: string | null }[]) {
+    const s = stat.get(v.plan_id) ?? { xong: 0, chua: 0, cuoi: null }
+    if (v.completed_at) s.xong++; else s.chua++
+    if (v.due_date && (!s.cuoi || v.due_date > s.cuoi)) s.cuoi = v.due_date
+    stat.set(v.plan_id, s)
+  }
+  const kh = new Map(((khach ?? []) as { id: string; full_name: string; primary_phone: string | null }[]).map((k) => [k.id, k]))
+  return ps.map((p) => {
+    const s = stat.get(p.id) ?? { xong: 0, chua: 0, cuoi: null }
+    const k = kh.get(p.customer_id)
+    return {
+      plan_id: p.id, customer_id: p.customer_id, ten_khach: k?.full_name ?? null, primary_phone: k?.primary_phone ?? null,
+      bo_may: p.bo_may, tong_lan: p.tong_lan, so_xong: s.xong, con_lai: s.chua, luot_cuoi: s.cuoi,
+    }
+  }).filter((r) => r.so_xong + r.con_lai > 0 && r.con_lai <= 1).sort((a, b) => a.con_lai - b.con_lai)
 }
 
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */

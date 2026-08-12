@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { OTimKiem } from '@/bang'
-import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView, baoTriChuaMap, baoTriDaMap, baoTriTheoThang } from '@/app/actions'
+import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView, baoTriChuaMap, baoTriDaMap, baoTriTheoThang, baoTriSapHet } from '@/app/actions'
 import { PhanTrang } from '@/bang'
 import { ChipSapXep } from '@/bang'
 import { laQuanLy } from '@/lib/supabase'
@@ -26,7 +26,7 @@ export default async function BaoTriPage({
   const thang = /^\d{4}-\d{2}$/.test(thangRaw ?? '') ? thangRaw! : new Date().toISOString().slice(0, 7)
   const nhe = laMap || laLich
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, tong, soTrang, sapXep }, counts, views, admin, chuaMap, daMap, lichRows] = await Promise.all([
+  const [{ rows, tong, soTrang, sapXep }, counts, views, admin, chuaMap, daMap, lichRows, sapHet] = await Promise.all([
     nhe
       ? Promise.resolve({ rows: [], tong: 0, trang: 1, soTrang: 1, sapXep: { cot: 'due_date', tang: true, macDinh: true } } as Awaited<ReturnType<typeof maintenanceDue>>)
       : maintenanceDue(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
@@ -36,6 +36,7 @@ export default async function BaoTriPage({
     laMap ? baoTriChuaMap() : Promise.resolve([]),
     laMap ? baoTriDaMap() : Promise.resolve([]),
     laLich ? baoTriTheoThang(thang) : Promise.resolve([]),
+    laMap ? baoTriSapHet() : Promise.resolve([]),
   ])
 
   const tabs = [
@@ -88,7 +89,7 @@ export default async function BaoTriPage({
           <LichBaoTriThang thang={thang} rows={lichRows} />
         ) : laMap ? (
           admin ? (
-            <BaoTriQuanLy chuaMap={chuaMap} daMap={daMap} />
+            <BaoTriQuanLy chuaMap={chuaMap} daMap={daMap} sapHet={sapHet} />
           ) : (
             <p className="text-sm text-amber-600">Chỉ cấp quản lý mới map khách / lên lịch bảo trì.</p>
           )
