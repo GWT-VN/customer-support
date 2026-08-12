@@ -2,20 +2,21 @@ import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes, nhomLoiChon } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
 import { TicketNotes } from '@/components/TicketNotes'
 import { TicketItems } from '@/components/TicketItems'
+import { GanNhomLoi } from '@/components/GanNhomLoi'
 import { vnDate } from '@/components/Badge'
 
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items, me, catalog, loaiList] = await Promise.all([
+  const [t, nhom, notes, staff, items, me, catalog, loaiList, nhomList, admin] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
-    listCatalogItems(), ticketTypes(),
+    listCatalogItems(), ticketTypes(), nhomLoiChon(), laAdmin(),
   ])
   if (!t) notFound()
 
@@ -46,24 +47,35 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           </p>
         )}
 
-        {nhom.length > 0 && (
+        {(nhom.length > 0 || admin) && (
           <section className="bg-white rounded-xl border p-5 space-y-2">
             <h2 className="font-medium text-slate-900">Thuộc nhóm lỗi</h2>
-            <div className="flex flex-wrap gap-2">
-              {nhom.map((n) => (
-                <Link
-                  key={n.group_code}
-                  href={`/nhom-loi/${n.group_code}`}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-slate-50"
-                >
-                  <span className="text-sm text-slate-900">{n.nhom_ten}</span>
-                  <MucDoBadge muc_do={n.muc_do} />
-                </Link>
-              ))}
-            </div>
+            {nhom.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {nhom.map((n) => (
+                  <Link
+                    key={n.group_code}
+                    href={`/nhom-loi/${n.group_code}`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-slate-50"
+                  >
+                    <span className="text-sm text-slate-900">{n.nhom_ten}</span>
+                    <MucDoBadge muc_do={n.muc_do} />
+                    {n.nguon === 'người' && <span className="text-[10px] text-violet-500">gán tay</span>}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">Chưa vào nhóm nào (mô tả không khớp mẫu tự động).</p>
+            )}
             <p className="text-xs text-slate-500">
               Gom tự động từ nội dung mô tả. Xem cả cụm để biết đây là ca lẻ hay lỗi hàng loạt.
             </p>
+            {admin && (
+              <div className="pt-2 border-t mt-2">
+                <p className="text-xs font-medium text-slate-600 mb-2">Gắn tay vào nhóm (lỗi mới chưa có mẫu):</p>
+                <GanNhomLoi code={t.ticket_code} daGan={nhom} nhomList={nhomList} />
+              </div>
+            )}
           </section>
         )}
 
@@ -133,7 +145,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
-          <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={await laAdmin()} />
+          <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={admin} />
         </section>
 
         <section className="bg-white rounded-xl border p-5">

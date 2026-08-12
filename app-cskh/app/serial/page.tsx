@@ -7,14 +7,16 @@ import { PhanTrang } from '@/bang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
 import { NhapKhoSerial } from '@/components/NhapKhoSerial'
+import { DoiTrangThaiKho } from '@/components/DoiTrangThaiKho'
+import { NHAN_TRANG_THAI_SERIAL } from '@/lib/danhSach'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function SerialPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tab?: string; trang?: string }>
+  searchParams: Promise<{ q?: string; tab?: string; trang?: string; tt?: string }>
 }) {
-  const { q = '', tab = '', trang: trangRaw } = await searchParams
+  const { q = '', tab = '', trang: trangRaw, tt = '' } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const laCho = tab === 'cho'
   const laNhap = tab === 'nhap'
@@ -24,7 +26,7 @@ export default async function SerialPage({
           rows: [], tong: 0, trang: 1, soTrang: 1,
           sapXep: { cot: 'serial', tang: true, macDinh: true },
         })
-      : searchSerialsTrang(q, { trang }),
+      : searchSerialsTrang(q, { trang }, tt),
     listSerialPending('cho_duyet'),
     laAdmin(),
     laNhap ? catalogChon() : Promise.resolve<CatalogChon[]>([]),
@@ -73,16 +75,30 @@ export default async function SerialPage({
               <input name="q" defaultValue={q}
                 placeholder="Gõ serial, mã nội bộ, model, mã quốc tế…"
                 className="flex-1 rounded-lg border px-4 py-2.5 text-slate-900 bg-white" />
+              {tt && <input type="hidden" name="tt" value={tt} />}
               <button className="rounded-lg bg-slate-900 text-white px-5 font-medium">Tìm</button>
             </form>
+            <div className="flex gap-1.5 flex-wrap">
+              <Link href={`/serial${q ? `?${new URLSearchParams({ q })}` : ''}`}
+                className={`px-2.5 py-1 rounded-lg text-xs border ${!tt ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+                Tất cả
+              </Link>
+              {(['ton_kho', 'da_lap', 'trung_bay', 'mkt', 'kiem_dinh_nuoc', 'lap_test', 'bao_tri', 'thanh_ly'] as const).map((t) => (
+                <Link key={t} href={`/serial?${new URLSearchParams({ ...(q && { q }), tt: t })}`}
+                  className={`px-2.5 py-1 rounded-lg text-xs border ${tt === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+                  {NHAN_TRANG_THAI_SERIAL[t]}
+                </Link>
+              ))}
+            </div>
             <p className="text-sm text-slate-500">
               {rows.length < tong ? `Hiện ${rows.length} trên ${tong} serial` : `${tong} serial`}
+              {tt && <span className="text-slate-400"> · lọc: {NHAN_TRANG_THAI_SERIAL[tt] ?? tt}</span>}
             </p>
             <KhungChon
               khoaTrang={rows.map((s) => s.serial)}
               tong={tong}
               bat={admin}
-              thamSo={{ q }}
+              thamSo={{ q, ...(tt && { tt }) }}
               layTatCaKhoa={khoaTatCaSerial}
             >
             <ThanhDaChon nhan="serial" />
@@ -94,7 +110,7 @@ export default async function SerialPage({
                     <th className="text-left px-4 py-3 font-medium">Serial</th>
                     <th className="text-left px-4 py-3 font-medium">Mã nội bộ</th>
                     <th className="text-left px-4 py-3 font-medium">Model</th>
-                    <th className="text-left px-4 py-3 font-medium">Mã quốc tế</th>
+                    <th className="text-left px-4 py-3 font-medium">Trạng thái</th>
                     <th className="text-left px-4 py-3 font-medium">Tên nội bộ</th>
                   </tr>
                 </thead>
@@ -105,7 +121,9 @@ export default async function SerialPage({
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-900">{s.serial}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.internal_code ?? '—'}</td>
                       <td className="px-4 py-2.5 text-slate-700">{s.model ?? '—'}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{s.ma_quoc_te ?? '—'}</td>
+                      <td className="px-4 py-2.5">
+                        <DoiTrangThaiKho serial={s.serial} trangThai={s.trang_thai} laAdmin={admin} />
+                      </td>
                       <td className="px-4 py-2.5 text-slate-600">{s.ten_noi_bo ?? '—'}</td>
                     </tr>
                   ))}

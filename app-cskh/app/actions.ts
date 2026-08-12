@@ -5,6 +5,7 @@ import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
 import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
+import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -1126,6 +1127,7 @@ export async function machinesOfCustomer(customerId: string): Promise<Machine[]>
 export type SerialRow = {
   serial: string; code: string | null; model: string | null
   internal_code: string | null; ma_quoc_te: string | null; ten_noi_bo: string | null; po: string | null
+  trang_thai: string | null
 }
 export type SerialPending = {
   id: string; serial: string; internal_code: string | null; model: string | null
@@ -1139,11 +1141,11 @@ export type SerialPending = {
  * rồi lệch nhau (xem chú thích ở TuyChonDanhSach.moiTrang).
  * Không export nên không bị luật "'use server' chỉ export async function" đụng tới.
  */
-async function truyVanSerial(q: string, limit: number, tu = 0) {
+async function truyVanSerial(q: string, limit: number, tu = 0, tt?: string) {
   await requireStaff()
   let query = dataClient()
     .from('serial_registry')
-    .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po', { count: 'exact' })
+    .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po, trang_thai', { count: 'exact' })
   const term = q.trim()
   if (term) {
     const safe = term.replace(/[%_]/g, (c) => '\\' + c)
@@ -1152,6 +1154,7 @@ async function truyVanSerial(q: string, limit: number, tu = 0) {
         `ma_quoc_te.ilike.%${safe}%,ten_noi_bo.ilike.%${safe}%`
     )
   }
+  if (tt && tt.trim()) query = query.eq('trang_thai', tt.trim())
   const { data, error, count } = await query.order('serial').range(tu, tu + limit - 1)
   if (error) throw new Error(error.message)
   return { rows: (data ?? []) as SerialRow[], tong: count ?? 0 }
@@ -1172,11 +1175,12 @@ export async function searchSerials(q: string, limit = 50): Promise<SerialRow[]>
  */
 export async function searchSerialsTrang(
   q: string,
-  tuyChon: TuyChonDanhSach = {}
+  tuyChon: TuyChonDanhSach = {},
+  tt?: string
 ): Promise<KetQuaTrang<SerialRow>> {
   const trang = Math.max(1, tuyChon.trang ?? 1)
   const moi = tuyChon.moiTrang ?? MOI_TRANG
-  const { rows, tong } = await truyVanSerial(q, moi, (trang - 1) * moi)
+  const { rows, tong } = await truyVanSerial(q, moi, (trang - 1) * moi, tt)
   return {
     rows,
     tong,
@@ -2615,6 +2619,164 @@ export async function ticketsChuaPhanNhom(q = ''): Promise<ChuaPhanNhom[]> {
   return (data ?? []) as ChuaPhanNhom[]
 }
 
+// ── Q3: quản lý nhóm lỗi — tạo/sửa/xoá + gán tay ticket + gợi ý gom ──────────
+
+export type NhomLoiChiTiet = {
+  code: string; ten: string; mo_ta: string | null; muc_do: MucDo; bao_hang: boolean
+  mau_mo_ta: string; mau_may: string | null; thu_tu: number | null
+}
+export type NhomLoiInput = {
+  code: string; ten: string; mo_ta?: string; muc_do: MucDo; bao_hang: boolean
+  mau_mo_ta: string; mau_may?: string; thu_tu?: number
+}
+export type NhomChon = { code: string; ten: string; muc_do: MucDo }
+
+const MUC_DO_HOP_LE: readonly MucDo[] = ['an_toan', 'nghiem_trong', 'thuong', 'nhe', 'khong_loi']
+
+/** 1 nhóm lỗi để sửa (đọc thẳng bảng issue_group, không qua view báo cáo). */
+export async function nhomLoiChiTiet(code: string): Promise<NhomLoiChiTiet | null> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('issue_group')
+    .select('code, ten, mo_ta, muc_do, bao_hang, mau_mo_ta, mau_may, thu_tu')
+    .eq('code', code).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data ?? null) as NhomLoiChiTiet | null
+}
+
+/** Danh sách nhóm lỗi để CHỌN (gán tay ticket). */
+export async function nhomLoiChon(): Promise<NhomChon[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('issue_group').select('code, ten, muc_do').order('thu_tu')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as NhomChon[]
+}
+
+/**
+ * Mẫu regex có biên dịch được trong Postgres không.
+ * Chặn mẫu hỏng lưu vào issue_group -> nếu không, `van_ban ~* mau` ném lỗi làm
+ * VỠ v_ticket_issue cho mọi người. Không dùng RegExp của JS được vì mẫu hiện có
+ * xài cú pháp POSIX (\m \M) mà JS coi là sai.
+ */
+async function regexPgHopLe(db: ReturnType<typeof dataClient>, mau: string): Promise<boolean> {
+  const { data, error } = await db.rpc('kiem_tra_regex_pg', { p: mau })
+  if (error) throw new Error(error.message)
+  return data === true
+}
+
+function chuanMaNhom(code: string): string {
+  return code.trim().toUpperCase().replace(/[^A-Z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** Tạo nhóm lỗi mới. CHỈ ADMIN. Validate mã + mức độ + mẫu regex. */
+export async function taoNhomLoi(
+  input: NhomLoiInput
+): Promise<{ ok: true; code: string } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const code = chuanMaNhom(input.code)
+  if (code.length < 2) return { ok: false, error: 'Mã nhóm cần ≥2 ký tự (A-Z, 0-9, gạch ngang).' }
+  const ten = input.ten.trim()
+  if (!ten) return { ok: false, error: 'Thiếu tên nhóm.' }
+  if (!MUC_DO_HOP_LE.includes(input.muc_do)) return { ok: false, error: 'Mức độ không hợp lệ.' }
+  const mau = input.mau_mo_ta.trim()
+  const db = dataClient()
+  if (!(await regexPgHopLe(db, mau))) return { ok: false, error: 'Mẫu mô tả (regex) rỗng hoặc sai cú pháp.' }
+  const mauMay = input.mau_may?.trim()
+  if (mauMay && !(await regexPgHopLe(db, mauMay))) return { ok: false, error: 'Mẫu model (regex) sai cú pháp.' }
+  const { error } = await db.from('issue_group').insert({
+    code, ten, mo_ta: input.mo_ta?.trim() || null, muc_do: input.muc_do,
+    bao_hang: input.bao_hang, mau_mo_ta: mau, mau_may: mauMay || null,
+    thu_tu: input.thu_tu ?? 100,
+  })
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: `Mã nhóm "${code}" đã tồn tại.` }
+    return { ok: false, error: error.message }
+  }
+  await ghiAudit('tao_nhom_loi', `nhom:${code}`, { ten, muc_do: input.muc_do })
+  revalidatePath('/nhom-loi')
+  return { ok: true, code }
+}
+
+/** Sửa nhóm lỗi (KHÔNG đổi mã). CHỈ ADMIN. */
+export async function suaNhomLoi(
+  code: string, input: Omit<NhomLoiInput, 'code'>
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const ten = input.ten.trim()
+  if (!ten) return { ok: false, error: 'Thiếu tên nhóm.' }
+  if (!MUC_DO_HOP_LE.includes(input.muc_do)) return { ok: false, error: 'Mức độ không hợp lệ.' }
+  const mau = input.mau_mo_ta.trim()
+  const db = dataClient()
+  if (!(await regexPgHopLe(db, mau))) return { ok: false, error: 'Mẫu mô tả (regex) rỗng hoặc sai cú pháp.' }
+  const mauMay = input.mau_may?.trim()
+  if (mauMay && !(await regexPgHopLe(db, mauMay))) return { ok: false, error: 'Mẫu model (regex) sai cú pháp.' }
+  const { error, count } = await db.from('issue_group').update({
+    ten, mo_ta: input.mo_ta?.trim() || null, muc_do: input.muc_do,
+    bao_hang: input.bao_hang, mau_mo_ta: mau, mau_may: mauMay || null,
+    thu_tu: input.thu_tu ?? 100, updated_at: new Date().toISOString(),
+  }, { count: 'exact' }).eq('code', code)
+  if (error) return { ok: false, error: error.message }
+  if (!count) return { ok: false, error: 'Không tìm thấy nhóm để sửa.' }
+  await ghiAudit('sua_nhom_loi', `nhom:${code}`, { ten })
+  revalidatePath('/nhom-loi'); revalidatePath(`/nhom-loi/${code}`)
+  return { ok: true }
+}
+
+/** Xoá nhóm lỗi (FK cascade tự xoá override của nhóm). CHỈ ADMIN. */
+export async function xoaNhomLoi(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('issue_group').delete().eq('code', code)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_nhom_loi', `nhom:${code}`)
+  revalidatePath('/nhom-loi')
+  return { ok: true }
+}
+
+/** Gán tay 1 ticket vào 1 nhóm (issue_override gan=true -> nguồn 'người'). CHỈ ADMIN. */
+export async function ganTicketVaoNhom(
+  ticketCode: string, groupCode: string, lyDo?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const nv = await layNhanVien()
+  const { error } = await dataClient().from('issue_override').upsert({
+    ticket_code: ticketCode, group_code: groupCode, gan: true,
+    ly_do: lyDo?.trim() || null, nguoi_sua: nv?.email ?? nv?.ten ?? null,
+  }, { onConflict: 'ticket_code,group_code' })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('gan_nhom_loi', `ticket:${ticketCode}`, { nhom: groupCode })
+  revalidatePath(`/ticket/${ticketCode}`); revalidatePath('/nhom-loi'); revalidatePath(`/nhom-loi/${groupCode}`)
+  return { ok: true }
+}
+
+/** Bỏ gán tay (xoá dòng override). CHỈ ADMIN. */
+export async function boGanNhom(
+  ticketCode: string, groupCode: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('issue_override').delete()
+    .eq('ticket_code', ticketCode).eq('group_code', groupCode)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('bo_gan_nhom_loi', `ticket:${ticketCode}`, { nhom: groupCode })
+  revalidatePath(`/ticket/${ticketCode}`); revalidatePath('/nhom-loi'); revalidatePath(`/nhom-loi/${groupCode}`)
+  return { ok: true }
+}
+
+/** Gợi ý gom nhóm từ ticket CHƯA phân nhóm (có mô tả). Rule-based, chỉ đọc. */
+export async function goiYGomNhom(toiThieu = 3): Promise<CumGoiY[]> {
+  await requireStaff()
+  const chua = await ticketsChuaPhanNhom('')
+  const coMoTa = chua
+    .filter((t) => t.description && !t.ly_do.startsWith('thiếu mô tả'))
+    .map((t) => ({ ticket_code: t.ticket_code, description: t.description }))
+  return goiYGomTu(coMoTa, toiThieu)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Task 5b — tìm kiếm gộp: tách kết quả theo máy / ticket / khách
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2742,7 +2904,7 @@ export async function khoaTatCaBaoTri(t: ThamSoLoc): Promise<string[]> {
 
 export async function khoaTatCaSerial(t: ThamSoLoc): Promise<string[]> {
   return gomKhoa(
-    (trang, moiTrang) => searchSerialsTrang(t.q ?? '', { trang, moiTrang }),
+    (trang, moiTrang) => searchSerialsTrang(t.q ?? '', { trang, moiTrang }, t.tt),
     (r) => r.serial,
     TOI_DA_CHON
   )

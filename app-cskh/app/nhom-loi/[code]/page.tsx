@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
-import { issueReport, ticketsInGroup } from '@/app/actions'
+import { issueReport, ticketsInGroup, nhomLoiChiTiet } from '@/app/actions'
+import { laAdmin } from '@/lib/supabase'
 import { MucDoBadge, BaoHangBadge, NguonBadge } from '@/components/NhomLoiBadge'
 import { StateBadge, vnDateTime } from '@/components/TicketBadge'
+import { NhomLoiForm } from '@/components/NhomLoiForm'
 
 export default async function NhomLoiDetail({
   params,
@@ -11,7 +13,9 @@ export default async function NhomLoiDetail({
   params: Promise<{ code: string }>
 }) {
   const { code } = await params
-  const [all, tickets] = await Promise.all([issueReport(false), ticketsInGroup(code)])
+  const [all, tickets, chiTiet, admin] = await Promise.all([
+    issueReport(false), ticketsInGroup(code), nhomLoiChiTiet(code), laAdmin(),
+  ])
   const nhom = all.find((r) => r.code === code)
   if (!nhom) notFound()
 
@@ -124,6 +128,15 @@ export default async function NhomLoiDetail({
             </tbody>
           </table>
         </div>
+
+        {admin && chiTiet && (
+          <details className="bg-white rounded-xl border p-4">
+            <summary className="cursor-pointer font-medium text-slate-900">Sửa nhóm / mẫu gom / xoá</summary>
+            <div className="pt-3">
+              <NhomLoiForm nhom={chiTiet} />
+            </div>
+          </details>
+        )}
       </div>
     </main>
   )
