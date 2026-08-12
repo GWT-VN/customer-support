@@ -4,31 +4,26 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   datTrangThaiSerial, doiMayChoKhach, doiKhachMay, doiSerialMay, xoaMayDaLap,
-  serialsTheoMay, type SuDungSerial, type SerialKho,
+  serialsTheoMay, type SuDungSerial, type SerialKho, type TrangThai,
 } from '@/app/actions'
-import { NHAN_TRANG_THAI_SERIAL, TRANG_THAI_KHO_DAT_TAY } from '@/lib/danhSach'
+import { MAU_TRANG_THAI } from '@/lib/danhSach'
 import { KhachPicker } from '@/components/KhachPicker'
 import { vnDateTime } from '@/components/TicketBadge'
 
-const MAU: Record<string, string> = {
-  ton_kho: 'bg-slate-100 text-slate-600', da_lap: 'bg-emerald-100 text-emerald-800',
-  trung_bay: 'bg-sky-100 text-sky-800', mkt: 'bg-violet-100 text-violet-800',
-  kiem_dinh_nuoc: 'bg-cyan-100 text-cyan-800', lap_test: 'bg-indigo-100 text-indigo-800',
-  bao_tri: 'bg-amber-100 text-amber-800', thanh_ly: 'bg-red-100 text-red-700',
-}
 type KetQua = { ok: true; applied?: boolean; ma_moi?: string } | { ok: false; error: string }
 type Panel = '' | 'doi_may' | 'doi_serial' | 'doi_khach' | 'go'
 
 /**
  * MỘT chỗ quản lý máy: trạng thái + nhật ký + các thao tác — gom gọn, nhãn rõ.
  *  · Máy đang ở khách: Đổi máy (thay máy lỗi) · Đổi serial (gõ nhầm) · Đổi khách · Gỡ về kho.
- *  · Máy ở kho: đặt trạng thái (trưng bày/mkt/kiểm định/test/bảo trì/thanh lý) + ghi chú vị trí.
+ *  · Máy ở kho: đặt trạng thái (danh mục cấu hình được) + BẮT BUỘC mô tả hiện trạng máy.
+ * Danh mục trạng thái (`ds`) do trang truyền vào từ bảng serial_trang_thai.
  */
 export function QuanLyMay({
-  serial, internalCode, trangThai, suKien, dangLap, laAdmin,
+  serial, internalCode, trangThai, suKien, dangLap, laAdmin, ds,
 }: {
   serial: string; internalCode: string | null; trangThai: string | null
-  suKien: SuDungSerial[]; dangLap: boolean; laAdmin: boolean
+  suKien: SuDungSerial[]; dangLap: boolean; laAdmin: boolean; ds: TrangThai[]
 }) {
   const router = useRouter()
   const [panel, setPanel] = useState<Panel>('')
@@ -39,6 +34,12 @@ export function QuanLyMay({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+
+  const mapTT = new Map(ds.map((t) => [t.code, t]))
+  const nhan = (code: string | null | undefined) => (code ? mapTT.get(code)?.nhan ?? code : '—')
+  const mauClass = (code: string | null | undefined) =>
+    MAU_TRANG_THAI[mapTT.get(code ?? '')?.mau ?? 'slate'] ?? MAU_TRANG_THAI.slate
+  const datTayList = ds.filter((t) => t.cho_dat_tay && t.hoat_dong && t.code !== trangThai)
 
   function mo(p: Panel) {
     setPanel(p); setErr(null); setMsg(null); setSerialMoi('')
@@ -69,9 +70,7 @@ export function QuanLyMay({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <span className="text-sm text-slate-500">Trạng thái:</span>
-        <span className={`px-2 py-0.5 rounded-full text-xs ${MAU[trangThai ?? ''] ?? 'bg-slate-100 text-slate-500'}`}>
-          {NHAN_TRANG_THAI_SERIAL[trangThai ?? ''] ?? (trangThai ?? '—')}
-        </span>
+        <span className={`px-2 py-0.5 rounded-full text-xs ${mauClass(trangThai)}`}>{nhan(trangThai)}</span>
       </div>
 
       {laAdmin && dangLap && (
@@ -86,7 +85,7 @@ export function QuanLyMay({
 
           {panel === 'doi_may' && (
             <div className="rounded-lg border bg-white p-2.5 space-y-2">
-              <p className="text-xs text-slate-500">Thay máy MỚI cho khách: máy này về <strong>bảo trì</strong>, máy mới nối tiếp <strong>bảo hành + khách cũ</strong>.</p>
+              <p className="text-xs text-slate-500">Thay máy MỚI cho khách: máy này về <strong>Thu hồi bảo hành</strong>, máy mới nối tiếp <strong>bảo hành + khách cũ</strong>.</p>
               <div className="flex flex-wrap items-center gap-2">
                 {oSerial}
                 <input value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Lý do (tuỳ chọn)" className="rounded-lg border px-3 py-1.5 text-sm text-slate-900" />
@@ -120,14 +119,14 @@ export function QuanLyMay({
 
       {laAdmin && !dangLap && (
         <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
-          <p className="text-xs font-medium text-slate-600">Máy ở kho — đặt trạng thái + ghi chú (vị trí trưng bày, mục đích…):</p>
+          <p className="text-xs font-medium text-slate-600">Máy ở kho — đổi trạng thái (bắt buộc mô tả hiện trạng máy):</p>
           <div className="flex flex-wrap items-center gap-2">
             <select value={den} onChange={(e) => setDen(e.target.value)} className="rounded-lg border px-3 py-1.5 text-sm bg-white text-slate-900">
               <option value="">— Chọn trạng thái —</option>
-              {TRANG_THAI_KHO_DAT_TAY.filter((t) => t !== trangThai).map((t) => <option key={t} value={t}>{NHAN_TRANG_THAI_SERIAL[t]}</option>)}
+              {datTayList.map((t) => <option key={t.code} value={t.code}>{t.nhan}</option>)}
             </select>
-            <input value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Ghi chú (vd: trưng bày showroom HN)" className="rounded-lg border px-3 py-1.5 text-sm text-slate-900 min-w-56" />
-            <button disabled={busy || !den} onClick={() => chay(() => datTrangThaiSerial(serial, den, ghiChu || undefined), `Đổi trạng thái serial ${serial} → ${NHAN_TRANG_THAI_SERIAL[den] ?? den}?`, 'Đã cập nhật.')} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-50">Đặt</button>
+            <input value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="Mô tả hiện trạng máy (bắt buộc)" className="rounded-lg border px-3 py-1.5 text-sm text-slate-900 min-w-64" />
+            <button disabled={busy || !den || !ghiChu.trim()} onClick={() => chay(() => datTrangThaiSerial(serial, den, ghiChu), `Đổi trạng thái serial ${serial} → ${nhan(den)}?`, 'Đã cập nhật.')} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-50">Đặt</button>
           </div>
         </div>
       )}
@@ -142,9 +141,9 @@ export function QuanLyMay({
               <li key={s.id} className="px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-slate-800">
-                    {NHAN_TRANG_THAI_SERIAL[s.den_trang_thai ?? ''] ?? s.su_kien}
+                    {nhan(s.den_trang_thai) !== '—' ? nhan(s.den_trang_thai) : s.su_kien}
                     {s.tu_trang_thai && s.den_trang_thai && (
-                      <span className="text-slate-400"> ({NHAN_TRANG_THAI_SERIAL[s.tu_trang_thai] ?? s.tu_trang_thai} → {NHAN_TRANG_THAI_SERIAL[s.den_trang_thai] ?? s.den_trang_thai})</span>
+                      <span className="text-slate-400"> ({nhan(s.tu_trang_thai)} → {nhan(s.den_trang_thai)})</span>
                     )}
                   </span>
                   <span className="text-[11px] text-slate-400 flex-none">{vnDateTime(s.luc)}</span>

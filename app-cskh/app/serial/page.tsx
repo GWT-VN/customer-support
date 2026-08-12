@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import { laAdmin } from '@/lib/supabase'
 import { Suspense } from 'react'
-import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, type SerialRow, type CatalogChon } from '@/app/actions'
+import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
 import { NhapKhoSerial } from '@/components/NhapKhoSerial'
 import { DoiTrangThaiKho } from '@/components/DoiTrangThaiKho'
-import { NHAN_TRANG_THAI_SERIAL } from '@/lib/danhSach'
+import { TrangThaiCauHinh } from '@/components/TrangThaiCauHinh'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function SerialPage({
@@ -20,8 +20,9 @@ export default async function SerialPage({
   const trang = Math.max(1, Number(trangRaw) || 1)
   const laCho = tab === 'cho'
   const laNhap = tab === 'nhap'
-  const [{ rows, tong, soTrang }, pending, admin, catalog] = await Promise.all([
-    laCho || laNhap
+  const laCauHinh = tab === 'cauhinh'
+  const [{ rows, tong, soTrang }, pending, admin, catalog, dsTT] = await Promise.all([
+    laCho || laNhap || laCauHinh
       ? Promise.resolve<KetQuaTrang<SerialRow>>({
           rows: [], tong: 0, trang: 1, soTrang: 1,
           sapXep: { cot: 'serial', tang: true, macDinh: true },
@@ -30,7 +31,9 @@ export default async function SerialPage({
     listSerialPending('cho_duyet'),
     laAdmin(),
     laNhap ? catalogChon() : Promise.resolve<CatalogChon[]>([]),
+    dsTrangThai(),
   ])
+  const nhanTT = (code: string) => dsTT.find((t) => t.code === code)?.nhan ?? code
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -54,9 +57,17 @@ export default async function SerialPage({
             className={`px-3 py-1.5 rounded-lg text-sm border ${laCho ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-amber-700 border-amber-200'}`}>
             Chờ duyệt ({pending.length})
           </Link>
+          {admin && (
+            <Link href="/serial?tab=cauhinh"
+              className={`px-3 py-1.5 rounded-lg text-sm border ${laCauHinh ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+              Cấu hình trạng thái
+            </Link>
+          )}
         </div>
 
-        {laNhap ? (
+        {laCauHinh ? (
+          admin ? <TrangThaiCauHinh ds={dsTT} /> : <p className="text-sm text-amber-600">Chỉ admin.</p>
+        ) : laNhap ? (
           <section className="space-y-3">
             {admin ? (
               <NhapKhoSerial catalog={catalog} />
@@ -83,16 +94,16 @@ export default async function SerialPage({
                 className={`px-2.5 py-1 rounded-lg text-xs border ${!tt ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
                 Tất cả
               </Link>
-              {(['ton_kho', 'da_lap', 'trung_bay', 'mkt', 'kiem_dinh_nuoc', 'lap_test', 'bao_tri', 'thanh_ly'] as const).map((t) => (
-                <Link key={t} href={`/serial?${new URLSearchParams({ ...(q && { q }), tt: t })}`}
-                  className={`px-2.5 py-1 rounded-lg text-xs border ${tt === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
-                  {NHAN_TRANG_THAI_SERIAL[t]}
+              {dsTT.map((t) => (
+                <Link key={t.code} href={`/serial?${new URLSearchParams({ ...(q && { q }), tt: t.code })}`}
+                  className={`px-2.5 py-1 rounded-lg text-xs border ${tt === t.code ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
+                  {t.nhan}
                 </Link>
               ))}
             </div>
             <p className="text-sm text-slate-500">
               {rows.length < tong ? `Hiện ${rows.length} trên ${tong} serial` : `${tong} serial`}
-              {tt && <span className="text-slate-400"> · lọc: {NHAN_TRANG_THAI_SERIAL[tt] ?? tt}</span>}
+              {tt && <span className="text-slate-400"> · lọc: {nhanTT(tt)}</span>}
             </p>
             <KhungChon
               khoaTrang={rows.map((s) => s.serial)}
@@ -122,7 +133,7 @@ export default async function SerialPage({
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.internal_code ?? '—'}</td>
                       <td className="px-4 py-2.5 text-slate-700">{s.model ?? '—'}</td>
                       <td className="px-4 py-2.5">
-                        <DoiTrangThaiKho serial={s.serial} trangThai={s.trang_thai} laAdmin={admin} />
+                        <DoiTrangThaiKho serial={s.serial} trangThai={s.trang_thai} laAdmin={admin} ds={dsTT} />
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{s.ten_noi_bo ?? '—'}</td>
                     </tr>

@@ -3,31 +3,34 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { datTrangThaiSerial } from '@/app/actions'
-import { NHAN_TRANG_THAI_SERIAL, TRANG_THAI_KHO_DAT_TAY } from '@/lib/danhSach'
-
-const MAU: Record<string, string> = {
-  ton_kho: 'bg-slate-100 text-slate-600', da_lap: 'bg-emerald-100 text-emerald-800',
-  trung_bay: 'bg-sky-100 text-sky-800', mkt: 'bg-violet-100 text-violet-800',
-  kiem_dinh_nuoc: 'bg-cyan-100 text-cyan-800', lap_test: 'bg-indigo-100 text-indigo-800',
-  bao_tri: 'bg-amber-100 text-amber-800', thanh_ly: 'bg-red-100 text-red-700',
-}
+import { datTrangThaiSerial, type TrangThai } from '@/app/actions'
+import { MAU_TRANG_THAI } from '@/lib/danhSach'
 
 /**
  * Badge trạng thái + đổi nhanh NGAY trong list kho serial (đỡ phải mở từng máy).
- *  - Máy đã lắp khách: chỉ hiện badge + link sang trang máy (phải thu hồi trước khi đổi).
- *  - Máy ở kho + admin: chọn trạng thái mới -> Đặt (có xác nhận). Ghi nhật ký vòng đời.
+ *  - Máy đã lắp khách: chỉ badge + link sang trang máy (phải thu hồi trước khi đổi).
+ *  - Máy ở kho + admin: chọn trạng thái mới + BẮT BUỘC mô tả hiện trạng -> Đặt.
+ * Danh mục `ds` do trang truyền vào (bảng serial_trang_thai).
  */
-export function DoiTrangThaiKho({ serial, trangThai, laAdmin }: { serial: string; trangThai: string | null; laAdmin: boolean }) {
+export function DoiTrangThaiKho({
+  serial, trangThai, laAdmin, ds,
+}: {
+  serial: string; trangThai: string | null; laAdmin: boolean; ds: TrangThai[]
+}) {
   const router = useRouter()
   const [den, setDen] = useState('')
+  const [ghiChu, setGhiChu] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const mapTT = new Map(ds.map((t) => [t.code, t]))
   const tt = trangThai ?? 'ton_kho'
+  const nhan = (code: string) => mapTT.get(code)?.nhan ?? code
+  const mauClass = MAU_TRANG_THAI[mapTT.get(tt)?.mau ?? 'slate'] ?? MAU_TRANG_THAI.slate
+  const datTayList = ds.filter((t) => t.cho_dat_tay && t.hoat_dong && t.code !== tt)
+
   const badge = (
-    <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${MAU[tt] ?? 'bg-slate-100 text-slate-500'}`}>
-      {NHAN_TRANG_THAI_SERIAL[tt] ?? tt}
-    </span>
+    <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${mauClass}`}>{nhan(tt)}</span>
   )
 
   if (tt === 'da_lap') {
@@ -41,28 +44,32 @@ export function DoiTrangThaiKho({ serial, trangThai, laAdmin }: { serial: string
   if (!laAdmin) return badge
 
   async function dat() {
-    if (!den) return
-    if (!window.confirm(`Đổi ${serial} → ${NHAN_TRANG_THAI_SERIAL[den] ?? den}?`)) return
+    if (!den || !ghiChu.trim()) return
+    if (!window.confirm(`Đổi ${serial} → ${nhan(den)}?`)) return
     setBusy(true); setErr(null)
-    const r = await datTrangThaiSerial(serial, den)
+    const r = await datTrangThaiSerial(serial, den, ghiChu)
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
-    setDen(''); router.refresh()
+    setDen(''); setGhiChu(''); router.refresh()
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      {badge}
-      <select value={den} onChange={(e) => setDen(e.target.value)} disabled={busy}
-        className="rounded border px-1.5 py-1 text-xs bg-white text-slate-700 max-w-[9rem]">
-        <option value="">đổi…</option>
-        {TRANG_THAI_KHO_DAT_TAY.filter((t) => t !== tt).map((t) => (
-          <option key={t} value={t}>{NHAN_TRANG_THAI_SERIAL[t]}</option>
-        ))}
-      </select>
-      {den && (
-        <button disabled={busy} onClick={dat} className="rounded bg-slate-900 text-white px-2 py-1 text-xs disabled:opacity-50">Đặt</button>
-      )}
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {badge}
+        <select value={den} onChange={(e) => setDen(e.target.value)} disabled={busy}
+          className="rounded border px-1.5 py-1 text-xs bg-white text-slate-700 max-w-[9rem]">
+          <option value="">đổi…</option>
+          {datTayList.map((t) => <option key={t.code} value={t.code}>{t.nhan}</option>)}
+        </select>
+        {den && (
+          <>
+            <input value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="mô tả hiện trạng (bắt buộc)"
+              className="rounded border px-2 py-1 text-xs text-slate-900 min-w-48" />
+            <button disabled={busy || !ghiChu.trim()} onClick={dat} className="rounded bg-slate-900 text-white px-2 py-1 text-xs disabled:opacity-50">Đặt</button>
+          </>
+        )}
+      </div>
       {err && <span className="text-[11px] text-red-600">{err}</span>}
     </div>
   )

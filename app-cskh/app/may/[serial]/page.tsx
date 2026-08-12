@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
-import { getMachine, ticketsOfSerial, lichSuSerial } from '@/app/actions'
+import { getMachine, ticketsOfSerial, lichSuSerial, dsTrangThai } from '@/app/actions'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
@@ -13,8 +13,8 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
-  const [tickets, vongDoi, admin] = await Promise.all([
-    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laAdmin(),
+  const [tickets, vongDoi, admin, dsTT] = await Promise.all([
+    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laAdmin(), dsTrangThai(),
   ])
   // Máy này có phải máy THAY THẾ (đổi máy cho khách) không -> hiện tính chuyển tiếp.
   const suKienThayThe = vongDoi.su_kien.find((s) => s.su_kien === 'doi_may_lap_moi')
@@ -97,7 +97,7 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Quản lý máy</h2>
           <QuanLyMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
-            dangLap={!!m.customer_id} laAdmin={admin} />
+            dangLap={!!m.customer_id} laAdmin={admin} ds={dsTT} />
         </section>
       </div>
     </main>

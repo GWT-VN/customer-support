@@ -191,9 +191,21 @@ export const NHAN_TRANG_THAI_SERIAL: Record<string, string> = {
   mkt: 'Marketing / Quay phim', kiem_dinh_nuoc: 'Kiểm định nước', lap_test: 'Lắp test thử',
   bao_tri: 'Thu hồi bảo trì', thanh_ly: 'Thanh lý',
 }
-/** Các trạng thái KHO có thể đặt tay cho máy chưa gắn khách (không gồm da_lap). */
+/** Các trạng thái KHO có thể đặt tay cho máy chưa gắn khách (không gồm da_lap).
+ *  DÙNG LÀM DỰ PHÒNG — nguồn chính giờ là bảng cấu hình serial_trang_thai (dsTrangThai). */
 export const TRANG_THAI_KHO_DAT_TAY =
   ['ton_kho', 'trung_bay', 'mkt', 'kiem_dinh_nuoc', 'lap_test', 'bao_tri', 'thanh_ly'] as const
+
+/** Token màu (cấu hình trong serial_trang_thai.mau) -> class badge. Liệt kê literal để
+ *  Tailwind JIT quét được. Thêm token mới thì thêm cả ở đây. */
+export const MAU_TRANG_THAI: Record<string, string> = {
+  slate: 'bg-slate-100 text-slate-600', emerald: 'bg-emerald-100 text-emerald-800',
+  sky: 'bg-sky-100 text-sky-800', violet: 'bg-violet-100 text-violet-800',
+  cyan: 'bg-cyan-100 text-cyan-800', indigo: 'bg-indigo-100 text-indigo-800',
+  amber: 'bg-amber-100 text-amber-800', orange: 'bg-orange-100 text-orange-800',
+  red: 'bg-red-100 text-red-700', teal: 'bg-teal-100 text-teal-800', rose: 'bg-rose-100 text-rose-700',
+}
+export const MAU_TOKENS = ['slate', 'emerald', 'sky', 'violet', 'cyan', 'indigo', 'amber', 'orange', 'red', 'teal', 'rose'] as const
 
 export const MA_COMBO = ['WH15A', 'WH30A', 'WH15AECO', 'WH30AECO'] as const
 export type MaCombo = (typeof MA_COMBO)[number]

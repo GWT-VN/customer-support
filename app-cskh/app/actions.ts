@@ -9,7 +9,7 @@ import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, TRANG_THAI_KHO_DAT_TAY,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay,
   type TinhTrangBH, type DongNhapSerial,
 } from '@/lib/danhSach'
 
@@ -1598,20 +1598,27 @@ export async function lichSuSerial(serial: string): Promise<{ trang_thai: string
   }
 }
 
-/** Đặt trạng thái KHO cho serial chưa gắn khách (trưng bày/mkt/bảo trì/thanh lý/về kho). CHỈ ADMIN. */
+/** Đặt trạng thái KHO cho serial chưa gắn khách (trưng bày/mkt/bảo trì/thanh lý/về kho).
+ *  CHỈ ADMIN. BẮT BUỘC mô tả hiện trạng máy (lưu vào nhật ký vòng đời). Trạng thái hợp lệ
+ *  lấy từ bảng cấu hình serial_trang_thai (cho_dat_tay + hoat_dong). */
 export async function datTrangThaiSerial(serial: string, den: string, ghiChu?: string) {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
-  if (!(TRANG_THAI_KHO_DAT_TAY as readonly string[]).includes(den)) return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
+  const moTa = ghiChu?.trim()
+  if (!moTa) return { ok: false as const, error: 'Cần ghi mô tả hiện trạng máy khi đổi trạng thái.' }
   const db = dataClient()
+  const { data: hopLe } = await db.from('serial_trang_thai').select('code')
+    .eq('code', den).eq('cho_dat_tay', true).eq('hoat_dong', true).maybeSingle()
+  if (!hopLe) return { ok: false as const, error: 'Trạng thái không hợp lệ hoặc đã ngừng dùng.' }
   const { data: sr } = await db.from('serial_registry').select('trang_thai').eq('serial', serial).maybeSingle()
   if (!sr) return { ok: false as const, error: 'Serial không có trong kho.' }
   const { data: ib } = await db.from('installed_base').select('serial').eq('serial', serial).eq('status', 'active').maybeSingle()
   if (ib) return { ok: false as const, error: 'Máy đang lắp cho khách — thu hồi trước khi đổi trạng thái kho.' }
   const cu = (sr as { trang_thai: string }).trang_thai
-  await ghiSuDung(db, { serial, su_kien: `dat_${den}`, tu: cu, den, ghi_chu: ghiChu })
+  await ghiSuDung(db, { serial, su_kien: `dat_${den}`, tu: cu, den, ghi_chu: moTa })
   await ghiAudit('dat_trang_thai_serial', `serial:${serial}`, { tu: cu, den })
   revalidatePath(`/may/${encodeURIComponent(serial)}`)
+  revalidatePath('/serial')
   return { ok: true as const }
 }
 
@@ -1642,8 +1649,9 @@ export async function thuHoiMay(serial: string, ghiChu?: string) {
 }
 
 /**
- * Đổi máy khác cho khách (máy cũ lỗi): thu hồi máy CŨ về "bảo trì" + lắp máy MỚI cho
- * cùng khách, BH **kế thừa mốc cũ** (đổi do lỗi, không mua mới). Một thao tác. CHỈ ADMIN.
+ * Đổi máy khác cho khách (máy cũ lỗi): thu hồi máy CŨ về "Thu hồi BẢO HÀNH" (đổi do lỗi
+ * BH, khác "Thu hồi bảo trì" của thuHoiMay) + lắp máy MỚI cho cùng khách, BH **kế thừa
+ * mốc cũ** (đổi do lỗi, không mua mới). Một thao tác. CHỈ ADMIN.
  */
 export async function doiMayChoKhach(serialCu: string, serialMoi: string, ghiChu?: string) {
   await requireStaff()
@@ -1669,11 +1677,11 @@ export async function doiMayChoKhach(serialCu: string, serialMoi: string, ghiChu
   const mocBH = (bhCu as { start_date: string | null } | null)?.start_date ?? c.install_date   // kế thừa mốc BH cũ
   const khach = c.customer_id
 
-  // 1) Thu hồi máy cũ -> bảo trì (gỡ khách, KHÔNG xoá để giữ ticket/lịch sử)
+  // 1) Thu hồi máy cũ -> THU HỒI BẢO HÀNH (gỡ khách, KHÔNG xoá để giữ ticket/lịch sử)
   const { error: e1 } = await db.from('installed_base')
     .update({ customer_id: null, status: 'thu_hoi', updated_at: new Date().toISOString() }).eq('serial', cu)
   if (e1) return { ok: false as const, error: e1.message }
-  await ghiSuDung(db, { serial: cu, su_kien: 'doi_may_thu_hoi', tu: 'da_lap', den: 'bao_tri', customer_id: khach, ghi_chu: `Đổi sang ${moi}. ${ghiChu ?? ''}`.trim() })
+  await ghiSuDung(db, { serial: cu, su_kien: 'doi_may_thu_hoi', tu: 'da_lap', den: 'thu_hoi_bao_hanh', customer_id: khach, ghi_chu: `Đổi sang ${moi}. ${ghiChu ?? ''}`.trim() })
 
   // 2) Lắp máy mới cho khách, BH kế thừa mốc cũ
   const { error: e2 } = await db.from('installed_base').upsert({
@@ -1690,6 +1698,78 @@ export async function doiMayChoKhach(serialCu: string, serialMoi: string, ghiChu
   revalidatePath(`/may/${encodeURIComponent(moi)}`)
   revalidatePath(`/khach/${khach}`)
   return { ok: true as const, ma_moi: moi }
+}
+
+// ── Cấu hình danh mục trạng thái máy (admin sửa được, thay hằng số hardcode) ──
+export type TrangThai = {
+  code: string; nhan: string; mau: string; thu_tu: number
+  he_thong: boolean; cho_dat_tay: boolean; hoat_dong: boolean
+}
+export type TrangThaiInput = { nhan: string; mau: string; thu_tu?: number; cho_dat_tay: boolean; hoat_dong?: boolean }
+
+/** Danh mục trạng thái máy (ordered). chiDatTay=true -> chỉ trạng thái đặt-tay đang bật. */
+export async function dsTrangThai(chiDatTay = false): Promise<TrangThai[]> {
+  await requireStaff()
+  let q = dataClient().from('serial_trang_thai')
+    .select('code, nhan, mau, thu_tu, he_thong, cho_dat_tay, hoat_dong').order('thu_tu')
+  if (chiDatTay) q = q.eq('cho_dat_tay', true).eq('hoat_dong', true)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TrangThai[]
+}
+
+/** Thêm trạng thái mới (không phải hệ thống). CHỈ ADMIN. */
+export async function taoTrangThai(code: string, input: TrangThaiInput): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const ma = code.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+  if (ma.length < 2) return { ok: false, error: 'Mã trạng thái cần ≥2 ký tự (a-z, 0-9, gạch dưới).' }
+  if (!input.nhan.trim()) return { ok: false, error: 'Thiếu tên hiển thị.' }
+  const { error } = await dataClient().from('serial_trang_thai').insert({
+    code: ma, nhan: input.nhan.trim(), mau: input.mau || 'slate',
+    thu_tu: input.thu_tu ?? 100, cho_dat_tay: input.cho_dat_tay, hoat_dong: input.hoat_dong ?? true,
+    he_thong: false,
+  })
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: `Mã "${ma}" đã tồn tại.` }
+    return { ok: false, error: error.message }
+  }
+  await ghiAudit('tao_trang_thai', `trang-thai:${ma}`, { nhan: input.nhan.trim() })
+  revalidatePath('/serial'); revalidatePath('/')
+  return { ok: true }
+}
+
+/** Sửa trạng thái (nhãn/màu/thứ tự/đặt-tay/bật-tắt). Không đổi mã. CHỈ ADMIN. */
+export async function suaTrangThai(code: string, input: TrangThaiInput): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!input.nhan.trim()) return { ok: false, error: 'Thiếu tên hiển thị.' }
+  const { error, count } = await dataClient().from('serial_trang_thai').update({
+    nhan: input.nhan.trim(), mau: input.mau || 'slate', thu_tu: input.thu_tu ?? 100,
+    cho_dat_tay: input.cho_dat_tay, hoat_dong: input.hoat_dong ?? true, updated_at: new Date().toISOString(),
+  }, { count: 'exact' }).eq('code', code)
+  if (error) return { ok: false, error: error.message }
+  if (!count) return { ok: false, error: 'Không thấy trạng thái để sửa.' }
+  await ghiAudit('sua_trang_thai', `trang-thai:${code}`, { nhan: input.nhan.trim() })
+  revalidatePath('/serial'); revalidatePath('/')
+  return { ok: true }
+}
+
+/** Xoá trạng thái. Chặn nếu là hệ thống hoặc còn máy đang dùng. CHỈ ADMIN. */
+export async function xoaTrangThai(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: tt } = await db.from('serial_trang_thai').select('he_thong').eq('code', code).maybeSingle()
+  if (!tt) return { ok: false, error: 'Không thấy trạng thái.' }
+  if ((tt as { he_thong: boolean }).he_thong) return { ok: false, error: 'Trạng thái hệ thống — không xoá được (có thể "ngừng dùng").' }
+  const { count } = await db.from('serial_registry').select('serial', { count: 'exact', head: true }).eq('trang_thai', code)
+  if ((count ?? 0) > 0) return { ok: false, error: `Còn ${count} máy đang ở trạng thái này — đổi chúng trước khi xoá.` }
+  const { error } = await db.from('serial_trang_thai').delete().eq('code', code)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_trang_thai', `trang-thai:${code}`)
+  revalidatePath('/serial')
+  return { ok: true }
 }
 
 // ── Phần 4: Đăng ký bảo hành + khách (chờ duyệt) ────────────────────────────
