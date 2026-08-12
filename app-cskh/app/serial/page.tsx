@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { Suspense } from 'react'
 import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
@@ -29,7 +29,7 @@ export default async function SerialPage({
         })
       : searchSerialsTrang(q, { trang }, tt),
     listSerialPending('cho_duyet'),
-    laAdmin(),
+    laQuanLy(),
     laNhap ? catalogChon() : Promise.resolve<CatalogChon[]>([]),
     dsTrangThai(),
   ])

@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
-import { chuanHoaVaiTro, laQuyenAdmin, type VaiTro } from './quyen'
+import { chuanHoaVaiTro, coQuyenQuanLy, laQuyenAdmin, type VaiTro } from './quyen'
 
 /**
  * Hai client TÁCH BIỆT — đừng trộn lẫn:
@@ -156,6 +156,14 @@ export async function laAdmin(): Promise<boolean> {
 }
 
 /**
+ * Cấp QUẢN LÝ CS = admin HOẶC cs_manager. Được duyệt + nghiệp vụ CS nâng cao.
+ * Xem lib/quyen.ts:coQuyenQuanLy để biết ranh giới (XOÁ khách/nhân sự/catalog vẫn CHỈ admin).
+ */
+export async function laQuanLy(): Promise<boolean> {
+  return coQuyenQuanLy((await layNhanVien())?.vai_tro)
+}
+
+/**
  * Chặn TRANG chỉ dành cho admin.
  *
  * Ẩn nút trên giao diện KHÔNG phải phân quyền — ai biết đường dẫn vẫn mở được.
@@ -163,4 +171,9 @@ export async function laAdmin(): Promise<boolean> {
  */
 export async function chanNeuKhongPhaiAdmin() {
   if (!(await laAdmin())) redirect('/?loi=khong_du_quyen')
+}
+
+/** Chặn TRANG dành cho cấp quản lý (admin hoặc cs_manager). */
+export async function chanNeuKhongPhaiQuanLy() {
+  if (!(await laQuanLy())) redirect('/?loi=khong_du_quyen')
 }

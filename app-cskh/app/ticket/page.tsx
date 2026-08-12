@@ -4,7 +4,7 @@ import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, listBangView
 import type { KetQuaTrang } from '@/bang'
 import { ExportTicketButton } from '@/components/ExportTicketButton'
 import { BangTicket } from '@/components/BangTicket'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
@@ -40,7 +40,7 @@ export default async function TicketsPage({
           trang, cot, chieu, loaiTicket: loai || undefined, ngtu, ngden,
         })),
     ticketTypes(),
-    laAdmin(),
+    laQuanLy(),
   ])
   const views = await listBangView('tickets')
   const { rows: tickets, tong, soTrang, sapXep } = ketQua

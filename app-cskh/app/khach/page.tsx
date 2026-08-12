@@ -5,7 +5,7 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function ToFixPage({
@@ -17,7 +17,7 @@ export default async function ToFixPage({
   const trang = Math.max(1, Number(trangRaw) || 1)
   const [{ rows: list, tong, soTrang, sapXep }, admin] = await Promise.all([
     listToFix(q, { trang, cot, chieu }),
-    laAdmin(),
+    laQuanLy(),
   ])
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)

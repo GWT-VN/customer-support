@@ -1,11 +1,11 @@
-import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
+import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { listKhachChoDuyet, listYeuCauThayDoi, listYeuCauExport } from '@/app/actions'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 import { DuyetList } from '@/components/DuyetList'
 import { DuyetExportList } from '@/components/DuyetExportList'
 
 export default async function DuyetPage() {
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuKhongPhaiQuanLy()
   const [khachCho, yeuCau, yeuCauExport] = await Promise.all([
     listKhachChoDuyet(), listYeuCauThayDoi(), listYeuCauExport(),
   ])

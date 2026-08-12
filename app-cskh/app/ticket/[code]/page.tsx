@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes, nhomLoiChon } from '@/app/actions'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
@@ -16,7 +16,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
   const ma = decodeURIComponent(code)
   const [t, nhom, notes, staff, items, me, catalog, loaiList, nhomList, admin] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
-    listCatalogItems(), ticketTypes(), nhomLoiChon(), laAdmin(),
+    listCatalogItems(), ticketTypes(), nhomLoiChon(), laQuanLy(),
   ])
   if (!t) notFound()
 

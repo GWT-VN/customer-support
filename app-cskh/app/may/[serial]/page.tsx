@@ -7,14 +7,14 @@ import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
 import { QuanLyMay } from '@/components/QuanLyMay'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
   const [tickets, vongDoi, admin, dsTT] = await Promise.all([
-    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laAdmin(), dsTrangThai(),
+    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laQuanLy(), dsTrangThai(),
   ])
   // Máy này có phải máy THAY THẾ (đổi máy cho khách) không -> hiện tính chuyển tiếp.
   const suKienThayThe = vongDoi.su_kien.find((s) => s.su_kien === 'doi_may_lap_moi')

@@ -42,6 +42,21 @@ export function laQuyenAdmin(vaiTro: string | string[] | null | undefined): bool
   return chuanHoaVaiTro(vaiTro).includes('admin')
 }
 
+/**
+ * Cấp QUẢN LÝ CS = admin HOẶC cs_manager. Là mức được:
+ *  - DUYỆT: serial pending · yêu cầu sửa · export · khách chờ.
+ *  - Nghiệp vụ CS NÂNG CAO: ghi chi phí/mục ticket · lắp/thu hồi/đổi máy · kho serial ·
+ *    lắp bộ · nhóm lỗi · xuất báo cáo · cập nhật hàng loạt · lưu view chung · trạng thái máy.
+ *
+ * KHÔNG gồm (vẫn CHỈ admin): quản lý nhân viên · đồng bộ catalog · nhật ký thao tác ·
+ * XOÁ thông tin khách (xoá khách / duyệt yêu cầu xoá khách / xoá hàng loạt khách).
+ * KHÔNG gồm sales/sales_manager — app này là nghiệp vụ CS.
+ */
+export function coQuyenQuanLy(vaiTro: string | string[] | null | undefined): boolean {
+  const r = chuanHoaVaiTro(vaiTro)
+  return r.includes('admin') || r.includes('cs_manager')
+}
+
 export type YeuCauSua = {
   /** id nhân viên đang thực hiện thao tác */
   idNguoiSua: string

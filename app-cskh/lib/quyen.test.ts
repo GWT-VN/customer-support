@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe } from './quyen'
+import { chuanHoaVaiTro, coQuyenQuanLy, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe } from './quyen'
 
 const NGUOI_SUA = 'admin-1'
 const NGUOI_KHAC = 'nv-2'
@@ -35,6 +35,24 @@ describe('laQuyenAdmin', () => {
     expect(laQuyenAdmin(null)).toBe(false)
     expect(laQuyenAdmin(undefined)).toBe(false)
     expect(laQuyenAdmin('Admin')).toBe(false) // phân biệt hoa thường, không đoán
+  })
+})
+
+describe('coQuyenQuanLy — admin hoặc cs_manager', () => {
+  it('đúng với admin và cs_manager (kể cả kiêm nhiệm)', () => {
+    expect(coQuyenQuanLy(['admin'])).toBe(true)
+    expect(coQuyenQuanLy(['cs_manager'])).toBe(true)
+    expect(coQuyenQuanLy(['cs', 'cs_manager'])).toBe(true)
+    expect(coQuyenQuanLy(['admin', 'sales'])).toBe(true)
+    expect(coQuyenQuanLy('admin')).toBe(true) // chuỗi cũ
+  })
+  it('sai với cs / sales / sales_manager thường và rỗng', () => {
+    expect(coQuyenQuanLy(['cs'])).toBe(false)
+    expect(coQuyenQuanLy(['sales'])).toBe(false)
+    expect(coQuyenQuanLy(['sales_manager'])).toBe(false) // sales_manager KHÔNG có quyền CS
+    expect(coQuyenQuanLy(['sales', 'sales_manager'])).toBe(false)
+    expect(coQuyenQuanLy([])).toBe(false)
+    expect(coQuyenQuanLy(null)).toBe(false)
   })
 })
 

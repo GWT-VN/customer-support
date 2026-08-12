@@ -1,9 +1,9 @@
-import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
+import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { LapBoForm } from '@/components/LapBoForm'
 import { NutQuayLai } from '@/components/NutQuayLai'
 
 export default async function LapBoPage() {
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuKhongPhaiQuanLy()
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">

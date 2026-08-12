@@ -5,7 +5,7 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { LocNgay } from '@/bang'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportLoiButton } from '@/components/ExportLoiButton'
 import { BangLoi } from '@/components/BangLoi'
@@ -23,7 +23,7 @@ export default async function LoiPage({
   const [{ rows, tong, soTrang, sapXep }, counts, admin, views] = await Promise.all([
     coreForecast(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     coreCounts(),
-    laAdmin(),
+    laQuanLy(),
     listBangView('core'),
   ])
 

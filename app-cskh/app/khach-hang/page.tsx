@@ -6,7 +6,7 @@ import { BangKhach } from '@/components/BangKhach'
 import { SUA_HL_KHACH } from '@/lib/danhSach'
 import { OTimKiem, ThanhDangLoc, PhanTrang } from '@/bang'
 import { KhungChon, ThanhDaChon } from '@/bang'
-import { laAdmin } from '@/lib/supabase'
+import { laAdmin, laQuanLy } from '@/lib/supabase'
 
 export default async function KhachHangPage({
   searchParams,
@@ -15,8 +15,10 @@ export default async function KhachHangPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: list, tong, soTrang, sapXep }, admin, exportDuyet, views] = await Promise.all([
+  // quanLy (admin|cs_manager): xem/sửa hàng loạt + nút nâng cao. chiAdmin: riêng XOÁ khách.
+  const [{ rows: list, tong, soTrang, sapXep }, quanLy, chiAdmin, exportDuyet, views] = await Promise.all([
     listKhachHang(q, { trang, cot, chieu }),
+    laQuanLy(),
     laAdmin(),
     exportCuaToi(),
     listBangView('cs_customers'),
@@ -46,15 +48,15 @@ export default async function KhachHangPage({
         <KhungChon
           khoaTrang={list.map((c) => c.id)}
           tong={tong}
-          bat={admin}
+          bat={quanLy}
           thamSo={{ q, cot, chieu }}
           layTatCaKhoa={khoaTatCaKhachHang}
         >
           <ThanhDaChon nhan="khách">
-            <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} />
+            <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} choPhepXoa={chiAdmin} />
           </ThanhDaChon>
           <Suspense>
-            <BangKhach rows={list} admin={admin} views={views} />
+            <BangKhach rows={list} admin={quanLy} views={views} />
           </Suspense>
         </KhungChon>
 

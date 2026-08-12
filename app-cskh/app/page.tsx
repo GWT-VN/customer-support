@@ -6,7 +6,7 @@ import { PhanTrang } from '@/bang'
 import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
 import { BangMay } from '@/components/BangMay'
@@ -21,7 +21,7 @@ export default async function Home({
   const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([
     searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }),
     machineModels(),
-    laAdmin(),
+    laQuanLy(),
   ])
   const views = await listBangView('installed_base')
 

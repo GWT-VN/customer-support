@@ -7,10 +7,11 @@ import { capNhatHangLoat, xoaHangLoat } from '@/app/actions'
 import type { CotSuaHL } from '@/lib/danhSach'
 
 /**
- * Thao tác HÀNG LOẠT (CHỈ ADMIN) — cắm vào <ThanhDaChon>. Cập nhật 1 trường (chọn
- * trường + giá trị) hoặc xoá cho tất cả dòng đã chọn. Luôn hỏi xác nhận kèm SỐ DÒNG.
+ * Thao tác HÀNG LOẠT — cắm vào <ThanhDaChon>. Cập nhật 1 trường (chọn trường + giá
+ * trị) cho cấp QUẢN LÝ; nút XOÁ hàng loạt chỉ hiện khi choPhepXoa=true (CHỈ ADMIN —
+ * xoá thông tin khách). Luôn hỏi xác nhận kèm SỐ DÒNG. Server vẫn chặn thật.
  */
-export function ThaoTacHangLoat({ bang, truong }: { bang: string; truong: readonly CotSuaHL[] }) {
+export function ThaoTacHangLoat({ bang, truong, choPhepXoa = false }: { bang: string; truong: readonly CotSuaHL[]; choPhepXoa?: boolean }) {
   const { daChon, soDong, boChonHet } = useDaChon()
   const router = useRouter()
   const [mo, setMo] = useState(false)
@@ -73,10 +74,12 @@ export function ThaoTacHangLoat({ bang, truong }: { bang: string; truong: readon
             className="rounded-lg border bg-white px-3 py-1.5 text-sm text-slate-700 disabled:opacity-50">
             Cập nhật hàng loạt
           </button>
-          <button onClick={xoa} disabled={busy}
-            className="rounded-lg border border-red-200 text-red-600 px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-50">
-            Xoá hàng loạt
-          </button>
+          {choPhepXoa && (
+            <button onClick={xoa} disabled={busy}
+              className="rounded-lg border border-red-200 text-red-600 px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-50">
+              Xoá hàng loạt
+            </button>
+          )}
         </>
       )}
       {err && <span className="text-sm text-red-600">{err}</span>}

@@ -4,7 +4,7 @@ import { OTimKiem } from '@/bang'
 import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView } from '@/app/actions'
 import { PhanTrang } from '@/bang'
 import { ChipSapXep } from '@/bang'
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
@@ -24,7 +24,7 @@ export default async function BaoTriPage({
     maintenanceDue(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     maintenanceCounts(),
     listBangView('maintenance'),
-    laAdmin(),
+    laQuanLy(),
   ])
 
   const tabs = [

@@ -36,8 +36,12 @@ const NHOM: readonly Nhom[] = [
   ] },
 ] as const
 
-const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
+// Cấp QUẢN LÝ (admin | cs_manager): duyệt.
+const NHOM_QUANLY: Nhom = { ten: 'Quản lý', muc: [
   { href: '/duyet', nhan: 'Chờ duyệt' },
+] }
+// CHỈ admin: doanh số, catalog, nhật ký, nhân viên.
+const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
   { href: '/doanh-so', nhan: 'Doanh số' },
   { href: '/dong-bo-catalog', nhan: 'Đồng bộ catalog' },
   { href: '/audit', nhan: 'Nhật ký thao tác' },
@@ -54,10 +58,15 @@ function mucDangMo(pathname: string, hrefs: string[]): string | null {
   return CHA.find(([tienTo]) => pathname.startsWith(tienTo))?.[1] ?? null
 }
 
-export function SidebarNav({ laAdmin }: { laAdmin: boolean }) {
+export function SidebarNav({ laAdmin, laQuanLy }: { laAdmin: boolean; laQuanLy: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  const nhom = laAdmin ? [...NHOM, NHOM_ADMIN] : NHOM
+  // admin cũng là quản lý -> thấy cả 2 nhóm. cs_manager chỉ thấy nhóm Quản lý.
+  const nhom = [
+    ...NHOM,
+    ...(laQuanLy ? [NHOM_QUANLY] : []),
+    ...(laAdmin ? [NHOM_ADMIN] : []),
+  ]
   const dangMo = mucDangMo(pathname, nhom.flatMap((n) => n.muc.map((m) => m.href)))
 
   return (

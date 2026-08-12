@@ -26,12 +26,14 @@ export default async function NhanVienPage() {
         <BangNhanVien ds={ds} toiId={toi?.id ?? ''} />
 
         <div className="bg-white rounded-xl border p-4 text-sm text-slate-600 space-y-1">
-          <p className="font-medium text-slate-900">Quản trị làm được thêm gì</p>
-          <p>· Ghi chi phí, vật tư, đổi máy trên ticket</p>
-          <p>· Xuất CSV danh sách ticket</p>
-          <p>· Quản lý nhân viên ở trang này</p>
+          <p className="font-medium text-slate-900">Ba cấp quyền (một người giữ nhiều vai trò)</p>
+          <p>· <b>NV CSKH / NV Sales</b>: xem + xử lý khách, máy, ticket, lịch lõi như thường ngày.</p>
+          <p>· <b>Trưởng CSKH</b>: thêm quyền <i>duyệt</i> (serial, yêu cầu sửa, export, khách chờ) + nghiệp
+            vụ nâng cao (ghi chi phí ticket, lắp/thu hồi/đổi máy, kho serial, nhóm lỗi, xuất báo cáo).</p>
+          <p>· <b>Quản trị</b>: toàn quyền — quản lý nhân viên, đồng bộ catalog, nhật ký, và <b>xoá thông tin
+            khách</b> (chỉ admin duyệt).</p>
           <p className="text-slate-500 pt-1">
-            Nhân viên CSKH vẫn xem và xử lý được toàn bộ khách, máy, ticket, lịch lõi như cũ.
+            Trưởng Sales / NV Sales chưa có nghiệp vụ riêng trong app CSKH này.
           </p>
         </div>
       </div>
