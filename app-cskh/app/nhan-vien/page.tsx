@@ -1,13 +1,14 @@
 import { BangNhanVien } from '@/components/BangNhanVien'
 import { listAllStaff } from '@/app/actions'
 import { chanNeuKhongPhaiAdmin, layNhanVien } from '@/lib/supabase'
+import { laQuyenAdmin } from '@/lib/quyen'
 
 export default async function NhanVienPage() {
   // Rào THẬT của trang này. Ẩn mục menu chỉ là cho gọn mắt.
   await chanNeuKhongPhaiAdmin()
 
   const [ds, toi] = await Promise.all([listAllStaff(), layNhanVien()])
-  const soAdmin = ds.filter((n) => n.vai_tro === 'admin' && n.hoat_dong).length
+  const soAdmin = ds.filter((n) => n.hoat_dong && laQuyenAdmin(n.vai_tro)).length
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -18,8 +19,8 @@ export default async function NhanVienPage() {
 
         <p className="text-sm text-slate-500">
           {ds.length} người · {soAdmin} quản trị đang hoạt động. Ai đăng nhập bằng email
-          <code className="mx-1 text-xs">@gwt.vn</code> lần đầu sẽ tự xuất hiện ở đây với vai trò
-          Nhân viên CSKH.
+          <code className="mx-1 text-xs">@gwt.vn</code> lần đầu sẽ tự xuất hiện ở đây (đang khoá, chưa
+          gán vai trò) — bật hoạt động và tích vai trò cho họ. Một người có thể giữ nhiều vai trò.
         </p>
 
         <BangNhanVien ds={ds} toiId={toi?.id ?? ''} />

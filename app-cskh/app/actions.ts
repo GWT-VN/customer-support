@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, layNhanVien, requireStaff } from '@/lib/supabase'
-import { kiemTraSuaNhanVien, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
+import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import {
@@ -1911,7 +1911,12 @@ export async function duyetKhach(id: string) {
 }
 
 // ── Nhân viên phụ trách (Đợt 2) ─────────────────────────────────────────────
-export type Staff = { id: string; ten: string; vai_tro: string; email: string | null }
+export type Staff = { id: string; ten: string; vai_tro: VaiTro[]; email: string | null }
+
+/** Chuẩn hoá 1 dòng staff thô về Staff — vai_tro coerce về MẢNG (đọc cả chuỗi cũ lẫn text[] mới). */
+function toStaff(r: { id: string; ten: string; vai_tro: unknown; email: string | null }): Staff {
+  return { id: r.id, ten: r.ten, email: r.email, vai_tro: chuanHoaVaiTro(r.vai_tro as string | string[] | null) }
+}
 
 /** Danh sách NV đang hoạt động — để chọn người phụ trách. */
 export async function listStaff(): Promise<Staff[]> {
@@ -1919,7 +1924,7 @@ export async function listStaff(): Promise<Staff[]> {
   const { data, error } = await dataClient()
     .from('staff').select('id, ten, vai_tro, email').eq('hoat_dong', true).order('ten')
   if (error) throw new Error(error.message)
-  return (data ?? []) as Staff[]
+  return (data ?? []).map(toStaff)
 }
 
 /** NV ứng với người đang đăng nhập (khớp email) — cho lọc "việc của tôi". */
@@ -1929,7 +1934,7 @@ export async function currentStaff(): Promise<Staff | null> {
   const { data, error } = await dataClient()
     .from('staff').select('id, ten, vai_tro, email').eq('email', user.email).maybeSingle()
   if (error) throw new Error(error.message)
-  return (data as Staff) ?? null
+  return data ? toStaff(data) : null
 }
 
 // ── Quản lý nhân viên (chỉ admin) ───────────────────────────────────────────
@@ -1942,7 +1947,7 @@ export async function listAllStaff(): Promise<(Staff & { hoat_dong: boolean })[]
     .from('staff').select('id, ten, vai_tro, email, hoat_dong')
     .order('hoat_dong', { ascending: false }).order('vai_tro').order('ten')
   if (error) throw new Error(error.message)
-  return (data ?? []) as (Staff & { hoat_dong: boolean })[]
+  return (data ?? []).map((r) => ({ ...toStaff(r), hoat_dong: (r as { hoat_dong: boolean }).hoat_dong }))
 }
 
 /**
@@ -1953,14 +1958,19 @@ export async function listAllStaff(): Promise<(Staff & { hoat_dong: boolean })[]
  */
 export async function suaNhanVien(
   id: string,
-  patch: { vai_tro?: string; hoat_dong?: boolean }
+  patch: { vai_tro?: string[]; hoat_dong?: boolean }
 ) {
   await requireStaff()
   const toi = await layNhanVien()
   if (!toi || !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
 
-  if (patch.vai_tro !== undefined && !laVaiTroHopLe(patch.vai_tro)) {
-    return { ok: false as const, error: 'Vai trò không hợp lệ.' }
+  // Chuẩn hoá TẬP role: chặn role lạ, khử trùng. undefined = không đổi role.
+  let vaiTroMoi: VaiTro[] | undefined
+  if (patch.vai_tro !== undefined) {
+    if (!patch.vai_tro.every(laVaiTroHopLe)) {
+      return { ok: false as const, error: 'Vai trò không hợp lệ.' }
+    }
+    vaiTroMoi = chuanHoaVaiTro(patch.vai_tro)
   }
 
   const db = dataClient()
@@ -1969,24 +1979,32 @@ export async function suaNhanVien(
   if (e1) return { ok: false as const, error: e1.message }
   if (!biSua) return { ok: false as const, error: 'Không tìm thấy nhân viên.' }
 
-  const { count, error: e2 } = await db
-    .from('staff').select('id', { count: 'exact', head: true })
-    .eq('vai_tro', 'admin').eq('hoat_dong', true)
+  // Đếm admin đang hoạt động bằng coerce trong JS thay vì .eq('vai_tro','admin')
+  // — đúng cho cả cột chuỗi cũ lẫn text[] mới (bảng staff nhỏ, không lo chi phí).
+  const { data: dsHoatDong, error: e2 } = await db
+    .from('staff').select('vai_tro').eq('hoat_dong', true)
   if (e2) return { ok: false as const, error: e2.message }
+  const soAdmin = (dsHoatDong ?? [])
+    .filter((r) => laQuyenAdmin((r as { vai_tro: unknown }).vai_tro as string | string[] | null)).length
 
   const kt = kiemTraSuaNhanVien({
     idNguoiSua: toi.id,
     idBiSua: id,
-    vaiTroMoi: patch.vai_tro as VaiTro | undefined,
+    vaiTroMoi,
     hoatDongMoi: patch.hoat_dong,
-    vaiTroHienTai: (biSua as { vai_tro: string }).vai_tro,
-    soAdminDangHoatDong: count ?? 0,
+    vaiTroHienTai: chuanHoaVaiTro((biSua as { vai_tro: unknown }).vai_tro as string | string[] | null),
+    soAdminDangHoatDong: soAdmin,
   })
   if (!kt.ok) return { ok: false as const, error: kt.lyDo }
 
-  const { error } = await db.from('staff').update(patch).eq('id', id)
+  // Ghi TẬP đã chuẩn hoá (không ghi mảng thô từ client).
+  const capNhat: { vai_tro?: VaiTro[]; hoat_dong?: boolean } = {}
+  if (vaiTroMoi !== undefined) capNhat.vai_tro = vaiTroMoi
+  if (patch.hoat_dong !== undefined) capNhat.hoat_dong = patch.hoat_dong
+
+  const { error } = await db.from('staff').update(capNhat).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
-  await ghiAudit('sua_nv', `nv:${id}`, patch as Record<string, unknown>)
+  await ghiAudit('sua_nv', `nv:${id}`, capNhat as Record<string, unknown>)
   revalidatePath('/nhan-vien')
   return { ok: true as const }
 }

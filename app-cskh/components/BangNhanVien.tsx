@@ -7,7 +7,7 @@ import { NHAN_VAI_TRO, VAI_TRO } from '@/lib/quyen'
 export type DongNhanVien = {
   id: string
   ten: string
-  vai_tro: string
+  vai_tro: string[]
   email: string | null
   hoat_dong: boolean
 }
@@ -63,16 +63,31 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
                   </td>
 
                   <td className="px-4 py-3">
-                    <select
-                      defaultValue={nv.vai_tro}
-                      disabled={dangChay}
-                      onChange={(e) => chay(() => suaNhanVien(nv.id, { vai_tro: e.target.value }))}
-                      className="rounded-lg border px-2 py-1 text-slate-900"
-                    >
-                      {VAI_TRO.map((v) => (
-                        <option key={v} value={v}>{NHAN_VAI_TRO[v]}</option>
-                      ))}
-                    </select>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {VAI_TRO.map((v) => {
+                        const co = nv.vai_tro.includes(v)
+                        return (
+                          <label key={v} className="inline-flex items-center gap-1.5 text-slate-800 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={co}
+                              disabled={dangChay}
+                              onChange={() => {
+                                const moi = co
+                                  ? nv.vai_tro.filter((x) => x !== v)
+                                  : [...nv.vai_tro, v]
+                                chay(() => suaNhanVien(nv.id, { vai_tro: moi }))
+                              }}
+                              className="rounded border-slate-300"
+                            />
+                            {NHAN_VAI_TRO[v]}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {nv.vai_tro.length === 0 && (
+                      <div className="text-xs text-amber-600 mt-1">chưa gán vai trò</div>
+                    )}
                   </td>
 
                   <td className="px-4 py-3">

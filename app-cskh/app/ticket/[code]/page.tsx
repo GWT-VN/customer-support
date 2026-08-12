@@ -19,9 +19,10 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
   ])
   if (!t) notFound()
 
-  // Tự bắt người xử lý theo tên đăng nhập: kỹ thuật → ô Kỹ thuật, còn lại → ô CS.
-  const defaultCsId = me && me.vai_tro !== 'ky_thuat' ? me.id : null
-  const defaultKtId = me && me.vai_tro === 'ky_thuat' ? me.id : null
+  // Tự điền người xử lý = người đang đăng nhập vào ô CS (bộ role hiện tại không
+  // có vai trò kỹ thuật riêng; ô Kỹ thuật để trống, chọn tay khi cần).
+  const defaultCsId = me?.id ?? null
+  const defaultKtId = null
 
   return (
     <main className="min-h-screen bg-slate-50">

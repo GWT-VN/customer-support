@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
-import { laQuyenAdmin } from './quyen'
+import { chuanHoaVaiTro, laQuyenAdmin, type VaiTro } from './quyen'
 
 /**
  * Hai client TÁCH BIỆT — đừng trộn lẫn:
@@ -63,7 +63,7 @@ export const layNguoiDung = cache(async () => {
 export type NhanVien = {
   id: string
   ten: string
-  vai_tro: string
+  vai_tro: VaiTro[]
   email: string | null
   hoat_dong: boolean
 }
@@ -83,7 +83,9 @@ const layDongStaff = cache(async (email: string): Promise<NhanVien | null> => {
     .eq('email', chuanHoaEmail(email))
     .maybeSingle()
   if (error) throw error
-  return (data as NhanVien) ?? null
+  if (!data) return null
+  // Coerce vai_tro về MẢNG: đọc được cả chuỗi cũ (trước migration 33) lẫn text[] mới.
+  return { ...data, vai_tro: chuanHoaVaiTro((data as { vai_tro: string | string[] | null }).vai_tro) } as NhanVien
 })
 
 /** Đọc staff rồi xét luật. Dùng chung cho requireStaff() và route callback. */
@@ -97,7 +99,7 @@ export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
  * Tạo hồ sơ CHỜ DUYỆT cho người @gwt.vn vào lần đầu. KHÔNG đụng dòng đã có.
  *
  * hoat_dong=false -> chưa vào được; admin bật ở /nhan-vien mới cấp quyền (C1).
- * vai_tro để DB tự điền mặc định 'cs' — người mới không tự thành admin.
+ * vai_tro để DB tự điền mặc định '{}' (không role) — admin gán role lúc kích hoạt.
  * ten NOT NULL -> tạm lấy phần trước @, admin sửa lại sau.
  */
 export async function ghiNhanNhanVienMoi(email: string) {
