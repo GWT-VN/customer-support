@@ -20,6 +20,7 @@ export function DoiTrangThaiKho({
   const router = useRouter()
   const [den, setDen] = useState('')
   const [ghiChu, setGhiChu] = useState('')
+  const [ngay, setNgay] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -47,10 +48,10 @@ export function DoiTrangThaiKho({
     if (!den || !ghiChu.trim()) return
     if (!window.confirm(`Đổi ${serial} → ${nhan(den)}?`)) return
     setBusy(true); setErr(null)
-    const r = await datTrangThaiSerial(serial, den, ghiChu)
+    const r = await datTrangThaiSerial(serial, den, ghiChu, ngay || undefined)
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
-    setDen(''); setGhiChu(''); router.refresh()
+    setDen(''); setGhiChu(''); setNgay(''); router.refresh()
   }
 
   return (
@@ -64,6 +65,8 @@ export function DoiTrangThaiKho({
         </select>
         {den && (
           <>
+            <input type="date" value={ngay} onChange={(e) => setNgay(e.target.value)} title="Ngày (bỏ trống = hôm nay)"
+              className="rounded border px-1.5 py-1 text-xs text-slate-900" />
             <input value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} placeholder="mô tả hiện trạng (bắt buộc)"
               className="rounded border px-2 py-1 text-xs text-slate-900 min-w-48" />
             <button disabled={busy || !ghiChu.trim()} onClick={dat} className="rounded bg-slate-900 text-white px-2 py-1 text-xs disabled:opacity-50">Đặt</button>

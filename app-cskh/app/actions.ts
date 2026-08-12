@@ -1565,10 +1565,11 @@ export type SuDungSerial = {
   boi: string | null; luc: string
 }
 
-/** Ghi 1 sự kiện vòng đời + (tuỳ) cập nhật serial_registry.trang_thai. Gọi SAU thao tác chính. */
+/** Ghi 1 sự kiện vòng đời + (tuỳ) cập nhật serial_registry.trang_thai. Gọi SAU thao tác chính.
+ *  `luc` (YYYY-MM-DD) cho phép ghi mốc ngày CŨ khi backfill dữ liệu; bỏ trống -> now(). */
 async function ghiSuDung(
   db: ReturnType<typeof dataClient>,
-  input: { serial: string; su_kien: string; tu?: string | null; den?: string | null; customer_id?: string | null; ghi_chu?: string | null }
+  input: { serial: string; su_kien: string; tu?: string | null; den?: string | null; customer_id?: string | null; ghi_chu?: string | null; luc?: string | null }
 ) {
   await requireStaff()
   const nv = await layNhanVien()
@@ -1577,6 +1578,7 @@ async function ghiSuDung(
       serial: input.serial, su_kien: input.su_kien,
       tu_trang_thai: input.tu ?? null, den_trang_thai: input.den ?? null,
       customer_id: input.customer_id ?? null, ghi_chu: input.ghi_chu ?? null, boi: nv?.email ?? null,
+      ...(input.luc ? { luc: input.luc } : {}),
     })
     if (input.den) await db.from('serial_registry').update({ trang_thai: input.den }).eq('serial', input.serial)
   } catch {
@@ -1601,11 +1603,13 @@ export async function lichSuSerial(serial: string): Promise<{ trang_thai: string
 /** Đặt trạng thái KHO cho serial chưa gắn khách (trưng bày/mkt/bảo trì/thanh lý/về kho).
  *  CHỈ ADMIN. BẮT BUỘC mô tả hiện trạng máy (lưu vào nhật ký vòng đời). Trạng thái hợp lệ
  *  lấy từ bảng cấu hình serial_trang_thai (cho_dat_tay + hoat_dong). */
-export async function datTrangThaiSerial(serial: string, den: string, ghiChu?: string) {
+export async function datTrangThaiSerial(serial: string, den: string, ghiChu?: string, ngay?: string) {
   await requireStaff()
   if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
   const moTa = ghiChu?.trim()
   if (!moTa) return { ok: false as const, error: 'Cần ghi mô tả hiện trạng máy khi đổi trạng thái.' }
+  const luc = ngay?.trim()
+  if (luc && !/^\d{4}-\d{2}-\d{2}$/.test(luc)) return { ok: false as const, error: 'Ngày không hợp lệ (YYYY-MM-DD).' }
   const db = dataClient()
   const { data: hopLe } = await db.from('serial_trang_thai').select('code')
     .eq('code', den).eq('cho_dat_tay', true).eq('hoat_dong', true).maybeSingle()
@@ -1615,11 +1619,76 @@ export async function datTrangThaiSerial(serial: string, den: string, ghiChu?: s
   const { data: ib } = await db.from('installed_base').select('serial').eq('serial', serial).eq('status', 'active').maybeSingle()
   if (ib) return { ok: false as const, error: 'Máy đang lắp cho khách — thu hồi trước khi đổi trạng thái kho.' }
   const cu = (sr as { trang_thai: string }).trang_thai
-  await ghiSuDung(db, { serial, su_kien: `dat_${den}`, tu: cu, den, ghi_chu: moTa })
-  await ghiAudit('dat_trang_thai_serial', `serial:${serial}`, { tu: cu, den })
+  await ghiSuDung(db, { serial, su_kien: `dat_${den}`, tu: cu, den, ghi_chu: moTa, luc: luc || null })
+  await ghiAudit('dat_trang_thai_serial', `serial:${serial}`, { tu: cu, den, ngay: luc ?? 'nay' })
   revalidatePath(`/may/${encodeURIComponent(serial)}`)
   revalidatePath('/serial')
   return { ok: true as const }
+}
+
+/**
+ * Lắp máy KHO cho khách (máy đang ở kho: trưng bày/thu hồi/tồn kho…) → gắn khách + thành
+ * "Đã lắp", hiện ở "Máy đã lắp". `kichBH=false` cho ca LẮP NỘI BỘ (không kích hoạt bảo
+ * hành). `ngay` cho phép backfill mốc lắp cũ. CHỈ ADMIN.
+ */
+export async function lapMayChoKhach(
+  serial: string, customerId: string, ngay: string, kichBH: boolean, ghiChu?: string, diaChi?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const s = serial?.trim()
+  if (!s) return { ok: false, error: 'Thiếu serial.' }
+  if (!customerId) return { ok: false, error: 'Chọn khách.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày lắp không hợp lệ (YYYY-MM-DD).' }
+  const db = dataClient()
+  const { data: dangCo } = await db.from('installed_base').select('customer_id, status').eq('serial', s).maybeSingle()
+  const chu = (dangCo as { customer_id: string | null; status: string | null } | null)
+  if (chu?.customer_id && chu.customer_id !== customerId && chu.status === 'active')
+    return { ok: false, error: 'Serial đang lắp cho khách khác — gỡ khỏi khách cũ trước.' }
+  const { data: sr } = await db.from('serial_registry').select('internal_code, model, trang_thai').eq('serial', s).maybeSingle()
+  const r = sr as { internal_code: string | null; model: string | null; trang_thai: string | null } | null
+  if (!r) return { ok: false, error: `Serial ${s} không có trong kho.` }
+  // Nếu kích BH: chỉ cho MÁY (giống dangKyBaoHanh).
+  if (kichBH && r.internal_code) {
+    const { data: cat } = await db.from('catalog_item').select('"Danh mục cấp 1"').eq('Mã nội bộ', r.internal_code).limit(1).maybeSingle()
+    const dm1 = (cat as Record<string, string | null> | null)?.['Danh mục cấp 1']
+    if (dm1 && dm1 !== 'Machines') return { ok: false, error: `Mã "${r.internal_code}" là lõi/vật tư — không kích hoạt BH. Bỏ tick BH nếu lắp nội bộ.` }
+  }
+  const { error: e1 } = await db.from('installed_base').upsert({
+    serial: s, internal_code: r.internal_code, model_freetext: r.model,
+    customer_id: customerId, install_date: ngay, install_address: diaChi?.trim() || null,
+    channel_source: kichBH ? 'CSKH lắp' : 'CSKH lắp nội bộ', status: 'active',
+  }, { onConflict: 'serial' })
+  if (e1) return { ok: false, error: e1.message }
+  if (kichBH) {
+    const { error: e2 } = await db.rpc('activate_warranty', { p_serial: s, p_start: ngay })
+    if (e2) return { ok: false, error: e2.message }
+  }
+  await ghiSuDung(db, {
+    serial: s, su_kien: 'lap_dat', tu: r.trang_thai, den: 'da_lap', customer_id: customerId,
+    ghi_chu: kichBH ? (ghiChu || 'Lắp cho khách') : `Lắp nội bộ (không BH). ${ghiChu ?? ''}`.trim(), luc: ngay,
+  })
+  await ghiAudit('lap_may_cho_khach', `serial:${s}`, { customer_id: customerId, ngay, kich_bh: kichBH })
+  revalidatePath('/'); revalidatePath('/serial')
+  revalidatePath(`/may/${encodeURIComponent(s)}`); revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+/** Sửa MỐC NGÀY (và mô tả) của 1 sự kiện vòng đời đã ghi — để chỉnh mốc lịch sử. CHỈ ADMIN. */
+export async function suaSuKien(id: string, ngay: string, ghiChu?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày không hợp lệ (YYYY-MM-DD).' }
+  const db = dataClient()
+  const { data: ev } = await db.from('serial_su_dung').select('serial').eq('id', id).maybeSingle()
+  if (!ev) return { ok: false, error: 'Không thấy sự kiện.' }
+  const patch: Record<string, string> = { luc: ngay }
+  if (ghiChu !== undefined) patch.ghi_chu = ghiChu.trim()
+  const { error } = await db.from('serial_su_dung').update(patch).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('sua_su_kien_vong_doi', `su-kien:${id}`, { ngay })
+  revalidatePath(`/may/${encodeURIComponent((ev as { serial: string }).serial)}`)
+  return { ok: true }
 }
 
 /**
