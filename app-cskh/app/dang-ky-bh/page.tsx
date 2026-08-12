@@ -1,6 +1,6 @@
 import { laAdmin } from '@/lib/supabase'
 import { listKhachChoDuyet } from '@/app/actions'
-import { DangKyBHForm } from '@/components/DangKyBHForm'
+import { ChonKieuLap } from '@/components/ChonKieuLap'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 
 export default async function DangKyBHPage() {
@@ -12,10 +12,11 @@ export default async function DangKyBHPage() {
           <h1 className="text-xl font-semibold text-slate-900">Đăng ký bảo hành</h1>
         </header>
         <p className="text-sm bg-sky-50 text-sky-900 rounded-lg px-3 py-2">
-          Gắn máy (serial) cho khách và kích hoạt bảo hành. Thông tin máy tự lấy từ kho serial;
-          khách mới (đại lý/Shopee đăng ký sau) tạo được ngay nhưng <strong>chờ admin duyệt</strong>.
+          Gắn máy (serial) cho khách và kích hoạt bảo hành. Chọn <strong>1 máy lẻ</strong> hoặc
+          <strong> 1 bộ combo</strong> (WH15A/WH30A…). Thông tin máy tự lấy từ kho serial;
+          khách mới tạo được ngay nhưng <strong>chờ admin duyệt</strong>.
         </p>
-        <DangKyBHForm />
+        <ChonKieuLap admin={admin} />
 
         {admin && (
           <section className="bg-white rounded-xl border p-5 max-w-2xl">
