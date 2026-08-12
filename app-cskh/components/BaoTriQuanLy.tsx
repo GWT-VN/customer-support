@@ -19,7 +19,11 @@ const CHU_KY = [
  *  · Lên lịch: chọn ngày bắt đầu (mặc định ngày lắp) + chu kỳ + số lần + vùng
  *    (né T7/CN theo miền); hệ tự sinh các mốc.
  */
-export function BaoTriQuanLy({ chuaMap, daMap, sapHet }: { chuaMap: PlanChuaMap[]; daMap: PlanDaMap[]; sapHet: SapHetGoi[] }) {
+export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all' }: {
+  chuaMap: PlanChuaMap[]; daMap: PlanDaMap[]; sapHet: SapHetGoi[]; phan?: 'map' | 'lenlich' | 'all'
+}) {
+  const hienMap = phan === 'map' || phan === 'all'
+  const hienLen = phan === 'lenlich' || phan === 'all'
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -96,7 +100,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet }: { chuaMap: PlanChuaMap[
       {(msg || err) && <p className={`text-sm ${err ? 'text-red-600' : 'text-emerald-700'}`}>{err ?? msg}</p>}
 
       {/* ── Sắp hết gói → nhắc chào gói mới ── */}
-      {sapHet.length > 0 && (
+      {hienLen && sapHet.length > 0 && (
         <section className="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-2">
           <h2 className="font-medium text-rose-900">🔔 Sắp hết gói — chào gói mới ({sapHet.length})</h2>
           <p className="text-xs text-rose-800">Khách còn ≤1 lượt bảo trì chưa làm. Chào gói mới; tạo gói bằng nút &ldquo;Tạo lịch mới&rdquo; bên dưới (hoặc sửa số lần nếu khách mua/tặng thêm).</p>
@@ -115,6 +119,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet }: { chuaMap: PlanChuaMap[
       )}
 
       {/* ── Cần map khách ── */}
+      {hienMap && (
       <section className="bg-white rounded-xl border p-4 space-y-3">
         <div>
           <h2 className="font-medium text-slate-900">🔗 Cần map khách ({chuaMap.length})</h2>
@@ -152,7 +157,10 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet }: { chuaMap: PlanChuaMap[
         )}
       </section>
 
+      )}
+
       {/* ── Lên lịch ── */}
+      {hienLen && (
       <section className="bg-white rounded-xl border p-4 space-y-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -309,6 +317,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet }: { chuaMap: PlanChuaMap[
           </ul>
         )}
       </section>
+      )}
     </div>
   )
 }

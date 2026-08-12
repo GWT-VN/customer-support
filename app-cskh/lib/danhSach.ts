@@ -207,6 +207,14 @@ export const MAU_TRANG_THAI: Record<string, string> = {
 }
 export const MAU_TOKENS = ['slate', 'emerald', 'sky', 'violet', 'cyan', 'indigo', 'amber', 'orange', 'red', 'teal', 'rose'] as const
 
+/** Loại việc của lịch kỹ thuật (1 chuyến có thể nhiều việc). "khac" bắt buộc ghi cụ thể. */
+export const LOAI_VIEC_KT: { v: string; nhan: string }[] = [
+  { v: 'lap_may', nhan: 'Lắp máy' }, { v: 'bao_tri', nhan: 'Bảo trì' },
+  { v: 'ticket', nhan: 'Xử lý ticket' }, { v: 'thay_loi', nhan: 'Thay lõi' },
+  { v: 'khao_sat', nhan: 'Khảo sát' }, { v: 'khac', nhan: 'Khác' },
+]
+export const NHAN_LOAI_VIEC: Record<string, string> = Object.fromEntries(LOAI_VIEC_KT.map((x) => [x.v, x.nhan]))
+
 export const MA_COMBO = ['WH15A', 'WH30A', 'WH15AECO', 'WH30AECO'] as const
 export type MaCombo = (typeof MA_COMBO)[number]
 export function laMaBo(internalCode: string | null | undefined): boolean {

@@ -1123,6 +1123,129 @@ export async function baoTriSapHet(): Promise<SapHetGoi[]> {
   }).filter((r) => r.so_xong + r.con_lai > 0 && r.con_lai <= 1).sort((a, b) => a.con_lai - b.con_lai)
 }
 
+// ── Đợt 3a: lịch kỹ thuật — gán việc cho kỹ thuật, 1 chuyến đi nhiều việc ─────
+export type KyThuat = { id: string; ten: string; sdt: string | null; vung: string | null; email: string | null; la_ctv: boolean; hoat_dong: boolean }
+export type KyThuatInput = { ten: string; sdt?: string; vung?: string; email?: string; la_ctv?: boolean; hoat_dong?: boolean }
+
+/** Danh sách kỹ thuật (nhân viên + cộng tác viên). */
+export async function dsKyThuat(chiHoatDong = false): Promise<KyThuat[]> {
+  await requireStaff()
+  let q = dataClient().from('ky_thuat').select('id, ten, sdt, vung, email, la_ctv, hoat_dong').order('ten')
+  if (chiHoatDong) q = q.eq('hoat_dong', true)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []) as KyThuat[]
+}
+
+export async function taoKyThuat(input: KyThuatInput): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!input.ten.trim()) return { ok: false, error: 'Thiếu tên kỹ thuật.' }
+  const { error } = await dataClient().from('ky_thuat').insert({
+    ten: input.ten.trim(), sdt: input.sdt?.trim() || null, vung: input.vung?.trim() || null,
+    email: input.email?.trim() || null, la_ctv: !!input.la_ctv,
+  })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('tao_ky_thuat', 'ky-thuat', { ten: input.ten.trim() })
+  revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export async function suaKyThuat(id: string, input: KyThuatInput): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!input.ten.trim()) return { ok: false, error: 'Thiếu tên kỹ thuật.' }
+  const { error } = await dataClient().from('ky_thuat').update({
+    ten: input.ten.trim(), sdt: input.sdt?.trim() || null, vung: input.vung?.trim() || null,
+    email: input.email?.trim() || null, la_ctv: !!input.la_ctv, hoat_dong: input.hoat_dong ?? true,
+  }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('sua_ky_thuat', `ky-thuat:${id}`); revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export async function xoaKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('ky_thuat').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_ky_thuat', `ky-thuat:${id}`); revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export type ViecInput = { loai_viec: string; mo_ta?: string; ref?: string }
+
+/** Tạo 1 CHUYẾN ĐI cho kỹ thuật (nhiều việc). "khac" bắt buộc mô tả. CHỈ QUẢN LÝ. */
+export async function taoLichKyThuat(input: {
+  kyThuatId: string; ngay: string; customerId?: string; diaChi?: string; ghiChu?: string; viec: ViecInput[]
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!input.kyThuatId) return { ok: false, error: 'Chọn kỹ thuật.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
+  const viec = input.viec.filter((v) => v.loai_viec)
+  if (!viec.length) return { ok: false, error: 'Thêm ít nhất 1 việc.' }
+  for (const v of viec) if (v.loai_viec === 'khac' && !v.mo_ta?.trim()) return { ok: false, error: 'Việc "Khác" cần ghi cụ thể.' }
+  const db = dataClient()
+  const { data: created, error } = await db.from('lich_ky_thuat').insert({
+    ky_thuat_id: input.kyThuatId, ngay: input.ngay, customer_id: input.customerId || null,
+    dia_chi: input.diaChi?.trim() || null, ghi_chu: input.ghiChu?.trim() || null,
+  }).select('id').single()
+  if (error) return { ok: false, error: error.message }
+  const lichId = (created as { id: string }).id
+  const { error: e2 } = await db.from('lich_ky_thuat_viec').insert(
+    viec.map((v) => ({ lich_id: lichId, loai_viec: v.loai_viec, mo_ta: v.mo_ta?.trim() || null, ref: v.ref?.trim() || null }))
+  )
+  if (e2) return { ok: false, error: e2.message }
+  await ghiAudit('tao_lich_ky_thuat', `lich:${lichId}`, { ky_thuat: input.kyThuatId, ngay: input.ngay, so_viec: viec.length })
+  revalidatePath('/ky-thuat'); return { ok: true, id: lichId }
+}
+
+export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' | 'huy'): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('lich_ky_thuat').update({ trang_thai: trangThai, updated_at: new Date().toISOString() }).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export async function xoaLichKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('lich_ky_thuat').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export type LichKyThuatRow = {
+  id: string; ngay: string; ky_thuat_id: string | null; ten_ky_thuat: string | null; trang_thai: string
+  customer_id: string | null; ten_khach: string | null; dia_chi: string | null; ghi_chu: string | null
+  viec: { loai_viec: string; mo_ta: string | null; ref: string | null }[]
+}
+
+/** Lịch kỹ thuật trong khoảng ngày (tuỳ chọn lọc 1 kỹ thuật). */
+export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string): Promise<LichKyThuatRow[]> {
+  await requireStaff()
+  const db = dataClient()
+  let q = db.from('lich_ky_thuat')
+    .select('id, ngay, ky_thuat_id, trang_thai, customer_id, dia_chi, ghi_chu')
+    .gte('ngay', tu).lte('ngay', den).order('ngay')
+  if (kyThuatId) q = q.eq('ky_thuat_id', kyThuatId)
+  const { data: lich } = await q
+  const ls = (lich ?? []) as { id: string; ngay: string; ky_thuat_id: string | null; trang_thai: string; customer_id: string | null; dia_chi: string | null; ghi_chu: string | null }[]
+  if (!ls.length) return []
+  const ids = ls.map((l) => l.id)
+  const ktIds = [...new Set(ls.map((l) => l.ky_thuat_id).filter(Boolean))] as string[]
+  const cusIds = [...new Set(ls.map((l) => l.customer_id).filter(Boolean))] as string[]
+  const [{ data: viec }, { data: kt }, { data: kh }] = await Promise.all([
+    db.from('lich_ky_thuat_viec').select('lich_id, loai_viec, mo_ta, ref').in('lich_id', ids),
+    ktIds.length ? db.from('ky_thuat').select('id, ten').in('id', ktIds) : Promise.resolve({ data: [] as { id: string; ten: string }[] }),
+    cusIds.length ? db.from('cs_customers').select('id, full_name').in('id', cusIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ])
+  const vMap = new Map<string, { loai_viec: string; mo_ta: string | null; ref: string | null }[]>()
+  for (const v of (viec ?? []) as { lich_id: string; loai_viec: string; mo_ta: string | null; ref: string | null }[]) {
+    const a = vMap.get(v.lich_id) ?? []; a.push({ loai_viec: v.loai_viec, mo_ta: v.mo_ta, ref: v.ref }); vMap.set(v.lich_id, a)
+  }
+  const ktMap = new Map(((kt ?? []) as { id: string; ten: string }[]).map((k) => [k.id, k.ten]))
+  const khMap = new Map(((kh ?? []) as { id: string; full_name: string }[]).map((k) => [k.id, k.full_name]))
+  return ls.map((l) => ({
+    id: l.id, ngay: l.ngay, ky_thuat_id: l.ky_thuat_id, ten_ky_thuat: l.ky_thuat_id ? ktMap.get(l.ky_thuat_id) ?? null : null,
+    trang_thai: l.trang_thai, customer_id: l.customer_id, ten_khach: l.customer_id ? khMap.get(l.customer_id) ?? null : null,
+    dia_chi: l.dia_chi, ghi_chu: l.ghi_chu, viec: vMap.get(l.id) ?? [],
+  }))
+}
+
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
 export async function replacementsOfSerial(serial: string) {
   await requireStaff()

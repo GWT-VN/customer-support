@@ -36,9 +36,12 @@ const NHOM: readonly Nhom[] = [
   ] },
 ] as const
 
-// Cấp QUẢN LÝ (admin | cs_manager): duyệt.
+// Cấp QUẢN LÝ (admin | cs_manager): duyệt + quản lý bảo trì/kỹ thuật.
 const NHOM_QUANLY: Nhom = { ten: 'Quản lý', muc: [
   { href: '/duyet', nhan: 'Chờ duyệt' },
+  { href: '/bao-tri/map', nhan: 'BT · Map khách' },
+  { href: '/bao-tri/len-lich', nhan: 'BT · Lên lịch & gói' },
+  { href: '/ky-thuat', nhan: 'Lịch kỹ thuật' },
 ] }
 // CHỈ admin: doanh số, catalog, nhật ký, nhân viên.
 const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
