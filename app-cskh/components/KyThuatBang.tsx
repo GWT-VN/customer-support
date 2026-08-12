@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, type KyThuat, type ViecInput } from '@/app/actions'
+import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, type KyThuat, type ViecInput, type BoiCanhKhach } from '@/app/actions'
 import { LOAI_VIEC_KT } from '@/lib/danhSach'
 import { KhachPicker } from '@/components/KhachPicker'
 
@@ -30,6 +30,14 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
   const [diaChi, setDiaChi] = useState('')
   const [ghiChu, setGhiChu] = useState('')
   const [viec, setViec] = useState<ViecInput[]>([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }])
+  const [ctx, setCtx] = useState<BoiCanhKhach | null>(null)
+
+  async function chonKhach(id: string) {
+    setKhachId(id)
+    const c = await boiCanhKhach(id)
+    setCtx(c)
+    if (c.dia_chi) setDiaChi(c.dia_chi)   // địa chỉ tự theo địa chỉ lắp của máy
+  }
 
   async function themKt() {
     if (!ten.trim()) return
@@ -58,7 +66,7 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
     const r = await taoLichKyThuat({ kyThuatId: ktId, ngay, customerId: khachId || undefined, diaChi: diaChi || undefined, ghiChu: ghiChu || undefined, viec })
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
-    setMsg('Đã tạo chuyến.'); setKhachId(''); setDiaChi(''); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }]); router.refresh()
+    setMsg('Đã tạo chuyến.'); setKhachId(''); setCtx(null); setDiaChi(''); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }]); router.refresh()
   }
 
   const oInput = 'rounded border px-2 py-1 text-sm text-slate-900 bg-white'
@@ -85,24 +93,46 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
           </label>
         </div>
         <div>
-          <p className="text-xs text-slate-600 mb-1">Khách (tuỳ chọn):</p>
-          {khachId ? <p className="text-xs text-emerald-700">✓ đã chọn <button onClick={() => setKhachId('')} className="underline text-slate-500 ml-1">bỏ</button></p> : <KhachPicker onPick={(id) => setKhachId(id)} />}
+          <p className="text-xs text-slate-600 mb-1">Khách (chọn để tự lấy địa chỉ + bộ/máy/ticket):</p>
+          {khachId ? <p className="text-xs text-emerald-700">✓ đã chọn <button onClick={() => { setKhachId(''); setCtx(null) }} className="underline text-slate-500 ml-1">bỏ</button></p> : <KhachPicker onPick={(id) => chonKhach(id)} />}
         </div>
 
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-slate-600">Việc trong chuyến (1 chuyến nhiều việc):</p>
           {viec.map((v, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
-              <select value={v.loai_viec} onChange={(e) => setViecAt(i, { loai_viec: e.target.value })} className={oInput}>
+              <select value={v.loai_viec} onChange={(e) => setViecAt(i, { loai_viec: e.target.value, ref: '', mo_ta: '', so_tien: undefined })} className={oInput}>
                 {LOAI_VIEC_KT.map((l) => <option key={l.v} value={l.v}>{l.nhan}</option>)}
               </select>
-              <input value={v.mo_ta ?? ''} onChange={(e) => setViecAt(i, { mo_ta: e.target.value })}
-                placeholder={v.loai_viec === 'khac' ? 'Ghi cụ thể việc gì (bắt buộc)' : 'Mô tả / ref (serial, mã ticket…)'}
-                className={`${oInput} flex-1 min-w-48`} />
+              {v.loai_viec === 'bao_tri' && ctx && ctx.plans.length > 0 ? (
+                <select value={v.ref ?? ''} onChange={(e) => { const p = ctx.plans.find((x) => x.id === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: p?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
+                  <option value="">— Chọn bộ cần bảo trì —</option>
+                  {ctx.plans.map((p) => <option key={p.id} value={p.id}>{p.nhan}</option>)}
+                </select>
+              ) : v.loai_viec === 'thay_loi' && ctx && ctx.machines.length > 0 ? (
+                <select value={v.ref ?? ''} onChange={(e) => { const m = ctx.machines.find((x) => x.serial === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: m?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
+                  <option value="">— Chọn máy thay lõi —</option>
+                  {ctx.machines.map((m) => <option key={m.serial} value={m.serial}>{m.nhan}</option>)}
+                </select>
+              ) : v.loai_viec === 'ticket' && ctx && ctx.tickets.length > 0 ? (
+                <select value={v.ref ?? ''} onChange={(e) => { const t = ctx.tickets.find((x) => x.code === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: t?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
+                  <option value="">— Chọn ticket —</option>
+                  {ctx.tickets.map((t) => <option key={t.code} value={t.code}>{t.nhan}</option>)}
+                </select>
+              ) : v.loai_viec === 'thu_tien' ? (
+                <>
+                  <input type="number" value={v.so_tien ?? ''} onChange={(e) => setViecAt(i, { so_tien: Number(e.target.value) || undefined })} placeholder="Số tiền (VND)" className={`${oInput} w-36`} />
+                  <input value={v.mo_ta ?? ''} onChange={(e) => setViecAt(i, { mo_ta: e.target.value })} placeholder="Nội dung thu (tuỳ chọn)" className={`${oInput} flex-1 min-w-40`} />
+                </>
+              ) : (
+                <input value={v.mo_ta ?? ''} onChange={(e) => setViecAt(i, { mo_ta: e.target.value })}
+                  placeholder={v.loai_viec === 'khac' ? 'Ghi cụ thể việc gì (bắt buộc)' : 'Mô tả (tuỳ chọn)'} className={`${oInput} flex-1 min-w-48`} />
+              )}
               {viec.length > 1 && <button onClick={() => setViec((vs) => vs.filter((_, j) => j !== i))} className="text-red-500 text-sm">✕</button>}
             </div>
           ))}
           <button onClick={() => setViec((vs) => [...vs, { loai_viec: 'khac', mo_ta: '', ref: '' }])} className="text-xs text-sky-600 underline">+ thêm việc</button>
+          {!khachId && <p className="text-[11px] text-amber-500">Chọn khách ở trên để hiện danh sách bộ/máy/ticket cho từng việc (không chọn vẫn nhập tay được).</p>}
         </div>
 
         <div className="flex items-center gap-2">

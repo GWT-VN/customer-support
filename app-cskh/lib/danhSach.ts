@@ -211,7 +211,8 @@ export const MAU_TOKENS = ['slate', 'emerald', 'sky', 'violet', 'cyan', 'indigo'
 export const LOAI_VIEC_KT: { v: string; nhan: string }[] = [
   { v: 'lap_may', nhan: 'Lắp máy' }, { v: 'bao_tri', nhan: 'Bảo trì' },
   { v: 'ticket', nhan: 'Xử lý ticket' }, { v: 'thay_loi', nhan: 'Thay lõi' },
-  { v: 'khao_sat', nhan: 'Khảo sát' }, { v: 'khac', nhan: 'Khác' },
+  { v: 'khao_sat', nhan: 'Khảo sát' }, { v: 'thu_tien', nhan: 'Cần thu tiền' },
+  { v: 'khac', nhan: 'Khác' },
 ]
 export const NHAN_LOAI_VIEC: Record<string, string> = Object.fromEntries(LOAI_VIEC_KT.map((x) => [x.v, x.nhan]))
 

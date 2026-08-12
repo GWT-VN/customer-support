@@ -1167,9 +1167,34 @@ export async function xoaKyThuat(id: string): Promise<{ ok: true } | { ok: false
   await ghiAudit('xoa_ky_thuat', `ky-thuat:${id}`); revalidatePath('/ky-thuat'); return { ok: true }
 }
 
-export type ViecInput = { loai_viec: string; mo_ta?: string; ref?: string }
+export type ViecInput = { loai_viec: string; mo_ta?: string; ref?: string; so_tien?: number }
 
-/** Tạo 1 CHUYẾN ĐI cho kỹ thuật (nhiều việc). "khac" bắt buộc mô tả. CHỈ QUẢN LÝ. */
+export type BoiCanhKhach = {
+  dia_chi: string | null
+  plans: { id: string; nhan: string }[]
+  machines: { serial: string; nhan: string }[]
+  tickets: { code: string; nhan: string }[]
+}
+
+/** Ngữ cảnh 1 khách để gán việc kỹ thuật: địa chỉ lắp + bộ bảo trì + máy + ticket (để chọn). */
+export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: ib }, { data: plans }, { data: tks }] = await Promise.all([
+    db.from('installed_base').select('serial, internal_code, model_freetext, install_address').eq('customer_id', customerId).eq('status', 'active'),
+    db.from('maintenance_plan').select('id, bo_may').eq('customer_id', customerId),
+    db.from('tickets').select('ticket_code, description').eq('customer_id', customerId).order('created_at', { ascending: false }).limit(30),
+  ])
+  const machines = (ib ?? []) as { serial: string; internal_code: string | null; model_freetext: string | null; install_address: string | null }[]
+  return {
+    dia_chi: machines.find((m) => m.install_address)?.install_address ?? null,
+    plans: ((plans ?? []) as { id: string; bo_may: string | null }[]).map((p) => ({ id: p.id, nhan: p.bo_may ?? 'Gói bảo trì' })),
+    machines: machines.map((m) => ({ serial: m.serial, nhan: `${m.model_freetext ?? m.internal_code ?? ''} · ${m.serial}`.trim() })),
+    tickets: ((tks ?? []) as { ticket_code: string; description: string | null }[]).map((t) => ({ code: t.ticket_code, nhan: `${t.ticket_code}${t.description ? ` · ${t.description.slice(0, 40)}` : ''}` })),
+  }
+}
+
+/** Tạo 1 CHUYẾN ĐI cho kỹ thuật (nhiều việc). "khac" cần mô tả, "thu_tien" cần số tiền. CHỈ QUẢN LÝ. */
 export async function taoLichKyThuat(input: {
   kyThuatId: string; ngay: string; customerId?: string; diaChi?: string; ghiChu?: string; viec: ViecInput[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -1178,7 +1203,10 @@ export async function taoLichKyThuat(input: {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
   const viec = input.viec.filter((v) => v.loai_viec)
   if (!viec.length) return { ok: false, error: 'Thêm ít nhất 1 việc.' }
-  for (const v of viec) if (v.loai_viec === 'khac' && !v.mo_ta?.trim()) return { ok: false, error: 'Việc "Khác" cần ghi cụ thể.' }
+  for (const v of viec) {
+    if (v.loai_viec === 'khac' && !v.mo_ta?.trim()) return { ok: false, error: 'Việc "Khác" cần ghi cụ thể.' }
+    if (v.loai_viec === 'thu_tien' && !(v.so_tien && v.so_tien > 0)) return { ok: false, error: 'Việc "Cần thu tiền" cần nhập số tiền.' }
+  }
   const db = dataClient()
   const { data: created, error } = await db.from('lich_ky_thuat').insert({
     ky_thuat_id: input.kyThuatId, ngay: input.ngay, customer_id: input.customerId || null,
@@ -1187,7 +1215,7 @@ export async function taoLichKyThuat(input: {
   if (error) return { ok: false, error: error.message }
   const lichId = (created as { id: string }).id
   const { error: e2 } = await db.from('lich_ky_thuat_viec').insert(
-    viec.map((v) => ({ lich_id: lichId, loai_viec: v.loai_viec, mo_ta: v.mo_ta?.trim() || null, ref: v.ref?.trim() || null }))
+    viec.map((v) => ({ lich_id: lichId, loai_viec: v.loai_viec, mo_ta: v.mo_ta?.trim() || null, ref: v.ref?.trim() || null, so_tien: v.so_tien ?? null }))
   )
   if (e2) return { ok: false, error: e2.message }
   await ghiAudit('tao_lich_ky_thuat', `lich:${lichId}`, { ky_thuat: input.kyThuatId, ngay: input.ngay, so_viec: viec.length })
@@ -1211,7 +1239,7 @@ export async function xoaLichKyThuat(id: string): Promise<{ ok: true } | { ok: f
 export type LichKyThuatRow = {
   id: string; ngay: string; ky_thuat_id: string | null; ten_ky_thuat: string | null; trang_thai: string
   customer_id: string | null; ten_khach: string | null; dia_chi: string | null; ghi_chu: string | null
-  viec: { loai_viec: string; mo_ta: string | null; ref: string | null }[]
+  viec: { loai_viec: string; mo_ta: string | null; ref: string | null; so_tien: number | null }[]
 }
 
 /** Lịch kỹ thuật trong khoảng ngày (tuỳ chọn lọc 1 kỹ thuật). */
@@ -1229,13 +1257,13 @@ export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string)
   const ktIds = [...new Set(ls.map((l) => l.ky_thuat_id).filter(Boolean))] as string[]
   const cusIds = [...new Set(ls.map((l) => l.customer_id).filter(Boolean))] as string[]
   const [{ data: viec }, { data: kt }, { data: kh }] = await Promise.all([
-    db.from('lich_ky_thuat_viec').select('lich_id, loai_viec, mo_ta, ref').in('lich_id', ids),
+    db.from('lich_ky_thuat_viec').select('lich_id, loai_viec, mo_ta, ref, so_tien').in('lich_id', ids),
     ktIds.length ? db.from('ky_thuat').select('id, ten').in('id', ktIds) : Promise.resolve({ data: [] as { id: string; ten: string }[] }),
     cusIds.length ? db.from('cs_customers').select('id, full_name').in('id', cusIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ])
-  const vMap = new Map<string, { loai_viec: string; mo_ta: string | null; ref: string | null }[]>()
-  for (const v of (viec ?? []) as { lich_id: string; loai_viec: string; mo_ta: string | null; ref: string | null }[]) {
-    const a = vMap.get(v.lich_id) ?? []; a.push({ loai_viec: v.loai_viec, mo_ta: v.mo_ta, ref: v.ref }); vMap.set(v.lich_id, a)
+  const vMap = new Map<string, { loai_viec: string; mo_ta: string | null; ref: string | null; so_tien: number | null }[]>()
+  for (const v of (viec ?? []) as { lich_id: string; loai_viec: string; mo_ta: string | null; ref: string | null; so_tien: number | null }[]) {
+    const a = vMap.get(v.lich_id) ?? []; a.push({ loai_viec: v.loai_viec, mo_ta: v.mo_ta, ref: v.ref, so_tien: v.so_tien }); vMap.set(v.lich_id, a)
   }
   const ktMap = new Map(((kt ?? []) as { id: string; ten: string }[]).map((k) => [k.id, k.ten]))
   const khMap = new Map(((kh ?? []) as { id: string; full_name: string }[]).map((k) => [k.id, k.full_name]))

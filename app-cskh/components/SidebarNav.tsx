@@ -30,18 +30,24 @@ const NHOM: readonly Nhom[] = [
     { href: '/dang-ky-bh', nhan: 'Đăng ký BH' },
     { href: '/bh-cho-kich-hoat', nhan: 'Chờ kích hoạt BH' },
   ] },
-  { ten: 'Lịch', muc: [
-    { href: '/loi', nhan: 'Lịch thay lõi' },
-    { href: '/bao-tri', nhan: 'Lịch bảo trì' },
-  ] },
 ] as const
 
-// Cấp QUẢN LÝ (admin | cs_manager): duyệt + quản lý bảo trì/kỹ thuật.
+/** Nhóm "Bảo trì" — gom mọi mục liên quan. Mục quản lý chỉ hiện với cấp quản lý. */
+function nhomBaoTri(laQuanLy: boolean): Nhom {
+  return { ten: 'Bảo trì', muc: [
+    { href: '/bao-tri', nhan: 'Lịch bảo trì' },
+    { href: '/loi', nhan: 'Lịch thay lõi' },
+    ...(laQuanLy ? [
+      { href: '/bao-tri/map', nhan: 'Map khách' },
+      { href: '/bao-tri/len-lich', nhan: 'Lên lịch & gói' },
+      { href: '/ky-thuat', nhan: 'Lịch kỹ thuật' },
+    ] : []),
+  ] }
+}
+
+// Cấp QUẢN LÝ (admin | cs_manager): duyệt.
 const NHOM_QUANLY: Nhom = { ten: 'Quản lý', muc: [
   { href: '/duyet', nhan: 'Chờ duyệt' },
-  { href: '/bao-tri/map', nhan: 'BT · Map khách' },
-  { href: '/bao-tri/len-lich', nhan: 'BT · Lên lịch & gói' },
-  { href: '/ky-thuat', nhan: 'Lịch kỹ thuật' },
 ] }
 // CHỈ admin: doanh số, catalog, nhật ký, nhân viên.
 const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
@@ -67,6 +73,7 @@ export function SidebarNav({ laAdmin, laQuanLy }: { laAdmin: boolean; laQuanLy: 
   // admin cũng là quản lý -> thấy cả 2 nhóm. cs_manager chỉ thấy nhóm Quản lý.
   const nhom = [
     ...NHOM,
+    nhomBaoTri(laQuanLy),
     ...(laQuanLy ? [NHOM_QUANLY] : []),
     ...(laAdmin ? [NHOM_ADMIN] : []),
   ]

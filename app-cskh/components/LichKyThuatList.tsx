@@ -49,8 +49,10 @@ export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {r.viec.map((v, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded bg-slate-100 text-[11px] text-slate-700">
-                          {NHAN_LOAI_VIEC[v.loai_viec] ?? v.loai_viec}{v.mo_ta ? `: ${v.mo_ta}` : ''}
+                        <span key={i} className={`px-1.5 py-0.5 rounded text-[11px] ${v.loai_viec === 'thu_tien' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                          {NHAN_LOAI_VIEC[v.loai_viec] ?? v.loai_viec}
+                          {v.so_tien ? `: ${v.so_tien.toLocaleString('vi-VN')}đ` : ''}
+                          {v.mo_ta ? `${v.so_tien ? ' · ' : ': '}${v.mo_ta}` : ''}
                         </span>
                       ))}
                     </div>
