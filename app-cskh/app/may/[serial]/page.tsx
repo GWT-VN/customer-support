@@ -16,6 +16,8 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
   const [tickets, vongDoi, admin] = await Promise.all([
     ticketsOfSerial(m.serial), lichSuSerial(m.serial), laAdmin(),
   ])
+  // Máy này có phải máy THAY THẾ (đổi máy cho khách) không -> hiện tính chuyển tiếp.
+  const suKienThayThe = vongDoi.su_kien.find((s) => s.su_kien === 'doi_may_lap_moi')
 
   // Chỉ chứa DỮ LIỆU, không chứa JSX — cách hiển thị do chỗ render quyết định.
   // (Để JSX trong mảng thì eslint react/jsx-key báo lỗi, dù ở đây không cần key.)
@@ -44,6 +46,11 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Khách hàng</h2>
+          {suKienThayThe && (
+            <p className="text-sm bg-indigo-50 text-indigo-800 rounded-lg px-3 py-2 mb-3">
+              🔄 <strong>Máy thay thế</strong> — {suKienThayThe.ghi_chu ?? 'kế thừa bảo hành + khách của máy cũ'}
+            </p>
+          )}
           {m.customer_id ? (
             <p className="text-sm">
               <Link href={`/khach/${m.customer_id}`} prefetch={false} className="text-slate-900 underline font-medium">
