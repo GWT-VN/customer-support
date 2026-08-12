@@ -9,6 +9,7 @@ import { TicketEditor } from '@/components/TicketEditor'
 import { TicketNotes } from '@/components/TicketNotes'
 import { TicketItems } from '@/components/TicketItems'
 import { GanNhomLoi } from '@/components/GanNhomLoi'
+import { NhanViecButton } from '@/components/NhanViecButton'
 import { vnDate } from '@/components/Badge'
 
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
@@ -37,6 +38,16 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           <KhanBadge khan={t.khan} />
           <StateBadge state={t.state} />
           <span className="text-sm text-slate-500">{vnDateTime(t.created_at)}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Phụ trách:</span>
+          {t.cs_ten ? (
+            <span className="text-slate-900">{t.cs_ten}</span>
+          ) : (
+            <span className="text-amber-600">chưa gán</span>
+          )}
+          {!t.cs_phu_trach && <NhanViecButton code={t.ticket_code} />}
         </div>
 
         {t.may_khong_trong_he_thong && (

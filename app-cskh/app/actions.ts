@@ -965,6 +965,13 @@ export async function searchTickets(
   if (state) truyVan = truyVan.eq('state', state)
   if (onlyKhan) truyVan = truyVan.eq('khan', true)
   if (mineStaffId) truyVan = truyVan.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
+  // Miền phụ trách: NV thường chỉ thấy ticket CỦA MÌNH + ticket CHƯA gán (để nhận
+  // việc). Quản lý/admin thấy hết. (mineStaffId ở trên là bộ lọc opt-in, độc lập.)
+  if (!(await laQuanLy())) {
+    const me = await layNhanVien()
+    const id = me?.id ?? '00000000-0000-0000-0000-000000000000'
+    truyVan = truyVan.or(`cs_phu_trach.is.null,cs_phu_trach.eq.${id},ky_thuat.eq.${id}`)
+  }
   // Danh sách chọn ở giao diện sinh từ ticketTypes() (dữ liệu thật) nên giá trị luôn
   // hợp lệ; vẫn .eq() thẳng (không whitelist tĩnh) vì loại ticket là dữ liệu mở, không
   // cố định như cột sắp xếp.
@@ -1019,6 +1026,28 @@ export async function getTicket(code: string): Promise<Ticket | null> {
     .from('v_tickets').select('*').eq('ticket_code', code).maybeSingle()
   if (error) throw new Error(error.message)
   return (data as Ticket) ?? null
+}
+
+/**
+ * "Nhận việc": gán ticket CHƯA có người cho chính mình (cs_phu_trach = tôi).
+ * Chỉ nhận ticket đang trống hoặc đã là của mình — không giành ticket người khác
+ * (muốn đổi người thì dùng ô Phụ trách trong ticket, hoặc quản lý phân công).
+ */
+export async function nhanTicket(code: string) {
+  await requireStaff()
+  const me = await layNhanVien()
+  if (!me) return { ok: false as const, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: t, error: e0 } = await db.from('tickets').select('cs_phu_trach').eq('ticket_code', code).maybeSingle()
+  if (e0) return { ok: false as const, error: e0.message }
+  if (!t) return { ok: false as const, error: 'Không thấy ticket.' }
+  const cur = (t as { cs_phu_trach: string | null }).cs_phu_trach
+  if (cur && cur !== me.id) return { ok: false as const, error: 'Ticket đã có người khác phụ trách.' }
+  const { error } = await db.from('tickets').update({ cs_phu_trach: me.id }).eq('ticket_code', code)
+  if (error) return { ok: false as const, error: error.message }
+  await ghiAudit('nhan_ticket', `ticket:${code}`)
+  revalidatePath(`/ticket/${code}`); revalidatePath('/ticket')
+  return { ok: true as const }
 }
 
 /** Đổi trạng thái / cờ Khẩn / ghi chú tóm tắt / người phụ trách. */
