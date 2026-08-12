@@ -82,3 +82,6 @@ docs/CHECKLIST.md
 
 # Output đối chiếu khách (có PII) — không commit
 migrate/_out/
+
+# Obsidian editor config
+.obsidian/
