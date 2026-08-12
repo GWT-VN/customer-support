@@ -945,6 +945,57 @@ export async function baoTriDaMap(): Promise<PlanDaMap[]> {
   })
 }
 
+export type LuotThang = {
+  visit_id: string; due_date: string; lan_thu: number | null; tong_lan: number | null
+  bo_may: string | null; customer_name: string | null; primary_phone: string | null
+  completed_at: string | null; tinh_trang: string; chua_khop_khach: boolean | null
+}
+
+/** Các lượt bảo trì có due_date trong 1 THÁNG (calendar view). thang = 'YYYY-MM'. */
+export async function baoTriTheoThang(thang: string): Promise<LuotThang[]> {
+  await requireStaff()
+  const m = /^(\d{4})-(\d{2})$/.exec(thang)
+  if (!m) return []
+  const y = +m[1], mo = +m[2]
+  const dau = `${thang}-01`
+  const sauNam = mo === 12 ? y + 1 : y
+  const sauThang = mo === 12 ? 1 : mo + 1
+  const sau = `${sauNam}-${String(sauThang).padStart(2, '0')}-01`
+  const { data, error } = await dataClient()
+    .from('v_maintenance_due')
+    .select('visit_id, due_date, lan_thu, tong_lan, bo_may, customer_name, primary_phone, completed_at, tinh_trang, chua_khop_khach')
+    .gte('due_date', dau).lt('due_date', sau).order('due_date')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as LuotThang[]
+}
+
+export type LuotKhach = {
+  visit_id: string; due_date: string | null; lan_thu: number | null; tong_lan: number | null
+  bo_may: string | null; loai_goi: string | null; completed_at: string | null
+}
+
+/** Lịch bảo trì của 1 KHÁCH (mọi plan đã map khách) — hiện ở trang khách. */
+export async function baoTriCuaKhach(customerId: string): Promise<LuotKhach[]> {
+  await requireStaff()
+  const db = dataClient()
+  const { data: plans } = await db.from('maintenance_plan')
+    .select('id, bo_may, loai_goi').eq('customer_id', customerId)
+  const ps = (plans ?? []) as { id: string; bo_may: string | null; loai_goi: string | null }[]
+  if (!ps.length) return []
+  const meta = new Map(ps.map((p) => [p.id, p]))
+  const { data: visits } = await db.from('maintenance_visit')
+    .select('id, plan_id, lan_thu, due_date, completed_at').in('plan_id', ps.map((p) => p.id))
+    .order('due_date', { ascending: true, nullsFirst: false })
+  return ((visits ?? []) as { id: string; plan_id: string; lan_thu: number | null; due_date: string | null; completed_at: string | null }[])
+    .map((v) => {
+      const p = meta.get(v.plan_id)
+      return {
+        visit_id: v.id, due_date: v.due_date, lan_thu: v.lan_thu, tong_lan: null,
+        bo_may: p?.bo_may ?? null, loai_goi: p?.loai_goi ?? null, completed_at: v.completed_at,
+      }
+    })
+}
+
 export type LenLichInput = { ngayBatDau?: string; chuKyThang: number | null; tongLan: number; vung?: Vung }
 
 /** Sinh lịch bảo trì tự động cho 1 plan. Bắt buộc đã map khách + khách có máy đã lắp (BH). CHỈ QUẢN LÝ. */

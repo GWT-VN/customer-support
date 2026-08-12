@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { OTimKiem } from '@/bang'
-import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView, baoTriChuaMap, baoTriDaMap } from '@/app/actions'
+import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView, baoTriChuaMap, baoTriDaMap, baoTriTheoThang } from '@/app/actions'
 import { PhanTrang } from '@/bang'
 import { ChipSapXep } from '@/bang'
 import { laQuanLy } from '@/lib/supabase'
@@ -10,27 +10,32 @@ import { LocNgay } from '@/bang'
 import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
 import { BangBaoTri } from '@/components/BangBaoTri'
 import { BaoTriQuanLy } from '@/components/BaoTriQuanLy'
+import { LichBaoTriThang } from '@/components/LichBaoTriThang'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
 export default async function BaoTriPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; tt?: string; cot?: string; chieu?: string; trang?: string; ngtu?: string; ngden?: string }>
+  searchParams: Promise<{ q?: string; tt?: string; cot?: string; chieu?: string; trang?: string; ngtu?: string; ngden?: string; thang?: string }>
 }) {
-  const { q = '', tt, cot, chieu, trang: trangRaw, ngtu, ngden } = await searchParams
+  const { q = '', tt, cot, chieu, trang: trangRaw, ngtu, ngden, thang: thangRaw } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const laMap = tt === 'map'
+  const laLich = tt === 'lich'
+  const thang = /^\d{4}-\d{2}$/.test(thangRaw ?? '') ? thangRaw! : new Date().toISOString().slice(0, 7)
+  const nhe = laMap || laLich
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, tong, soTrang, sapXep }, counts, views, admin, chuaMap, daMap] = await Promise.all([
-    laMap
+  const [{ rows, tong, soTrang, sapXep }, counts, views, admin, chuaMap, daMap, lichRows] = await Promise.all([
+    nhe
       ? Promise.resolve({ rows: [], tong: 0, trang: 1, soTrang: 1, sapXep: { cot: 'due_date', tang: true, macDinh: true } } as Awaited<ReturnType<typeof maintenanceDue>>)
       : maintenanceDue(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     maintenanceCounts(),
-    laMap ? Promise.resolve([]) : listBangView('maintenance'),
+    nhe ? Promise.resolve([]) : listBangView('maintenance'),
     laQuanLy(),
     laMap ? baoTriChuaMap() : Promise.resolve([]),
     laMap ? baoTriDaMap() : Promise.resolve([]),
+    laLich ? baoTriTheoThang(thang) : Promise.resolve([]),
   ])
 
   const tabs = [
@@ -39,6 +44,7 @@ export default async function BaoTriPage({
     { key: 'còn hạn', label: `Còn hạn (${counts['còn hạn'] ?? 0})` },
     { key: 'đã xong', label: 'Đã xong' },
     { key: 'all', label: 'Tất cả' },
+    { key: 'lich', label: '📅 Lịch (calendar)' },
     { key: 'map', label: 'Map khách / Lên lịch' },
   ]
 
@@ -78,7 +84,9 @@ export default async function BaoTriPage({
           })}
         </div>
 
-        {laMap ? (
+        {laLich ? (
+          <LichBaoTriThang thang={thang} rows={lichRows} />
+        ) : laMap ? (
           admin ? (
             <BaoTriQuanLy chuaMap={chuaMap} daMap={daMap} />
           ) : (

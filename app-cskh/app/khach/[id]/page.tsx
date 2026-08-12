@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon } from '@/app/actions'
+import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon, baoTriCuaKhach } from '@/app/actions'
 import { CustomerEditor } from '@/components/CustomerEditor'
 import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
@@ -11,9 +11,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines, kenh] = await Promise.all([
-    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(),
+  const [tickets, machines, kenh, baoTri] = await Promise.all([
+    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id),
   ])
+  const btDaXong = baoTri.filter((v) => v.completed_at).length
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -47,6 +48,27 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <div className="text-xs text-slate-500">Lắp: {vnDate(m.install_date)}</div>
                   </div>
                   <WarrantyBadge m={m} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Lịch bảo trì ({btDaXong}/{baoTri.length} đã làm)</h2>
+          {baoTri.length === 0 ? (
+            <p className="text-sm text-slate-400">Khách này chưa có lịch bảo trì.</p>
+          ) : (
+            <ul className="divide-y border rounded-lg text-sm">
+              {baoTri.map((v) => (
+                <li key={v.visit_id} className="px-3 py-2 flex items-center justify-between gap-3">
+                  <span className="text-slate-700">
+                    <span className="text-slate-400">Lần {v.lan_thu ?? '?'}</span> · {vnDate(v.due_date)}
+                    {v.bo_may && <span className="text-slate-400"> · {v.bo_may}</span>}
+                  </span>
+                  {v.completed_at
+                    ? <span className="text-xs text-emerald-700">✓ đã làm {vnDate(v.completed_at.slice(0, 10))}</span>
+                    : <span className="text-xs text-amber-600">chưa làm</span>}
                 </li>
               ))}
             </ul>
