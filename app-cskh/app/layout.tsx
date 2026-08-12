@@ -1,3 +1,4 @@
+// build marker: 2026-08-12 (re-trigger Vercel deploy)
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
