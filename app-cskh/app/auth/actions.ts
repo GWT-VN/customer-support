@@ -17,7 +17,7 @@ export async function dangXuat() {
  * client nên cần bản tương đương chạy server, nếu không rào chỉ áp một nửa.
  */
 export async function xacNhanQuyenVaoCua(): Promise<
-  { ok: true } | { ok: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' | 'cho_duyet' }
+  { ok: true } | { ok: false; lyDo: 'bi_khoa' | 'ngoai_danh_sach' | 'cho_duyet' | 'ngoai_cs' }
 > {
   const supabase = await authClient()
   const { data } = await supabase.auth.getUser()

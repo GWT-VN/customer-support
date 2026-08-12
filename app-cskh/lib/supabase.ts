@@ -92,7 +92,7 @@ const layDongStaff = cache(async (email: string): Promise<NhanVien | null> => {
 export async function kiemTraVaoCua(email: string): Promise<KetQuaVaoCua> {
   const e = chuanHoaEmail(email)
   const dong = await layDongStaff(e)
-  return xetLuatVaoCua(e, dong ? { hoat_dong: dong.hoat_dong } : null)
+  return xetLuatVaoCua(e, dong ? { hoat_dong: dong.hoat_dong, vai_tro: dong.vai_tro } : null)
 }
 
 /**

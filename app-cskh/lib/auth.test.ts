@@ -10,19 +10,41 @@ describe('xetLuatVaoCua', () => {
     expect(xetLuatVaoCua('AI@GWT.VN', null)).toEqual({ duocVao: false, lyDo: 'cho_duyet' })
   })
 
-  it('luật 1: @gwt.vn đã được duyệt (có hồ sơ, đang bật) thì được vào', () => {
-    expect(xetLuatVaoCua('ai@gwt.vn', { hoat_dong: true }))
+  it('luật 1: @gwt.vn đã duyệt (đang bật + có vai trò CS) thì được vào', () => {
+    expect(xetLuatVaoCua('ai@gwt.vn', { hoat_dong: true, vai_tro: ['cs'] }))
       .toEqual({ duocVao: true, nguon: 'staff' })
   })
 
-  it('luật 2: email ngoài domain nhưng có trong bảng và đang bật thì được vào', () => {
-    expect(xetLuatVaoCua('freelancer@gmail.com', { hoat_dong: true }))
+  it('luật 2: email ngoài domain nhưng có trong bảng, đang bật + vai trò CS thì được vào', () => {
+    expect(xetLuatVaoCua('freelancer@gmail.com', { hoat_dong: true, vai_tro: ['cs'] }))
       .toEqual({ duocVao: true, nguon: 'staff' })
+  })
+
+  it('admin và cs_manager cũng vào được', () => {
+    expect(xetLuatVaoCua('a@gwt.vn', { hoat_dong: true, vai_tro: ['admin'] }).duocVao).toBe(true)
+    expect(xetLuatVaoCua('b@gwt.vn', { hoat_dong: true, vai_tro: ['cs_manager'] }).duocVao).toBe(true)
   })
 
   it('luật 1 THẮNG luật 3: @gwt.vn nhưng hoat_dong=false thì bị từ chối', () => {
-    expect(xetLuatVaoCua('nghi-viec@gwt.vn', { hoat_dong: false }))
+    expect(xetLuatVaoCua('nghi-viec@gwt.vn', { hoat_dong: false, vai_tro: ['cs'] }))
       .toEqual({ duocVao: false, lyDo: 'bi_khoa' })
+  })
+
+  it('CHẶN SALES: đang bật nhưng chỉ có vai trò sales/sales_manager -> ngoai_cs', () => {
+    expect(xetLuatVaoCua('sale@gwt.vn', { hoat_dong: true, vai_tro: ['sales'] }))
+      .toEqual({ duocVao: false, lyDo: 'ngoai_cs' })
+    expect(xetLuatVaoCua('lead@gwt.vn', { hoat_dong: true, vai_tro: ['sales', 'sales_manager'] }))
+      .toEqual({ duocVao: false, lyDo: 'ngoai_cs' })
+  })
+
+  it('CHẶN: đang bật nhưng CHƯA gán vai trò nào -> ngoai_cs', () => {
+    expect(xetLuatVaoCua('moi@gwt.vn', { hoat_dong: true, vai_tro: [] }))
+      .toEqual({ duocVao: false, lyDo: 'ngoai_cs' })
+  })
+
+  it('KIÊM NHIỆM: có cả sales lẫn cs thì VẪN vào được (vì có vai trò CS)', () => {
+    expect(xetLuatVaoCua('kiem@gwt.vn', { hoat_dong: true, vai_tro: ['sales', 'cs'] }))
+      .toEqual({ duocVao: true, nguon: 'staff' })
   })
 
   it('luật 4: email lạ bị từ chối', () => {
