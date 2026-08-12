@@ -2404,6 +2404,7 @@ export async function createTicket(input: {
   ky_thuat?: string | null
 }) {
   await requireStaff()
+  const nguoiTao = await layNhanVien()
   if (!input.customer_id?.trim()) return { ok: false as const, error: 'Bắt buộc chọn khách.' }
   if (!input.serial?.trim()) return { ok: false as const, error: 'Bắt buộc chọn serial máy báo lỗi (máy của khách).' }
   if (!input.ticket_type?.trim()) return { ok: false as const, error: 'Chọn loại ticket.' }
@@ -2437,7 +2438,8 @@ export async function createTicket(input: {
     state: input.state || 'Open',
     khan: input.khan ?? false,
     last_note: input.last_note?.trim() || null,
-    cs_phu_trach: input.cs_phu_trach || null,
+    // Bỏ trống người phụ trách -> auto gán người TẠO ticket (yêu cầu nghiệp vụ).
+    cs_phu_trach: input.cs_phu_trach || nguoiTao?.id || null,
     ky_thuat: input.ky_thuat || null,
   }
   if (input.created_at && input.created_at.trim()) row.created_at = new Date(input.created_at).toISOString()
