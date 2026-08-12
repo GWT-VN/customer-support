@@ -15,6 +15,20 @@
 
 export type Vung = 'bac' | 'nam'
 
+/**
+ * Mặc định lịch bảo trì theo BỘ MÁY (combo), tính từ ngày kích hoạt:
+ *  - WH15A / WH30A            -> 4 lần, mỗi 3 tháng.
+ *  - WH15A ECO / WH30A ECO    -> 2 lần, mỗi 3 tháng.
+ *  - Khác/không rõ            -> null (để CS tự nhập).
+ */
+export function macDinhTheoBoMay(boMay: string | null | undefined): { soLan: number; chuKy: number } | null {
+  if (!boMay) return null
+  const s = boMay.toUpperCase().replace(/\s+/g, '')
+  const laCombo = s.includes('WH15A') || s.includes('WH30A')
+  if (!laCombo) return null
+  return s.includes('ECO') ? { soLan: 2, chuKy: 3 } : { soLan: 4, chuKy: 3 }
+}
+
 /** Bỏ dấu + thường hoá để so tên tỉnh. */
 function boDau(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim()

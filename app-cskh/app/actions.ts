@@ -900,23 +900,24 @@ export type PlanDaMap = {
   id: string; customer_id: string; ten_khach: string | null; province: string | null
   bo_may: string | null; loai_goi: string | null; tong_lan: number | null
   chu_ky_thang: number | null; ngay_bat_dau: string | null; vung: string | null
-  so_visit: number; so_xong: number
+  so_visit: number; so_xong: number; ngay_kich_hoat: string | null; so_may: number
 }
 
-/** Plan bảo trì ĐÃ map khách + số lượt đã lên / đã xong (để lên lịch). */
+/** Plan bảo trì ĐÃ map khách + số lượt + ngày kích hoạt (ngày lắp sớm nhất) để lên lịch. */
 export async function baoTriDaMap(): Promise<PlanDaMap[]> {
   await requireStaff()
   const db = dataClient()
   const { data: plans } = await db.from('maintenance_plan')
     .select('id, customer_id, bo_may, loai_goi, tong_lan, chu_ky_thang, ngay_bat_dau, vung')
     .not('customer_id', 'is', null).order('updated_at', { ascending: false })
-  const ds = (plans ?? []) as Omit<PlanDaMap, 'ten_khach' | 'province' | 'so_visit' | 'so_xong'>[]
+  const ds = (plans ?? []) as Omit<PlanDaMap, 'ten_khach' | 'province' | 'so_visit' | 'so_xong' | 'ngay_kich_hoat' | 'so_may'>[]
   if (!ds.length) return []
   const ids = ds.map((p) => p.id)
   const cusIds = [...new Set(ds.map((p) => p.customer_id))]
-  const [{ data: visits }, { data: khach }] = await Promise.all([
+  const [{ data: visits }, { data: khach }, { data: may }] = await Promise.all([
     db.from('maintenance_visit').select('plan_id, completed_at').in('plan_id', ids),
     db.from('cs_customers').select('id, full_name, province').in('id', cusIds),
+    db.from('installed_base').select('customer_id, install_date').in('customer_id', cusIds).eq('status', 'active'),
   ])
   const dem = new Map<string, { visit: number; xong: number }>()
   for (const v of (visits ?? []) as { plan_id: string; completed_at: string | null }[]) {
@@ -924,11 +925,23 @@ export async function baoTriDaMap(): Promise<PlanDaMap[]> {
     c.visit++; if (v.completed_at) c.xong++
     dem.set(v.plan_id, c)
   }
+  // Ngày kích hoạt = ngày lắp SỚM NHẤT + đếm số máy đã lắp (gate "đã kích hoạt BH").
+  const kichHoat = new Map<string, { ngay: string | null; so: number }>()
+  for (const m of (may ?? []) as { customer_id: string; install_date: string | null }[]) {
+    const cur = kichHoat.get(m.customer_id) ?? { ngay: null, so: 0 }
+    cur.so++
+    if (m.install_date && (!cur.ngay || m.install_date < cur.ngay)) cur.ngay = m.install_date
+    kichHoat.set(m.customer_id, cur)
+  }
   const kh = new Map((((khach ?? []) as { id: string; full_name: string; province: string | null }[])).map((k) => [k.id, k]))
   return ds.map((p) => {
     const c = dem.get(p.id) ?? { visit: 0, xong: 0 }
     const k = kh.get(p.customer_id)
-    return { ...p, ten_khach: k?.full_name ?? null, province: k?.province ?? null, so_visit: c.visit, so_xong: c.xong }
+    const kt = kichHoat.get(p.customer_id) ?? { ngay: null, so: 0 }
+    return {
+      ...p, ten_khach: k?.full_name ?? null, province: k?.province ?? null,
+      so_visit: c.visit, so_xong: c.xong, ngay_kich_hoat: kt.ngay, so_may: kt.so,
+    }
   })
 }
 
@@ -1820,6 +1833,50 @@ export async function lapMayChoKhach(
   revalidatePath('/'); revalidatePath('/serial')
   revalidatePath(`/may/${encodeURIComponent(s)}`); revalidatePath(`/khach/${customerId}`)
   return { ok: true }
+}
+
+/**
+ * Cập nhật SỐ LẦN bảo trì THỰC của 1 plan = tặng + mua thêm (không cứng theo hợp đồng gốc).
+ * Nếu số lần MỚI > số lượt đang có -> tự NỐI THÊM lượt theo chu kỳ (tiếp mốc cuối, né cuối
+ * tuần). Nếu nhỏ hơn -> chỉ đổi mẫu số (không xoá lượt đã có/đã làm). CHỈ QUẢN LÝ.
+ */
+export async function datSoLanBaoTri(
+  planId: string, tongLan: number
+): Promise<{ ok: true; them: number } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const soMoi = Math.floor(tongLan)
+  if (!soMoi || soMoi < 1) return { ok: false, error: 'Số lần phải ≥ 1.' }
+  const db = dataClient()
+  const { data: plan } = await db.from('maintenance_plan')
+    .select('customer_id, chu_ky_thang, vung').eq('id', planId).maybeSingle()
+  const p = plan as { customer_id: string | null; chu_ky_thang: number | null; vung: Vung | null } | null
+  if (!p) return { ok: false, error: 'Không thấy plan.' }
+  const { data: vs } = await db.from('maintenance_visit')
+    .select('lan_thu, due_date').eq('plan_id', planId).order('lan_thu', { ascending: false })
+  const visits = (vs ?? []) as { lan_thu: number | null; due_date: string | null }[]
+  const lanMax = visits.reduce((m, v) => Math.max(m, v.lan_thu ?? 0), 0)
+  const dueCuoi = visits.find((v) => v.due_date)?.due_date ?? null
+
+  let them = 0
+  if (soMoi > lanMax && dueCuoi && (p.chu_ky_thang ?? 0) > 0) {
+    const { data: kh } = await db.from('cs_customers').select('province').eq('id', p.customer_id ?? '').maybeSingle()
+    const vung: Vung = p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
+    // sinh (soMoi-lanMax) mốc TIẾP THEO dueCuoi (bỏ mốc đầu = dueCuoi).
+    const dsNgay = sinhLichBaoTri(dueCuoi, p.chu_ky_thang, soMoi - lanMax + 1, vung).slice(1)
+    const rows = dsNgay.map((d, i) => ({ plan_id: planId, lan_thu: lanMax + 1 + i, due_date: d, ten_task: `Bảo trì lần ${lanMax + 1 + i}` }))
+    if (rows.length) {
+      const { error } = await db.from('maintenance_visit').insert(rows)
+      if (error) return { ok: false, error: error.message }
+      them = rows.length
+    }
+  }
+  const { error } = await db.from('maintenance_plan')
+    .update({ tong_lan: soMoi, updated_at: new Date().toISOString() }).eq('id', planId)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('dat_so_lan_bao_tri', `plan:${planId}`, { tong_lan: soMoi, them })
+  revalidatePath('/bao-tri')
+  return { ok: true, them }
 }
 
 /** Sửa MỐC NGÀY (và mô tả) của 1 sự kiện vòng đời đã ghi — để chỉnh mốc lịch sử. CHỈ ADMIN. */

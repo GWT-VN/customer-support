@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vungTheoTinh, sinhLichBaoTri } from './lichBaoTri'
+import { vungTheoTinh, sinhLichBaoTri, macDinhTheoBoMay } from './lichBaoTri'
 
 const weekday = (iso: string) => new Date(iso + 'T00:00:00Z').getUTCDay() // 0=CN, 6=T7
 
@@ -14,6 +14,21 @@ describe('vungTheoTinh', () => {
     expect(vungTheoTinh('Đà Nẵng')).toBe('bac')
     expect(vungTheoTinh(null)).toBe('bac')
     expect(vungTheoTinh('Nghệ An')).toBe('bac')
+  })
+})
+
+describe('macDinhTheoBoMay', () => {
+  it('WH15A/WH30A -> 4 lần × 3 tháng', () => {
+    expect(macDinhTheoBoMay('WH15A')).toEqual({ soLan: 4, chuKy: 3 })
+    expect(macDinhTheoBoMay('WH30A')).toEqual({ soLan: 4, chuKy: 3 })
+  })
+  it('ECO -> 2 lần × 3 tháng', () => {
+    expect(macDinhTheoBoMay('WH15A ECO')).toEqual({ soLan: 2, chuKy: 3 })
+    expect(macDinhTheoBoMay('WH30AECO')).toEqual({ soLan: 2, chuKy: 3 })
+  })
+  it('khác/không rõ -> null', () => {
+    expect(macDinhTheoBoMay('CTS10')).toBeNull()
+    expect(macDinhTheoBoMay(null)).toBeNull()
   })
 })
 
