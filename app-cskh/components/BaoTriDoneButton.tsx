@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { markMaintenanceDone, unmarkMaintenanceDone, ghiKetQuaBaoTri, type KetQuaDo } from '@/app/actions'
 import { vnDate } from '@/components/Badge'
+import { DinhKemMedia } from '@/components/DinhKemMedia'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 
@@ -64,6 +65,8 @@ export function BaoTriDoneButton({ visitId, completedAt }: { visitId: string; co
         {hang('Độ cứng', 'do_cung_truoc', 'do_cung_sau')}
         {hang('Clo dư', 'clo_truoc', 'clo_sau')}
         <input value={kq.ghi_chu ?? ''} onChange={(e) => setKq((c) => ({ ...c, ghi_chu: e.target.value }))} placeholder="Ghi chú khác" className="w-full rounded border px-2 py-1" />
+        {/* Ảnh hiện trường / kết quả đo — kho media chung, key = visitId (chỗ migration 41 đã chừa) */}
+        <DinhKemMedia entityType="bao_tri" entityId={visitId} choSua />
         <div className="flex items-center gap-2 pt-0.5">
           <button onClick={luuKQ} disabled={busy} className="rounded-lg bg-emerald-600 text-white px-3 py-1 font-medium disabled:opacity-50">{busy ? 'Đang lưu…' : 'Lưu kết quả'}</button>
           <button onClick={() => setMoKQ(false)} className="text-slate-500 underline">Huỷ</button>

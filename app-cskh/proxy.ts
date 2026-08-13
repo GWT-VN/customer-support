@@ -35,8 +35,10 @@ export async function proxy(request: NextRequest) {
   // giữ được việc gia hạn phiên, không làm người dùng bị đăng xuất giữa chừng.
   const { data: { session } } = await supabase.auth.getSession()
 
-  // /auth = vòng OAuth quay về, lúc đó CHƯA có session nên bắt buộc phải cho qua
-  const DUONG_CONG_KHAI = ['/login', '/auth']
+  // /auth = vòng OAuth quay về, lúc đó CHƯA có session nên bắt buộc phải cho qua.
+  // /api/media/cleanup do pg_cron gọi, tự xác thực bằng MEDIA_CLEANUP_SECRET —
+  // các đường /api/media khác VẪN bắt đăng nhập (ảnh chứa PII).
+  const DUONG_CONG_KHAI = ['/login', '/auth', '/api/media/cleanup']
   const congKhai = DUONG_CONG_KHAI.some((p) => request.nextUrl.pathname.startsWith(p))
 
   // Đã đăng nhập mà còn đứng ở /login -> đá thẳng vào trong.

@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "cskh",
+      "name": "app-cskh",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "app-cskh", "run", "dev"],
-      "port": 3000,
-      "autoPort": true
+      "port": 3000
     }
   ]
 }

@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { laQuanLy } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes, nhomLoiChon } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes, nhomLoiChon, listMedia } from '@/app/actions'
+import { DinhKemMedia } from '@/components/DinhKemMedia'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
@@ -15,9 +16,9 @@ import { vnDate } from '@/components/Badge'
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items, me, catalog, loaiList, nhomList, admin] = await Promise.all([
+  const [t, nhom, notes, staff, items, me, catalog, loaiList, nhomList, admin, media] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
-    listCatalogItems(), ticketTypes(), nhomLoiChon(), laQuanLy(),
+    listCatalogItems(), ticketTypes(), nhomLoiChon(), laQuanLy(), listMedia('ticket', ma),
   ])
   if (!t) notFound()
 
@@ -151,6 +152,11 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Nhật ký trao đổi</h2>
           <TicketNotes code={t.ticket_code} notes={notes} />
+        </section>
+
+        <section className="bg-white rounded-xl border p-5">
+          <h2 className="font-medium text-slate-900 mb-3">Ảnh / Video</h2>
+          <DinhKemMedia entityType="ticket" entityId={t.ticket_code} items={media} choSua />
         </section>
 
         <section className="bg-white rounded-xl border p-5">

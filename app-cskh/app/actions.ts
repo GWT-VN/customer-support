@@ -7,6 +7,8 @@ import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe, type V
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
+import { xoaDrive } from '@/lib/drive'
+import type { MediaEntityType } from '@/lib/media'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
@@ -4006,4 +4008,61 @@ export async function auditLog(limit = 100, hanhDong?: string): Promise<AuditRow
   const { data, error } = await q.order('id', { ascending: false }).limit(limit)
   if (error) throw new Error(error.message)
   return (data ?? []) as AuditRow[]
+}
+
+// ── Kho ảnh/video dùng chung (ticket + bảo trì) ─────────────────────────────
+// File nằm trên Google Drive, bảng media chỉ giữ metadata.
+// Upload đi qua route /api/media/upload (multipart); xem docs/plans/2026-08-13.
+
+export type MediaItem = {
+  id: string
+  entity_type: MediaEntityType
+  entity_id: string
+  filename: string | null
+  mime: string | null
+  size_bytes: number | null
+  uploaded_by: string | null
+  created_at: string
+}
+
+/** Media chưa xoá của một ticket / lượt bảo trì — nhúng vào trang chi tiết. */
+export async function listMedia(entityType: MediaEntityType, entityId: string): Promise<MediaItem[]> {
+  await requireStaff()
+  const { data, error } = await dataClient()
+    .from('media')
+    .select('id, entity_type, entity_id, filename, mime, size_bytes, uploaded_by, created_at')
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .is('deleted_at', null)
+    .order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as MediaItem[]
+}
+
+/** Xoá một media: xoá file Drive rồi soft-delete row (UI đã hỏi confirm). */
+export async function xoaMedia(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  const db = dataClient()
+  const { data: row, error: e1 } = await db
+    .from('media')
+    .select('id, entity_type, entity_id, drive_file_id, filename')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (e1) return { ok: false, error: e1.message }
+  if (!row) return { ok: false, error: 'File không còn.' }
+
+  // Drive trước, row sau: row còn = file còn, không bao giờ có row "ma" trỏ
+  // vào file đã mất. File đã biến mất sẵn trên Drive (404) thì cứ dọn row.
+  try {
+    await xoaDrive(row.drive_file_id)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Xoá file Drive thất bại.'
+    if (!/404|not\s*found/i.test(msg)) return { ok: false, error: msg }
+  }
+  const { error: e2 } = await db
+    .from('media').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (e2) return { ok: false, error: e2.message }
+  await ghiAudit('media_xoa', `${row.entity_type}:${row.entity_id}`, { media_id: id, filename: row.filename })
+  return { ok: true }
 }

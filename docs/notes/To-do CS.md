@@ -20,3 +20,13 @@ Máy đã lắp - Trang View All
 Khách - Trang Detail 
 - Bổ sung thêm nguồn khách hàng: cần sử dụng chung nguồn với sales 
 - 
+
+Yêu cầu mới (ghi nhận 2026-08-13, chưa có spec — 3 mục đều cần tài khoản/phí bên thứ ba):
+1. Cổng khách hàng xem web: KH tự xem được ngày kích hoạt BH + lịch bảo trì của mình
+   (luồng: CS tạo lịch -> KT nhập thông tin -> KH view). App hiện tại 100% nội bộ,
+   cần route công khai riêng — hướng mới hoàn toàn.
+2. Chatbot nhắc thay lõi/bảo trì đến hạn, gửi thẳng Zalo của KH; kênh 2 là Messenger.
+   Gửi fail thì phải báo lại CS. (Spec gốc 2026-07-12 đã định Zalo ZNS ở Phase 3,
+   chưa build; Messenger + báo-fail là phần thêm mới.)
+3. Kích hoạt bảo hành xong tự gửi SMS thông báo cho KH. (Spec gốc chọn Zalo ZNS,
+   chưa có luồng bắn tin ngay khi kích hoạt — cần chọn nhà cung cấp SMS + duyệt template.)

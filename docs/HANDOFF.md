@@ -115,6 +115,14 @@ làm bằng `npx tsc --noEmit` + truy vấn SQL, **không chạy được previe
 
 ## 8. Việc còn treo (ưu tiên từ trên xuống)
 
+**Kho ảnh/video (ticket + bảo trì) — code XONG 2026-08-13, chờ user cấu hình Google:**
+- [x] Code Đợt 1+2: bảng `media` (migration 44, ĐÃ áp), `lib/drive.ts`, route upload/proxy/cleanup,
+  component `DinhKemMedia` nhúng ticket + bảo trì, unit test, build sạch. Nhánh `feat/kho-anh-google-drive`.
+- [ ] User làm theo `docs/huong-dan-kho-anh-google-drive.md`: bật Drive API + service account,
+  tạo Shared Drive "GWT CSKH Media", điền 4 env trên Vercel → chạy 5 ca kiểm tra đầu-cuối.
+- [ ] Sau khi có secret Vault + domain production: sửa placeholder rồi áp migration
+  `45_media_cleanup_cron.sql` (CHƯA áp — bật cron thu dọn hàng tuần).
+
 **Cutover & hạ tầng:**
 - [ ] Tạo tài khoản Auth cho NV ở project mới (chặn đăng nhập nếu chưa).
 - [ ] Edge Function + cron đồng bộ 6 bảng gương catalog (hiện mirror thủ công) + health-check tỉ lệ khớp `v_machine_filter`.
