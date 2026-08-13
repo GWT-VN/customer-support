@@ -2687,18 +2687,108 @@ export async function serialInfo(serial: string): Promise<SerialKho | null> {
   return (data as SerialKho) ?? null
 }
 
+/**
+ * Chuẩn hoá SĐT về dạng 0 + 9 số cuối (SĐT VN 10 số). Nhận cả "84…", "+84…",
+ * số dính khoảng trắng, hoặc thiếu số 0 đầu (nguồn Google Sheet của Sales).
+ * `cuoi9` = 9 số cuối, khoá đối chiếu chung (khớp cách migration 26/12 đã map).
+ */
+function chuanHoaSdt(raw: string): { chuan: string; cuoi9: string; hopLe: boolean } {
+  let so = (raw ?? '').replace(/\D/g, '')
+  if (so.startsWith('84')) so = '0' + so.slice(2)
+  else if (so.length === 9) so = '0' + so
+  const hopLe = /^0\d{9,10}$/.test(so)
+  const cuoi9 = so.length >= 9 ? so.slice(-9) : so
+  return { chuan: so, cuoi9, hopLe }
+}
+
+/** Kết quả tra khách theo SĐT (cho form tạo khách: chống trùng + tái dùng khách Sales). */
+export type KhachKhopSdt = {
+  nguon: 'cs' | 'sales' | null
+  id?: string                 // cs_customers.id khi nguon='cs' (để chọn luôn, không tạo trùng)
+  full_name?: string
+  primary_phone?: string | null
+  address?: string | null
+  province?: string | null
+  customer_code?: string | null
+  trang_thai?: string | null
+}
+
+/**
+ * Tra khách theo SĐT (9 số cuối). Ưu tiên khách CS đã có (nguon='cs' -> chọn luôn,
+ * không tạo trùng); không có thì soi khách chung với Sales (nguon='sales' -> trả
+ * info để form tự điền, cho sửa lại địa chỉ). SĐT sai định dạng -> nguon=null.
+ */
+export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
+  await requireStaff()
+  const { cuoi9, hopLe } = chuanHoaSdt(sdt)
+  if (!hopLe || cuoi9.length < 9) return { nguon: null }
+  const db = dataClient()
+
+  // 1) Khách CS đã có (bỏ đã xoá) — khớp theo 9 số cuối của primary_phone.
+  const { data: cs } = await db.from('cs_customers')
+    .select('id, full_name, primary_phone, address, province, customer_code, trang_thai')
+    .neq('trang_thai', 'da_xoa').ilike('primary_phone', `%${cuoi9}`).limit(1)
+  if (cs && cs.length) {
+    const k = cs[0] as Record<string, unknown>
+    return {
+      nguon: 'cs', id: k.id as string, full_name: k.full_name as string,
+      primary_phone: (k.primary_phone as string) ?? null, address: (k.address as string) ?? null,
+      province: (k.province as string) ?? null, customer_code: (k.customer_code as string) ?? null,
+      trang_thai: (k.trang_thai as string) ?? null,
+    }
+  }
+
+  // 2) Khách chung với Sales (bảng mirror `customers`) — khớp phone_no0 (9 số).
+  const { data: sa } = await db.from('customers')
+    .select('name, phone_chuan, address, province, province_moi, customer_code')
+    .eq('phone_no0', cuoi9).limit(1)
+  if (sa && sa.length) {
+    const k = sa[0] as Record<string, unknown>
+    return {
+      nguon: 'sales', full_name: (k.name as string) ?? undefined,
+      primary_phone: (k.phone_chuan as string) ?? null, address: (k.address as string) ?? null,
+      province: (k.province_moi as string) || (k.province as string) || null,
+      customer_code: (k.customer_code as string) ?? null,
+    }
+  }
+
+  return { nguon: null }
+}
+
 /** Tạo khách mới TỪ CS -> trạng thái chờ admin duyệt (khách đại lý/Shopee đăng ký sau). */
 export async function taoKhachChoDuyet(input: {
   full_name: string; primary_phone?: string; address?: string; province?: string
-}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
   const ten = input.full_name?.trim()
   if (!ten) return { ok: false, error: 'Nhập tên khách.' }
-  const sdt = input.primary_phone?.trim() || null
-  const { data, error } = await dataClient().from('cs_customers').insert({
-    full_name: ten, primary_phone: sdt,
+
+  // SĐT BẮT BUỘC + đúng định dạng (khách mới). Rào thật ở server, không chỉ UI.
+  const { chuan, cuoi9, hopLe } = chuanHoaSdt(input.primary_phone ?? '')
+  if (!hopLe) return { ok: false, error: 'SĐT bắt buộc và phải đúng định dạng (vd 0xxxxxxxxx).' }
+
+  const db = dataClient()
+  // Chống trùng: SĐT đã có ở khách CS -> KHÔNG tạo bản mới, trả id để UI chọn luôn.
+  const { data: trung } = await db.from('cs_customers')
+    .select('id').neq('trang_thai', 'da_xoa').ilike('primary_phone', `%${cuoi9}`).limit(1)
+  if (trung && trung.length) {
+    return {
+      ok: false, existingId: (trung[0] as { id: string }).id,
+      error: 'SĐT này đã có khách trong hệ thống — dùng lại khách đã có, không tạo trùng.',
+    }
+  }
+
+  // Khách chung với Sales? -> lấy customer_code để liên kết (tái dùng hồ sơ Sales).
+  const { data: sa } = await db.from('customers')
+    .select('customer_code').eq('phone_no0', cuoi9).limit(1)
+  const customerCode = sa && sa.length ? (sa[0] as { customer_code: string | null }).customer_code : null
+
+  const { data, error } = await db.from('cs_customers').insert({
+    full_name: ten, primary_phone: chuan,
     address: input.address?.trim() || null, province: input.province?.trim() || null,
-    source: 'CSKH đăng ký', trang_thai: 'cho_duyet', needs_phone: !sdt,
+    customer_code: customerCode,
+    source: customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký',
+    trang_thai: 'cho_duyet', needs_phone: false,
   }).select('id').single()
   if (error) return { ok: false, error: error.message }
   revalidatePath('/khach')
@@ -2976,6 +3066,7 @@ export type TicketMuc = {
   serial_moi: string | null
   tac_gia: string | null
   created_at: string
+  ngay_thu_phi: string | null
 }
 
 export async function listTicketItems(code: string): Promise<TicketMuc[]> {
@@ -3009,7 +3100,7 @@ export async function listCatalogItems(): Promise<CatalogItem[]> {
 export async function addTicketItem(code: string, input: {
   loai: string; catalog_code?: string; so_luong?: number
   mo_ta?: string; so_tien?: number | null; tinh_phi?: boolean
-  serial_cu?: string; serial_moi?: string
+  serial_cu?: string; serial_moi?: string; ngay_thu_phi?: string | null
 }) {
   const user = await requireStaff()
   if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
@@ -3020,17 +3111,30 @@ export async function addTicketItem(code: string, input: {
   if (input.loai === 'hang_muc' && !input.catalog_code) {
     return { ok: false as const, error: 'Chọn hạng mục từ danh mục (catalog_item).' }
   }
+  // Phòng thủ số liệu (UI đã chặn ký tự lạ, đây là rào thật): thành tiền phải là
+  // null hoặc số hữu hạn ≥ 0 (chặn NaN/Infinity/âm); SL là số nguyên ≥ 1.
+  const soTien = input.so_tien ?? null
+  if (soTien != null && (!Number.isFinite(soTien) || soTien < 0)) {
+    return { ok: false as const, error: 'Thành tiền không hợp lệ (chỉ nhập số).' }
+  }
+  const soLuong = input.so_luong && input.so_luong >= 1 ? Math.floor(input.so_luong) : 1
+  const tinhPhi = input.tinh_phi ?? false
+  // Ngày thu phí chỉ lưu cho mục CÓ thu phí, và phải đúng dạng YYYY-MM-DD.
+  const ngayThuPhi = tinhPhi && input.ngay_thu_phi && /^\d{4}-\d{2}-\d{2}$/.test(input.ngay_thu_phi)
+    ? input.ngay_thu_phi : null
+
   const { error } = await dataClient().from('ticket_muc').insert({
     ticket_code: code,
     loai: input.loai,
     catalog_code: input.loai === 'hang_muc' ? input.catalog_code : null,
-    so_luong: input.so_luong && input.so_luong > 0 ? input.so_luong : 1,
+    so_luong: soLuong,
     mo_ta: input.mo_ta?.trim() || null,
-    so_tien: input.so_tien ?? null,
-    tinh_phi: input.tinh_phi ?? false,
+    so_tien: soTien,
+    tinh_phi: tinhPhi,
     serial_cu: input.serial_cu?.trim() || null,
     serial_moi: input.serial_moi?.trim() || null,
     tac_gia: user.email ?? null,
+    ngay_thu_phi: ngayThuPhi,
   })
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(`/ticket/${code}`)

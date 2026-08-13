@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addContact, deleteContact, updateCustomer, xoaKhach, type Contact, type Customer } from '@/app/actions'
+import { ChonTinh } from '@/components/ChonTinh'
 
 const ROLES: Record<string, string> = {
   owner: 'Chủ nhà',
@@ -73,8 +74,7 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
           </label>
           <label className="block">
             <span className="text-sm text-slate-700">Tỉnh/TP</span>
-            <input value={c.province ?? ''} onChange={(e) => setC({ ...c, province: e.target.value })}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+            <ChonTinh value={c.province} onChange={(v) => setC({ ...c, province: v })} />
           </label>
           <label className="block">
             <span className="text-sm text-slate-700">Địa chỉ</span>
