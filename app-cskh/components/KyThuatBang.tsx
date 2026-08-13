@@ -134,10 +134,23 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
                   {ctx.plans.map((p) => <option key={p.id} value={p.id}>{p.nhan}</option>)}
                 </select>
               ) : v.loai_viec === 'thay_loi' && ctx && ctx.machines.length > 0 ? (
-                <select value={v.ref ?? ''} onChange={(e) => { const m = ctx.machines.find((x) => x.serial === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: m?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
-                  <option value="">— Chọn máy thay lõi —</option>
-                  {ctx.machines.map((m) => <option key={m.serial} value={m.serial}>{m.nhan}{m.dia_chi ? ` — ${m.dia_chi}` : ''}</option>)}
-                </select>
+                <>
+                  <select value={v.ref ?? ''} onChange={(e) => setViecAt(i, { ref: e.target.value, mo_ta: '' })} className={oInput}>
+                    <option value="">— Chọn máy —</option>
+                    {ctx.machines.map((m) => <option key={m.serial} value={m.serial}>{m.nhan}{m.dia_chi ? ` — ${m.dia_chi}` : ''}</option>)}
+                  </select>
+                  {v.ref && (() => {
+                    const loi = ctx.machines.find((m) => m.serial === v.ref)?.loi ?? []
+                    return loi.length > 0 ? (
+                      <select value={v.mo_ta ?? ''} onChange={(e) => setViecAt(i, { mo_ta: e.target.value })} className={`${oInput} flex-1 min-w-40`}>
+                        <option value="">— Chọn lõi cần thay —</option>
+                        {loi.map((l) => <option key={l.code} value={`${l.ten ?? l.code} (${l.code})`}>{l.ten ?? l.code} ({l.code})</option>)}
+                      </select>
+                    ) : (
+                      <input value={v.mo_ta ?? ''} onChange={(e) => setViecAt(i, { mo_ta: e.target.value })} placeholder="Lõi cần thay (máy chưa có danh mục lõi)" className={`${oInput} flex-1 min-w-40`} />
+                    )
+                  })()}
+                </>
               ) : v.loai_viec === 'ticket' && ctx && ctx.tickets.length > 0 ? (
                 <select value={v.ref ?? ''} onChange={(e) => { const t = ctx.tickets.find((x) => x.code === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: t?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
                   <option value="">— Chọn ticket —</option>

@@ -54,6 +54,7 @@ export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
                           {NHAN_LOAI_VIEC[v.loai_viec] ?? v.loai_viec}
                           {v.so_tien ? `: ${v.so_tien.toLocaleString('vi-VN')}đ` : ''}
                           {v.mo_ta ? `${v.so_tien ? ' · ' : ': '}${v.mo_ta}` : ''}
+                          {(v.loai_viec === 'thay_loi' || v.loai_viec === 'ticket') && v.ref ? ` · ${v.ref}` : ''}
                         </span>
                       ))}
                     </div>

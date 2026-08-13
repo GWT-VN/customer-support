@@ -1173,11 +1173,11 @@ export type BoiCanhKhach = {
   dia_chi: string | null
   tinh: string | null
   plans: { id: string; nhan: string }[]
-  machines: { serial: string; nhan: string; dia_chi: string | null }[]
+  machines: { serial: string; nhan: string; dia_chi: string | null; loi: { code: string; ten: string | null }[] }[]
   tickets: { code: string; nhan: string }[]
 }
 
-/** Ngữ cảnh 1 khách để gán việc kỹ thuật: địa chỉ lắp (fallback khách) + tỉnh + bộ + máy (kèm địa chỉ từng máy) + ticket. */
+/** Ngữ cảnh 1 khách để gán việc kỹ thuật: địa chỉ + tỉnh + bộ + máy (kèm địa chỉ + LÕI của từng máy) + ticket. */
 export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
   await requireStaff()
   const db = dataClient()
@@ -1189,11 +1189,23 @@ export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
   ])
   const machines = (ib ?? []) as { serial: string; internal_code: string | null; model_freetext: string | null; install_address: string | null }[]
   const c = kh as { address: string | null; province: string | null } | null
+  // Lõi theo model (v_machine_filter: internal_code -> filter_code/name).
+  const ics = [...new Set(machines.map((m) => m.internal_code).filter(Boolean))] as string[]
+  const loiTheoIc = new Map<string, { code: string; ten: string | null }[]>()
+  if (ics.length) {
+    const { data: mf } = await db.from('v_machine_filter').select('internal_code, filter_code, filter_name').in('internal_code', ics)
+    for (const f of (mf ?? []) as { internal_code: string; filter_code: string; filter_name: string | null }[]) {
+      const a = loiTheoIc.get(f.internal_code) ?? []; a.push({ code: f.filter_code, ten: f.filter_name }); loiTheoIc.set(f.internal_code, a)
+    }
+  }
   return {
     dia_chi: machines.find((m) => m.install_address)?.install_address ?? c?.address ?? null,  // máy -> khách -> null
     tinh: c?.province ?? null,
     plans: ((plans ?? []) as { id: string; bo_may: string | null }[]).map((p) => ({ id: p.id, nhan: p.bo_may ?? 'Gói bảo trì' })),
-    machines: machines.map((m) => ({ serial: m.serial, nhan: `${m.model_freetext ?? m.internal_code ?? ''} · ${m.serial}`.trim(), dia_chi: m.install_address })),
+    machines: machines.map((m) => ({
+      serial: m.serial, nhan: `${m.model_freetext ?? m.internal_code ?? ''} · ${m.serial}`.trim(), dia_chi: m.install_address,
+      loi: m.internal_code ? loiTheoIc.get(m.internal_code) ?? [] : [],
+    })),
     tickets: ((tks ?? []) as { ticket_code: string; description: string | null }[]).map((t) => ({ code: t.ticket_code, nhan: `${t.ticket_code}${t.description ? ` · ${t.description.slice(0, 40)}` : ''}` })),
   }
 }
