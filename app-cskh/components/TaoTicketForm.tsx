@@ -10,7 +10,7 @@ const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 const STATES = [{ k: 'Open', l: 'Đang mở' }, { k: 'Done', l: 'Đã xong' }, { k: 'Cancel', l: 'Đã huỷ' }]
 
 /** Form tạo ticket đầy đủ: khách -> máy của khách + ngày/trạng thái/khẩn/ghi chú/người xử lý. */
-export function TaoTicketForm({ loaiList, staff }: { loaiList: string[]; staff: Staff[] }) {
+export function TaoTicketForm({ loaiList, staff, meId }: { loaiList: string[]; staff: Staff[]; meId?: string }) {
   const [khachId, setKhachId] = useState('')
   const [may, setMay] = useState<Machine[] | null>(null)   // null = chưa chọn khách
   const [dangTaiMay, setDangTaiMay] = useState(false)
@@ -21,7 +21,7 @@ export function TaoTicketForm({ loaiList, staff }: { loaiList: string[]; staff: 
   const [state, setState] = useState('Open')
   const [khan, setKhan] = useState(false)
   const [note, setNote] = useState('')
-  const [cs, setCs] = useState('')
+  const [cs, setCs] = useState(meId ?? '')   // mặc định người tạo; bỏ trống server vẫn auto gán mình
   const [kt, setKt] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
