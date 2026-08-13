@@ -1053,12 +1053,14 @@ export async function lenLichBaoTri(
  */
 export async function taoPlanBaoTri(
   customerId: string,
-  input: { boMay?: string; chuKyThang: number | null; tongLan: number; ngayBatDau: string; vung?: Vung; loaiGoi?: string }
+  input: { boMay?: string; chuKyThang: number | null; tongLan: number; ngayBatDau: string; vung?: Vung; loaiGoi?: string; ngayList?: string[] }
 ): Promise<{ ok: true; plan_id: string; so_lan: number } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
   if (!customerId) return { ok: false, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngayBatDau)) return { ok: false, error: 'Ngày bắt đầu không hợp lệ.' }
+  // Mốc do CS sửa tay (nếu có) — ưu tiên dùng thẳng, không sinh lại.
+  const ngayTay = (input.ngayList ?? []).map((d) => d.trim()).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
   const tongLan = Math.max(1, Math.floor(input.tongLan) || 1)
   const db = dataClient()
   // Plan MỚI trên CS -> gate BH: khách phải có ≥1 máy đã lắp/kích hoạt.
@@ -1075,7 +1077,7 @@ export async function taoPlanBaoTri(
   }).select('id').single()
   if (e0) return { ok: false, error: e0.message }
   const planId = (created as { id: string }).id
-  const ngayList = sinhLichBaoTri(input.ngayBatDau, input.chuKyThang, tongLan, vung)
+  const ngayList = ngayTay.length ? ngayTay : sinhLichBaoTri(input.ngayBatDau, input.chuKyThang, tongLan, vung)
   const rows = ngayList.map((d, i) => ({ plan_id: planId, lan_thu: i + 1, due_date: d, ten_task: `Bảo trì lần ${i + 1}` }))
   if (rows.length) {
     const { error } = await db.from('maintenance_visit').insert(rows)
