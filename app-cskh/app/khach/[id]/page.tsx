@@ -60,17 +60,28 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <p className="text-sm text-slate-400">Khách này chưa có lịch bảo trì.</p>
           ) : (
             <ul className="divide-y border rounded-lg text-sm">
-              {baoTri.map((v) => (
-                <li key={v.visit_id} className="px-3 py-2 flex items-center justify-between gap-3">
-                  <span className="text-slate-700">
-                    <span className="text-slate-400">Lần {v.lan_thu ?? '?'}</span> · {vnDate(v.due_date)}
-                    {v.bo_may && <span className="text-slate-400"> · {v.bo_may}</span>}
-                  </span>
-                  {v.completed_at
-                    ? <span className="text-xs text-emerald-700">✓ đã làm {vnDate(v.completed_at.slice(0, 10))}</span>
-                    : <span className="text-xs text-amber-600">chưa làm</span>}
-                </li>
-              ))}
+              {baoTri.map((v) => {
+                const doNuoc = [
+                  v.tds_truoc != null || v.tds_sau != null ? `TDS ${v.tds_truoc ?? '?'}→${v.tds_sau ?? '?'}` : null,
+                  v.ph_truoc != null || v.ph_sau != null ? `pH ${v.ph_truoc ?? '?'}→${v.ph_sau ?? '?'}` : null,
+                  v.do_cung_truoc != null || v.do_cung_sau != null ? `Độ cứng ${v.do_cung_truoc ?? '?'}→${v.do_cung_sau ?? '?'}` : null,
+                  v.clo_truoc != null || v.clo_sau != null ? `Clo ${v.clo_truoc ?? '?'}→${v.clo_sau ?? '?'}` : null,
+                ].filter(Boolean).join(' · ')
+                return (
+                  <li key={v.visit_id} className="px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-700">
+                        <span className="text-slate-400">Lần {v.lan_thu ?? '?'}</span> · {vnDate(v.due_date)}
+                        {v.bo_may && <span className="text-slate-400"> · {v.bo_may}</span>}
+                      </span>
+                      {v.completed_at
+                        ? <span className="text-xs text-emerald-700">✓ đã làm {vnDate(v.completed_at.slice(0, 10))}</span>
+                        : <span className="text-xs text-amber-600">chưa làm</span>}
+                    </div>
+                    {(doNuoc || v.ket_qua_ghi_chu) && <div className="text-[11px] text-slate-500 mt-0.5">💧 {doNuoc}{v.ket_qua_ghi_chu ? ` · ${v.ket_qua_ghi_chu}` : ''}</div>}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>

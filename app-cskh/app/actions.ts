@@ -1022,9 +1022,12 @@ export async function baoTriTheoThang(thang: string): Promise<LuotThang[]> {
 export type LuotKhach = {
   visit_id: string; due_date: string | null; lan_thu: number | null; tong_lan: number | null
   bo_may: string | null; loai_goi: string | null; completed_at: string | null
+  tds_truoc: number | null; tds_sau: number | null; ph_truoc: number | null; ph_sau: number | null
+  do_cung_truoc: number | null; do_cung_sau: number | null; clo_truoc: number | null; clo_sau: number | null
+  ket_qua_ghi_chu: string | null
 }
 
-/** Lịch bảo trì của 1 KHÁCH (mọi plan đã map khách) — hiện ở trang khách. */
+/** Lịch bảo trì của 1 KHÁCH (mọi plan đã map khách) + kết quả đo — hiện ở trang khách. */
 export async function baoTriCuaKhach(customerId: string): Promise<LuotKhach[]> {
   await requireStaff()
   const db = dataClient()
@@ -1034,16 +1037,20 @@ export async function baoTriCuaKhach(customerId: string): Promise<LuotKhach[]> {
   if (!ps.length) return []
   const meta = new Map(ps.map((p) => [p.id, p]))
   const { data: visits } = await db.from('maintenance_visit')
-    .select('id, plan_id, lan_thu, due_date, completed_at').in('plan_id', ps.map((p) => p.id))
+    .select('id, plan_id, lan_thu, due_date, completed_at, tds_truoc, tds_sau, ph_truoc, ph_sau, do_cung_truoc, do_cung_sau, clo_truoc, clo_sau, ket_qua_ghi_chu')
+    .in('plan_id', ps.map((p) => p.id))
     .order('due_date', { ascending: true, nullsFirst: false })
-  return ((visits ?? []) as { id: string; plan_id: string; lan_thu: number | null; due_date: string | null; completed_at: string | null }[])
-    .map((v) => {
-      const p = meta.get(v.plan_id)
-      return {
-        visit_id: v.id, due_date: v.due_date, lan_thu: v.lan_thu, tong_lan: null,
-        bo_may: p?.bo_may ?? null, loai_goi: p?.loai_goi ?? null, completed_at: v.completed_at,
-      }
-    })
+  type VRow = { id: string; plan_id: string; lan_thu: number | null; due_date: string | null; completed_at: string | null } & Omit<LuotKhach, 'visit_id' | 'due_date' | 'lan_thu' | 'tong_lan' | 'bo_may' | 'loai_goi' | 'completed_at'>
+  return ((visits ?? []) as VRow[]).map((v) => {
+    const p = meta.get(v.plan_id)
+    return {
+      visit_id: v.id, due_date: v.due_date, lan_thu: v.lan_thu, tong_lan: null,
+      bo_may: p?.bo_may ?? null, loai_goi: p?.loai_goi ?? null, completed_at: v.completed_at,
+      tds_truoc: v.tds_truoc, tds_sau: v.tds_sau, ph_truoc: v.ph_truoc, ph_sau: v.ph_sau,
+      do_cung_truoc: v.do_cung_truoc, do_cung_sau: v.do_cung_sau, clo_truoc: v.clo_truoc, clo_sau: v.clo_sau,
+      ket_qua_ghi_chu: v.ket_qua_ghi_chu,
+    }
+  })
 }
 
 export type LenLichInput = { ngayBatDau?: string; chuKyThang: number | null; tongLan: number; vung?: Vung }
