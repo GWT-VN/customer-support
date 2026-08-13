@@ -86,10 +86,12 @@ export function TaoTicketForm({ loaiList, staff, meId }: { loaiList: string[]; s
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-sm font-medium text-slate-700">Loại ticket *</span>
-          <input value={loai} onChange={(e) => setLoai(e.target.value)} list="loai-ticket"
-            placeholder="vd: Lỗi máy, Bảo trì…"
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
-          <datalist id="loai-ticket">{loaiList.map((l) => <option key={l} value={l} />)}</datalist>
+          <select value={loai} onChange={(e) => setLoai(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 bg-white">
+            <option value="">— Chọn loại —</option>
+            {loai && !loaiList.includes(loai) && <option value={loai}>{loai}</option>}
+            {loaiList.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
         </label>
         <label className="block">
           <span className="text-sm font-medium text-slate-700">Ngày tạo</span>

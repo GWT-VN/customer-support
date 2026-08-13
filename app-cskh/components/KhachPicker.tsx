@@ -93,11 +93,11 @@ export function KhachPicker(
       if (r.existingId) setKhop({ nguon: 'cs', id: r.existingId, full_name: f.full_name.trim() || undefined, primary_phone: f.primary_phone.trim() })
       return
     }
-    const nhan = `${f.full_name.trim()} (chờ duyệt)`
+    const nhan = `${f.full_name.trim()}${f.primary_phone.trim() ? ` · ${f.primary_phone.trim()}` : ''}`
     setChon(nhan)
     onPick(r.id, nhan, {
       id: r.id, full_name: f.full_name.trim(), primary_phone: f.primary_phone.trim() || null,
-      trang_thai: 'cho_duyet', address: f.address.trim() || null, province: f.province.trim() || null,
+      trang_thai: 'da_duyet', address: f.address.trim() || null, province: f.province.trim() || null,
     })
     setTaoMo(false)
   }
@@ -142,7 +142,7 @@ export function KhachPicker(
 
       {!taoMo ? (
         <button type="button" onClick={() => setTaoMo(true)}
-          className="text-sm text-slate-600 underline">+ Không có? Tạo khách mới (chờ duyệt)</button>
+          className="text-sm text-slate-600 underline">+ Không có? Tạo khách mới</button>
       ) : (
         <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
           <div className="grid sm:grid-cols-2 gap-2">
@@ -182,7 +182,7 @@ export function KhachPicker(
             <button type="button" onClick={taoMoi}
               disabled={busy || !f.full_name.trim() || !sdtHopLe(f.primary_phone) || khop?.nguon === 'cs'}
               className="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">
-              {busy ? 'Đang tạo…' : 'Tạo (chờ duyệt)'}
+              {busy ? 'Đang tạo…' : 'Tạo khách'}
             </button>
             <button type="button" onClick={() => { setTaoMo(false); setKhop(null) }} className="text-sm text-slate-500 underline">Đóng</button>
             {err && <span className="text-sm text-red-600">{err}</span>}

@@ -8,7 +8,7 @@
 
 Cả **ticket** lẫn module **bảo trì** cần đính kèm ảnh/video (kỹ thuật/CS chụp hiện trường; kết quả đo nước khi bảo trì). User chốt: **một kho dùng chung**, lưu trên **Google Drive (Shared Drive)** để tận dụng dung lượng Google Workspace (chi phí ~0), metadata ở Supabase. Kèm yêu cầu: **nén** (giảm dung lượng) + **thu dọn định kỳ** (không để rác). Ảnh có thể chứa PII (nhà khách/khuôn mặt) → **không để lộ công khai**.
 
-Đã khảo sát (greenfield): chưa có code media/storage nào; migration 41 đã ghi "Ảnh: làm sau (Storage)". Có sẵn: `dataClient()` service_role + `requireStaff()` (`lib/supabase.ts`), route handler mẫu (`app/auth/callback/route.ts`), pg_cron+http+Vault-secret (migration 13). Chưa có `googleapis`. Migration cao nhất hiện tại = **43** → dùng số tiếp theo còn trống (kiểm lại lúc làm; dự kiến **44**).
+Đã khảo sát (greenfield): chưa có code media/storage nào; migration 41 đã ghi "Ảnh: làm sau (Storage)". Có sẵn: `dataClient()` service_role + `requireStaff()` (`lib/supabase.ts`), route handler mẫu (`app/auth/callback/route.ts`), pg_cron+http+Vault-secret (migration 13). Chưa có `googleapis`. Migration cao nhất hiện tại = **44** (44 = fix trang_thai) → dùng số tiếp theo còn trống (kiểm lại lúc làm; dự kiến **45**).
 
 ## Quyết định đã chốt
 - Backend: **Google Drive (Shared Drive)** (user chọn, dù phức tạp hơn Supabase Storage).
@@ -21,7 +21,7 @@ Cả **ticket** lẫn module **bảo trì** cần đính kèm ảnh/video (kỹ 
 3. Env (Vercel + `.env.local`): `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON), `GDRIVE_SHARED_DRIVE_ID`, `GDRIVE_ROOT_FOLDER_ID`, `MEDIA_CLEANUP_SECRET`. Thêm (để trống) vào `app-cskh/.env.example`.
 - Doc mới `docs/huong-dan-kho-anh-google-drive.md` (theo mẫu `docs/huong-dan-cau-hinh-google-vercel.md`).
 
-## DB — `supabase-cskh/migrations/44_media.sql`
+## DB — `supabase-cskh/migrations/45_media.sql`
 Bảng `public.media`: `id uuid pk default gen_random_uuid()`, `entity_type text check in ('ticket','bao_tri')`, `entity_id text not null` (=`ticket_code` hoặc `maintenance_visit.id`), `drive_file_id text not null`, `filename text`, `mime text`, `size_bytes bigint`, `uploaded_by text`, `created_at timestamptz default now()`, `deleted_at timestamptz`. Index `(entity_type, entity_id) where deleted_at is null`. RLS bật (app đọc bằng service_role như các bảng khác).
 
 ## Thư viện Drive — `app-cskh/lib/drive.ts` (server-only)

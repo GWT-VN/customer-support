@@ -231,6 +231,18 @@ export async function getCustomer(id: string) {
 export async function updateCustomer(id: string, patch: Partial<Customer>) {
   await requireStaff()
   const sdt = patch.primary_phone || null
+  // Chống trùng SĐT khi SỬA: nếu 9 số cuối khớp khách KHÁC (chưa xoá) -> chặn.
+  if (sdt) {
+    const { cuoi9, hopLe } = chuanHoaSdt(sdt)
+    if (hopLe) {
+      const { data: trung } = await dataClient().from('cs_customers')
+        .select('id').neq('trang_thai', 'da_xoa').neq('id', id)
+        .ilike('primary_phone', `%${cuoi9}`).limit(1)
+      if (trung && trung.length) {
+        return { ok: false as const, error: 'SĐT này đã thuộc khách khác — không thể trùng.' }
+      }
+    }
+  }
   const payload: Record<string, unknown> = {
     full_name: patch.full_name,
     primary_phone: sdt,
@@ -2788,7 +2800,9 @@ export async function taoKhachChoDuyet(input: {
     address: input.address?.trim() || null, province: input.province?.trim() || null,
     customer_code: customerCode,
     source: customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký',
-    trang_thai: 'cho_duyet', needs_phone: false,
+    // Tạo thẳng (đã duyệt): rác lớn nhất (SĐT sai/trùng) đã chặn ngay lúc tạo nên
+    // không cần hàng chờ duyệt cho khách mới. Sửa/xoá khách vẫn qua duyệt như cũ.
+    trang_thai: 'da_duyet', needs_phone: false,
   }).select('id').single()
   if (error) return { ok: false, error: error.message }
   revalidatePath('/khach')
