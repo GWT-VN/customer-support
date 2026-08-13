@@ -140,9 +140,15 @@ export function TicketEditor({
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-sm text-slate-700">Phân loại *</span>
-          <input value={loai} onChange={(e) => setLoai(e.target.value)} list="loai-ticket-edit"
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
-          <datalist id="loai-ticket-edit">{loaiList.map((l) => <option key={l} value={l} />)}</datalist>
+          {/* Dropdown thật: <input list> lọc gợi ý theo chữ đang có nên khi đã là "Khác"
+              chỉ hiện mỗi "Khác" — dùng <select> để chọn được cả 18 loại. Giữ giá trị lạ
+              (loại cũ ngoài danh sách) để không mất dữ liệu. */}
+          <select value={loai} onChange={(e) => setLoai(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 bg-white">
+            <option value="">— Chọn loại —</option>
+            {loai && !loaiList.includes(loai) && <option value={loai}>{loai}</option>}
+            {loaiList.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
         </label>
       </div>
       <label className="block">
