@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, capNhatDiaChiMay, type KyThuat, type ViecInput, type BoiCanhKhach } from '@/app/actions'
-import { LOAI_VIEC_KT } from '@/lib/danhSach'
+import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, capNhatDiaChiMay, lichTuanKyThuat, taoNghiKyThuat, xoaNghiKyThuat, type KyThuat, type ViecInput, type BoiCanhKhach, type TuanKyThuat } from '@/app/actions'
+import { LOAI_VIEC_KT, NHAN_LOAI_VIEC } from '@/lib/danhSach'
 import { TINH_VN } from '@/lib/tinh'
 import { KhachPicker } from '@/components/KhachPicker'
+import { vnDate } from '@/components/Badge'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 
@@ -27,6 +28,18 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
   // tạo chuyến
   const [ktId, setKtId] = useState('')
   const [ngay, setNgay] = useState(HOM_NAY())
+  const [tuan, setTuan] = useState<TuanKyThuat | null>(null)
+
+  async function loadTuan(kt: string, ng: string) {
+    if (kt && ng) setTuan(await lichTuanKyThuat(kt, ng)); else setTuan(null)
+  }
+  async function baoNghi() {
+    if (!ktId || !ngay) return
+    const r = await taoNghiKyThuat(ktId, ngay); if (r.ok) loadTuan(ktId, ngay)
+  }
+  async function boNghi(id: string) {
+    const r = await xoaNghiKyThuat(id); if (r.ok) loadTuan(ktId, ngay)
+  }
   const [khachId, setKhachId] = useState('')
   const [diaChi, setDiaChi] = useState('')
   const [tinh, setTinh] = useState('')
@@ -78,7 +91,9 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
       }
     }
     setBusy(false)
-    setMsg('Đã tạo chuyến.' + themMsg); setKhachId(''); setCtx(null); setDiaChi(''); setTinh(''); setCapMay(false); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }]); router.refresh()
+    setMsg('Đã tạo chuyến.' + themMsg); setKhachId(''); setCtx(null); setDiaChi(''); setTinh(''); setCapMay(false); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }])
+    if (ktId && ngay) loadTuan(ktId, ngay)
+    router.refresh()
   }
 
   const oInput = 'rounded border px-2 py-1 text-sm text-slate-900 bg-white'
@@ -92,13 +107,13 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
         <h2 className="font-medium text-slate-900">Gán chuyến đi cho kỹ thuật</h2>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-slate-600">Kỹ thuật<br />
-            <select value={ktId} onChange={(e) => setKtId(e.target.value)} className={`${oInput} mt-0.5`}>
+            <select value={ktId} onChange={(e) => { setKtId(e.target.value); loadTuan(e.target.value, ngay) }} className={`${oInput} mt-0.5`}>
               <option value="">— Chọn —</option>
               {dsKt.filter((k) => k.hoat_dong).map((k) => <option key={k.id} value={k.id}>{k.ten}{k.la_ctv ? ' (CTV)' : ''}</option>)}
             </select>
           </label>
           <label className="text-xs text-slate-600">Ngày<br />
-            <input type="date" value={ngay} onChange={(e) => setNgay(e.target.value)} className={`${oInput} mt-0.5`} />
+            <input type="date" value={ngay} onChange={(e) => { setNgay(e.target.value); loadTuan(ktId, e.target.value) }} className={`${oInput} mt-0.5`} />
           </label>
           <label className="text-xs text-slate-600">Tỉnh/TP<br />
             <select value={tinh} onChange={(e) => setTinh(e.target.value)} className={`${oInput} mt-0.5`}>
@@ -110,6 +125,26 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
             <input value={diaChi} onChange={(e) => setDiaChi(e.target.value)} className={`${oInput} mt-0.5 w-full`} />
           </label>
         </div>
+        {tuan && ktId && (
+          <div className="rounded-lg border bg-slate-50 p-2 text-xs">
+            <p className="text-slate-600 mb-1">
+              Lịch tuần của kỹ thuật ({vnDate(tuan.tu)} – {vnDate(tuan.den)}): {tuan.chuyen.length} chuyến · {tuan.nghi.length} ngày nghỉ
+              <button onClick={baoNghi} className="text-amber-700 underline ml-2">Báo nghỉ ngày {vnDate(ngay)}</button>
+            </p>
+            {tuan.chuyen.length === 0 && tuan.nghi.length === 0 ? (
+              <p className="text-slate-400">Trống — rảnh cả tuần.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {tuan.nghi.map((n) => (
+                  <li key={n.id} className="text-amber-700">🌙 {vnDate(n.ngay)}: nghỉ phép{n.ly_do ? ` (${n.ly_do})` : ''} <button onClick={() => boNghi(n.id)} className="text-slate-400 underline">bỏ</button></li>
+                ))}
+                {tuan.chuyen.map((c) => (
+                  <li key={c.id} className="text-slate-600">📅 {vnDate(c.ngay)}: {c.ten_khach ?? c.dia_chi ?? 'chuyến'} · {c.viec.map((v) => NHAN_LOAI_VIEC[v.loai_viec] ?? v.loai_viec).join(', ')}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {khachId && diaChi.trim() && ctx?.dia_chi !== diaChi.trim() && (
           <label className="flex items-center gap-1.5 text-xs text-amber-700">
             <input type="checkbox" checked={capMay} onChange={(e) => setCapMay(e.target.checked)} />

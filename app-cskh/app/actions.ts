@@ -1306,6 +1306,43 @@ export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string)
   }))
 }
 
+export type NghiKyThuat = { id: string; ngay: string; ly_do: string | null }
+
+/** Báo nghỉ phép cho kỹ thuật 1 ngày. CHỈ QUẢN LÝ. */
+export async function taoNghiKyThuat(kyThuatId: string, ngay: string, lyDo?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!kyThuatId) return { ok: false, error: 'Chọn kỹ thuật.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
+  const { error } = await dataClient().from('ky_thuat_nghi')
+    .upsert({ ky_thuat_id: kyThuatId, ngay, ly_do: lyDo?.trim() || null }, { onConflict: 'ky_thuat_id,ngay' })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('nghi_ky_thuat', `ky-thuat:${kyThuatId}`, { ngay })
+  revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export async function xoaNghiKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const { error } = await dataClient().from('ky_thuat_nghi').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+export type TuanKyThuat = { chuyen: LichKyThuatRow[]; nghi: NghiKyThuat[]; tu: string; den: string }
+
+/** Lịch TUẦN (T2-CN chứa `ngay`) của 1 kỹ thuật: chuyến + nghỉ phép — để tránh gán trùng. */
+export async function lichTuanKyThuat(kyThuatId: string, ngay: string): Promise<TuanKyThuat> {
+  await requireStaff()
+  if (!kyThuatId || !/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { chuyen: [], nghi: [], tu: ngay, den: ngay }
+  const d = new Date(ngay + 'T00:00:00Z')
+  const dow = (d.getUTCDay() + 6) % 7  // Thứ 2 = 0
+  const tu = new Date(d.getTime() - dow * 86400000).toISOString().slice(0, 10)
+  const den = new Date(new Date(tu + 'T00:00:00Z').getTime() + 6 * 86400000).toISOString().slice(0, 10)
+  const chuyen = await dsLichKyThuat(tu, den, kyThuatId)
+  const { data: nghi } = await dataClient().from('ky_thuat_nghi')
+    .select('id, ngay, ly_do').eq('ky_thuat_id', kyThuatId).gte('ngay', tu).lte('ngay', den).order('ngay')
+  return { chuyen, nghi: (nghi ?? []) as NghiKyThuat[], tu, den }
+}
+
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
 export async function replacementsOfSerial(serial: string) {
   await requireStaff()
