@@ -77,6 +77,12 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Lõi lọc & lịch thay</h2>
           <LoiCuaMay serial={m.serial} />
+          {admin && m.customer_id && (
+            <Link href={`/ky-thuat?kh=${m.customer_id}&loai=thay_loi&ref=${encodeURIComponent(m.serial)}`}
+              className="mt-3 inline-block rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
+              + Tạo lịch kỹ thuật (thay lõi máy này)
+            </Link>
+          )}
         </section>
 
         <section className="bg-white rounded-xl border p-5">

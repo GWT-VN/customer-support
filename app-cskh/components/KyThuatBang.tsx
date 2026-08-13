@@ -14,7 +14,10 @@ const HOM_NAY = () => new Date().toISOString().slice(0, 10)
  * Quản lý kỹ thuật + GÁN CHUYẾN ĐI (1 chuyến nhiều việc).
  * Kỹ thuật gồm nhân viên + cộng tác viên. Việc "Khác" bắt buộc ghi cụ thể.
  */
-export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
+export function KyThuatBang({ dsKt, prefill }: {
+  dsKt: KyThuat[]
+  prefill?: { khachId: string; ctx: BoiCanhKhach; ngay?: string; viec?: ViecInput[] }
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -27,7 +30,7 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
 
   // tạo chuyến
   const [ktId, setKtId] = useState('')
-  const [ngay, setNgay] = useState(HOM_NAY())
+  const [ngay, setNgay] = useState(prefill?.ngay ?? HOM_NAY())
   const [tuan, setTuan] = useState<TuanKyThuat | null>(null)
 
   async function loadTuan(kt: string, ng: string) {
@@ -40,13 +43,13 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
   async function boNghi(id: string) {
     const r = await xoaNghiKyThuat(id); if (r.ok) loadTuan(ktId, ngay)
   }
-  const [khachId, setKhachId] = useState('')
-  const [diaChi, setDiaChi] = useState('')
-  const [tinh, setTinh] = useState('')
+  const [khachId, setKhachId] = useState(prefill?.khachId ?? '')
+  const [diaChi, setDiaChi] = useState(prefill?.ctx.dia_chi ?? '')
+  const [tinh, setTinh] = useState(prefill?.ctx.tinh ?? '')
   const [capMay, setCapMay] = useState(false)   // cập nhật địa chỉ mới cho máy của khách
   const [ghiChu, setGhiChu] = useState('')
-  const [viec, setViec] = useState<ViecInput[]>([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }])
-  const [ctx, setCtx] = useState<BoiCanhKhach | null>(null)
+  const [viec, setViec] = useState<ViecInput[]>(prefill?.viec ?? [{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }])
+  const [ctx, setCtx] = useState<BoiCanhKhach | null>(prefill?.ctx ?? null)
 
   async function chonKhach(id: string) {
     setKhachId(id); setCapMay(false)
@@ -163,10 +166,10 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
               <select value={v.loai_viec} onChange={(e) => setViecAt(i, { loai_viec: e.target.value, ref: '', mo_ta: '', so_tien: undefined })} className={oInput}>
                 {LOAI_VIEC_KT.map((l) => <option key={l.v} value={l.v}>{l.nhan}</option>)}
               </select>
-              {v.loai_viec === 'bao_tri' && ctx && ctx.plans.length > 0 ? (
-                <select value={v.ref ?? ''} onChange={(e) => { const p = ctx.plans.find((x) => x.id === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: p?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
-                  <option value="">— Chọn bộ cần bảo trì —</option>
-                  {ctx.plans.map((p) => <option key={p.id} value={p.id}>{p.nhan}</option>)}
+              {v.loai_viec === 'bao_tri' && ctx && ctx.visits.length > 0 ? (
+                <select value={v.ref ?? ''} onChange={(e) => { const vs = ctx.visits.find((x) => x.id === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: vs?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
+                  <option value="">— Chọn lượt bảo trì (máy · lần · hạn) —</option>
+                  {ctx.visits.map((vs) => <option key={vs.id} value={vs.id}>{vs.nhan}</option>)}
                 </select>
               ) : v.loai_viec === 'thay_loi' && ctx && ctx.machines.length > 0 ? (
                 <>

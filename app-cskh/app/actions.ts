@@ -1175,6 +1175,7 @@ export type BoiCanhKhach = {
   dia_chi: string | null
   tinh: string | null
   plans: { id: string; nhan: string }[]
+  visits: { id: string; nhan: string }[]
   machines: { serial: string; nhan: string; dia_chi: string | null; loi: { code: string; ten: string | null }[] }[]
   tickets: { code: string; nhan: string }[]
 }
@@ -1191,6 +1192,17 @@ export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
   ])
   const machines = (ib ?? []) as { serial: string; internal_code: string | null; model_freetext: string | null; install_address: string | null }[]
   const c = kh as { address: string | null; province: string | null } | null
+  const planRows = (plans ?? []) as { id: string; bo_may: string | null }[]
+  // Lượt bảo trì CHƯA làm của khách (để gán "bảo trì" đúng lượt/lịch).
+  const boMayPlan = new Map(planRows.map((p) => [p.id, p.bo_may]))
+  let visits: { id: string; nhan: string }[] = []
+  if (planRows.length) {
+    const { data: vs } = await db.from('maintenance_visit')
+      .select('id, plan_id, lan_thu, due_date').in('plan_id', planRows.map((p) => p.id))
+      .is('completed_at', null).order('due_date', { ascending: true, nullsFirst: false }).limit(40)
+    visits = ((vs ?? []) as { id: string; plan_id: string; lan_thu: number | null; due_date: string | null }[])
+      .map((v) => ({ id: v.id, nhan: `${boMayPlan.get(v.plan_id) ?? 'Bảo trì'} · lần ${v.lan_thu ?? '?'}${v.due_date ? ` · ${v.due_date}` : ''}` }))
+  }
   // Lõi theo model (v_machine_filter: internal_code -> filter_code/name).
   const ics = [...new Set(machines.map((m) => m.internal_code).filter(Boolean))] as string[]
   const loiTheoIc = new Map<string, { code: string; ten: string | null }[]>()
@@ -1203,7 +1215,8 @@ export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
   return {
     dia_chi: machines.find((m) => m.install_address)?.install_address ?? c?.address ?? null,  // máy -> khách -> null
     tinh: c?.province ?? null,
-    plans: ((plans ?? []) as { id: string; bo_may: string | null }[]).map((p) => ({ id: p.id, nhan: p.bo_may ?? 'Gói bảo trì' })),
+    plans: planRows.map((p) => ({ id: p.id, nhan: p.bo_may ?? 'Gói bảo trì' })),
+    visits,
     machines: machines.map((m) => ({
       serial: m.serial, nhan: `${m.model_freetext ?? m.internal_code ?? ''} · ${m.serial}`.trim(), dia_chi: m.install_address,
       loi: m.internal_code ? loiTheoIc.get(m.internal_code) ?? [] : [],

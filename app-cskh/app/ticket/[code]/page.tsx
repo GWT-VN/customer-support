@@ -149,6 +149,13 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           </dl>
         </section>
 
+        {admin && t.customer_id && (
+          <Link href={`/ky-thuat?kh=${t.customer_id}&loai=ticket&ref=${encodeURIComponent(t.ticket_code)}&mota=${encodeURIComponent(t.description ?? '')}`}
+            className="inline-block rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
+            + Tạo lịch kỹ thuật cho ticket này
+          </Link>
+        )}
+
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Nhật ký trao đổi</h2>
           <TicketNotes code={t.ticket_code} notes={notes} />
