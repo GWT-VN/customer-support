@@ -58,54 +58,14 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           </p>
         )}
 
-        {(nhom.length > 0 || admin) && (
-          <section className="bg-white rounded-xl border p-5 space-y-2">
-            <h2 className="font-medium text-slate-900">Thuộc nhóm lỗi</h2>
-            {nhom.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {nhom.map((n) => (
-                  <Link
-                    key={n.group_code}
-                    href={`/nhom-loi/${n.group_code}`}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-slate-50"
-                  >
-                    <span className="text-sm text-slate-900">{n.nhom_ten}</span>
-                    <MucDoBadge muc_do={n.muc_do} />
-                    {n.nguon === 'người' && <span className="text-[10px] text-violet-500">gán tay</span>}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400">Chưa vào nhóm nào (mô tả không khớp mẫu tự động).</p>
-            )}
-            <p className="text-xs text-slate-500">
-              Gom tự động từ nội dung mô tả. Xem cả cụm để biết đây là ca lẻ hay lỗi hàng loạt.
-            </p>
-            {admin && (
-              <div className="pt-2 border-t mt-2">
-                <p className="text-xs font-medium text-slate-600 mb-2">Gắn tay vào nhóm (lỗi mới chưa có mẫu):</p>
-                <GanNhomLoi code={t.ticket_code} daGan={nhom} nhomList={nhomList} />
-              </div>
-            )}
-          </section>
-        )}
-
-        <section className="bg-white rounded-xl border p-5 space-y-3">
-          <h2 className="font-medium text-slate-900">Nội dung</h2>
-          <div>
-            <span className="text-xs text-slate-500">Loại</span>
-            <p className="text-slate-900">{t.ticket_type ?? '—'}</p>
-          </div>
-          <div>
-            <span className="text-xs text-slate-500">Mô tả khách báo</span>
-            <p className="text-slate-900 whitespace-pre-wrap">{t.description || '—'}</p>
-          </div>
-          {t.province && (
-            <div>
-              <span className="text-xs text-slate-500">Tỉnh/TP</span>
-              <p className="text-slate-900">{t.province}</p>
-            </div>
-          )}
+        {/* Nội dung + xử lý gộp một khối: mặc định XEM, bấm "Sửa" để sửa tại chỗ. */}
+        <section className="bg-white rounded-xl border p-5">
+          <TicketEditor
+            code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note}
+            ticketType={t.ticket_type} description={t.description} province={t.province}
+            loaiList={loaiList} staff={staff} csId={t.cs_phu_trach} ktId={t.ky_thuat}
+            defaultCsId={defaultCsId} defaultKtId={defaultKtId}
+          />
         </section>
 
         <section className="bg-white rounded-xl border p-5">
@@ -156,6 +116,38 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           </Link>
         )}
 
+        {(nhom.length > 0 || admin) && (
+          <section className="bg-white rounded-xl border p-5 space-y-2">
+            <h2 className="font-medium text-slate-900">Thuộc nhóm lỗi</h2>
+            {nhom.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {nhom.map((n) => (
+                  <Link
+                    key={n.group_code}
+                    href={`/nhom-loi/${n.group_code}`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-slate-50"
+                  >
+                    <span className="text-sm text-slate-900">{n.nhom_ten}</span>
+                    <MucDoBadge muc_do={n.muc_do} />
+                    {n.nguon === 'người' && <span className="text-[10px] text-violet-500">gán tay</span>}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">Chưa vào nhóm nào (mô tả không khớp mẫu tự động).</p>
+            )}
+            <p className="text-xs text-slate-500">
+              Gom tự động từ nội dung mô tả. Xem cả cụm để biết đây là ca lẻ hay lỗi hàng loạt.
+            </p>
+            {admin && (
+              <div className="pt-2 border-t mt-2">
+                <p className="text-xs font-medium text-slate-600 mb-2">Gắn tay vào nhóm (lỗi mới chưa có mẫu):</p>
+                <GanNhomLoi code={t.ticket_code} daGan={nhom} nhomList={nhomList} />
+              </div>
+            )}
+          </section>
+        )}
+
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Nhật ký trao đổi</h2>
           <TicketNotes code={t.ticket_code} notes={notes} />
@@ -164,16 +156,6 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
           <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={admin} />
-        </section>
-
-        <section className="bg-white rounded-xl border p-5">
-          <h2 className="font-medium text-slate-900 mb-3">Xử lý</h2>
-          <TicketEditor
-            code={t.ticket_code} state={t.state} khan={t.khan} lastNote={t.last_note}
-            ticketType={t.ticket_type} description={t.description} loaiList={loaiList}
-            staff={staff} csId={t.cs_phu_trach} ktId={t.ky_thuat}
-            defaultCsId={defaultCsId} defaultKtId={defaultKtId}
-          />
         </section>
       </div>
     </main>

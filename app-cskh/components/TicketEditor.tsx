@@ -10,6 +10,11 @@ const STATES = [
   { key: 'Cancel', label: 'Đã huỷ' },
 ]
 
+/**
+ * Khối nội dung + xử lý của ticket: mặc định chế độ XEM, bấm "Sửa" để sửa TẠI CHỖ
+ * chính khối này (không tách view trên / edit dưới). Lưu/Huỷ xong quay lại chế độ xem.
+ * Dùng chung server action updateTicket (đã validate/trim server-side).
+ */
 export function TicketEditor({
   code,
   state,
@@ -17,6 +22,7 @@ export function TicketEditor({
   lastNote,
   ticketType,
   description,
+  province = null,
   loaiList = [],
   staff,
   csId,
@@ -30,6 +36,7 @@ export function TicketEditor({
   lastNote: string | null
   ticketType: string | null
   description: string | null
+  province?: string | null
   loaiList?: string[]
   staff: Staff[]
   csId: string | null
@@ -38,6 +45,7 @@ export function TicketEditor({
   defaultCsId?: string | null
   defaultKtId?: string | null
 }) {
+  const [edit, setEdit] = useState(false)
   const [st, setSt] = useState(state)
   const [kh, setKh] = useState(khan)
   const [note, setNote] = useState(lastNote ?? '')
@@ -50,6 +58,8 @@ export function TicketEditor({
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
+  const tenNV = (id: string) => staff.find((s) => s.id === id)?.ten ?? '—'
+
   async function save() {
     if (!loai.trim() || !moTa.trim()) { setErr('Phân loại và Mô tả không được trống.'); return }
     setBusy(true); setErr(null); setMsg(null)
@@ -59,11 +69,74 @@ export function TicketEditor({
     })
     setBusy(false)
     if (!r.ok) setErr(r.error)
-    else { setMsg('Đã lưu.'); router.refresh() }
+    else { setMsg('Đã lưu.'); setEdit(false); router.refresh() }
   }
 
+  // Huỷ: trả các ô về đúng giá trị gốc (từ props / server) rồi quay lại chế độ xem.
+  function huy() {
+    setSt(state); setKh(khan); setNote(lastNote ?? ''); setLoai(ticketType ?? '')
+    setMoTa(description ?? ''); setCs(csId ?? defaultCsId ?? ''); setKt(ktId ?? defaultKtId ?? '')
+    setErr(null); setEdit(false)
+  }
+
+  // ── Chế độ XEM (mặc định) ────────────────────────────────────────────────
+  if (!edit) {
+    const stLabel = STATES.find((s) => s.key === st)?.label ?? st
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-medium text-slate-900">Nội dung &amp; xử lý</h2>
+          <button onClick={() => setEdit(true)}
+            className="text-sm text-slate-600 underline flex-none">Sửa</button>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <div>
+            <span className="text-xs text-slate-500">Loại</span>
+            <p className="text-slate-900">{loai || '—'}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Trạng thái</span>
+            <p className="text-slate-900">
+              {stLabel}
+              {kh && <span className="ml-2 font-medium text-red-600">· 🔴 Khẩn</span>}
+            </p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">CS phụ trách</span>
+            <p className="text-slate-900">{cs ? tenNV(cs) : <span className="text-amber-600">chưa gán</span>}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Kỹ thuật phụ trách</span>
+            <p className="text-slate-900">{kt ? tenNV(kt) : <span className="text-slate-400">chưa gán</span>}</p>
+          </div>
+          {province && (
+            <div>
+              <span className="text-xs text-slate-500">Tỉnh/TP</span>
+              <p className="text-slate-900">{province}</p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <span className="text-xs text-slate-500">Mô tả khách báo</span>
+          <p className="text-slate-900 whitespace-pre-wrap">{moTa || '—'}</p>
+        </div>
+        <div>
+          <span className="text-xs text-slate-500">Tóm tắt xử lý (hiện tại)</span>
+          <p className="text-slate-900 whitespace-pre-wrap">{note || '—'}</p>
+        </div>
+
+        {msg && <p className="text-sm text-emerald-700">{msg}</p>}
+      </div>
+    )
+  }
+
+  // ── Chế độ SỬA ───────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
+      <h2 className="font-medium text-slate-900">Sửa nội dung &amp; xử lý</h2>
+
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-sm text-slate-700">Phân loại *</span>
@@ -83,7 +156,7 @@ export function TicketEditor({
         <div className="mt-1 flex gap-2">
           {STATES.map((s) => (
             <button
-              key={s.key} onClick={() => setSt(s.key)}
+              key={s.key} type="button" onClick={() => setSt(s.key)}
               className={`px-3 py-1.5 rounded-lg text-sm border ${
                 st === s.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
               }`}
@@ -98,7 +171,7 @@ export function TicketEditor({
         <span className="text-sm text-slate-700">Ưu tiên</span>
         <div className="mt-1">
           <button
-            onClick={() => setKh(!kh)}
+            type="button" onClick={() => setKh(!kh)}
             className={`px-3 py-1.5 rounded-lg text-sm border ${
               kh ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600'
             }`}
@@ -143,7 +216,12 @@ export function TicketEditor({
         >
           {busy ? 'Đang lưu…' : 'Lưu'}
         </button>
-        {msg && <span className="text-sm text-emerald-700">{msg}</span>}
+        <button
+          type="button" onClick={huy} disabled={busy}
+          className="rounded-lg border px-4 py-2 font-medium text-slate-600 disabled:opacity-50 hover:bg-slate-50"
+        >
+          Huỷ
+        </button>
       </div>
 
       {err && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
