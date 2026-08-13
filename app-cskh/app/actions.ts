@@ -1466,10 +1466,53 @@ export async function xoaLichKyThuat(id: string): Promise<{ ok: true } | { ok: f
   revalidatePath('/ky-thuat'); return { ok: true }
 }
 
+/** Loại máy để chọn chỉ tiêu đo: POU (máy uống → TDS/pH), POE (lọc tổng → độ cứng/Clo). */
+export type LoaiMay = 'POU' | 'POE' | null
+
+export type ViecLich = {
+  loai_viec: string; mo_ta: string | null; ref: string | null; so_tien: number | null
+  /** Chỉ set cho việc bảo trì: loại máy của lượt (suy từ serial → catalog cấp 2). */
+  mmloai?: LoaiMay
+}
+
 export type LichKyThuatRow = {
   id: string; ngay: string; ky_thuat_id: string | null; ten_ky_thuat: string | null; trang_thai: string
   customer_id: string | null; ten_khach: string | null; dia_chi: string | null; tinh: string | null; ghi_chu: string | null
-  viec: { loai_viec: string; mo_ta: string | null; ref: string | null; so_tien: number | null }[]
+  viec: ViecLich[]
+}
+
+/**
+ * Phân loại POU/POE cho các lượt bảo trì (visitId): plan.serial → serial_registry
+ * .internal_code → catalog_item "Danh mục cấp 2". Trả map visitId -> LoaiMay.
+ * Không suy ra được (thiếu serial / không khớp catalog) -> null (form hiện đủ 4 chỉ số).
+ */
+async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> {
+  await requireStaff()
+  const out = new Map<string, LoaiMay>()
+  const ids = [...new Set(visitIds.filter(Boolean))]
+  if (!ids.length) return out
+  const db = dataClient()
+  const { data: vs } = await db.from('maintenance_visit').select('id, plan_id').in('id', ids)
+  const visits = (vs ?? []) as { id: string; plan_id: string | null }[]
+  const planIds = [...new Set(visits.map((v) => v.plan_id).filter(Boolean))] as string[]
+  if (!planIds.length) return out
+  const { data: ps } = await db.from('maintenance_plan').select('id, serial').in('id', planIds)
+  const planSerial = new Map(((ps ?? []) as { id: string; serial: string | null }[]).map((p) => [p.id, (p.serial ?? '').trim()]))
+  const serials = [...new Set([...planSerial.values()].filter(Boolean))]
+  if (!serials.length) return out
+  const { data: sr } = await db.from('serial_registry').select('serial, internal_code').in('serial', serials)
+  const serialIc = new Map(((sr ?? []) as { serial: string; internal_code: string | null }[]).map((s) => [s.serial, s.internal_code]))
+  const ics = [...new Set([...serialIc.values()].filter(Boolean))] as string[]
+  if (!ics.length) return out
+  const { data: ci } = await db.from('catalog_item').select('"Mã nội bộ", "Danh mục cấp 2"').in('Mã nội bộ', ics)
+  const icLoai = new Map(((ci ?? []) as Record<string, string | null>[]).map((c) => [c['Mã nội bộ'], c['Danh mục cấp 2']]))
+  const chuan = (x: string | null | undefined): LoaiMay => (x === 'POU' ? 'POU' : x === 'POE' ? 'POE' : null)
+  for (const v of visits) {
+    const serial = v.plan_id ? planSerial.get(v.plan_id) : ''
+    const ic = serial ? serialIc.get(serial) : null
+    out.set(v.id, chuan(ic ? icLoai.get(ic) : null))
+  }
+  return out
 }
 
 /** Lịch kỹ thuật trong khoảng ngày (tuỳ chọn lọc 1 kỹ thuật). */
@@ -1513,6 +1556,14 @@ export async function lichCuaToi(tu: string, den: string): Promise<{ kt: KyThuat
   const kt = await kyThuatCuaToi()
   if (!kt) return { kt: null, rows: [] }
   const rows = await dsLichKyThuat(tu, den, kt.id)
+  // Gắn loại máy (POU/POE) cho từng việc bảo trì -> form đo hiện đúng chỉ tiêu.
+  const refs = rows.flatMap((r) => r.viec.filter((v) => v.loai_viec === 'bao_tri' && v.ref).map((v) => v.ref!))
+  const loaiMap = await phanLoaiVisit(refs)
+  for (const r of rows) {
+    for (const v of r.viec) {
+      if (v.loai_viec === 'bao_tri' && v.ref) v.mmloai = loaiMap.get(v.ref) ?? null
+    }
+  }
   return { kt, rows }
 }
 

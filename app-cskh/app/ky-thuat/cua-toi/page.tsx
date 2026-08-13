@@ -1,6 +1,7 @@
 import { requireStaff } from '@/lib/supabase'
 import { lichCuaToi } from '@/app/actions'
 import { LichCuaToiKT } from '@/components/LichCuaToiKT'
+import { DoiMatKhau } from '@/components/DoiMatKhau'
 import { NutQuayLai } from '@/components/NutQuayLai'
 
 /** Màn hình cho KỸ THUẬT: lịch chuyến của chính mình (7 ngày trước → 30 ngày tới). */
@@ -30,6 +31,12 @@ export default async function LichCuaToiPage() {
         ) : (
           <LichCuaToiKT rows={rows} />
         )}
+
+        <details className="bg-white rounded-xl border p-4">
+          <summary className="text-sm font-medium text-slate-700 cursor-pointer">Đổi mật khẩu</summary>
+          <p className="text-xs text-slate-500 mt-1 mb-2">Nên đổi mật khẩu tạm được cấp sang mật khẩu của riêng bạn.</p>
+          <DoiMatKhau />
+        </details>
       </div>
     </main>
   )

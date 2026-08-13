@@ -4,6 +4,7 @@ import { dsKyThuat, dsLichKyThuat } from '@/app/actions'
 import { LichKyThuatList } from '@/components/LichKyThuatList'
 import { LichKyThuatCalendar } from '@/components/LichKyThuatCalendar'
 import { BangDieuPhoiKT } from '@/components/BangDieuPhoiKT'
+import { LOAI_VIEC_KT } from '@/lib/danhSach'
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 
@@ -18,10 +19,10 @@ function thuHai(d: Date): Date {
 export default async function XemLichKyThuatPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; tu?: string; den?: string; kt?: string; thang?: string; tuan?: string }>
+  searchParams: Promise<{ view?: string; tu?: string; den?: string; kt?: string; thang?: string; tuan?: string; loai?: string }>
 }) {
   await chanNeuKhongPhaiQuanLy()
-  const { view = 'list', tu: tuRaw, den: denRaw, kt, thang: thangRaw, tuan: tuanRaw } = await searchParams
+  const { view = 'list', tu: tuRaw, den: denRaw, kt, thang: thangRaw, tuan: tuanRaw, loai } = await searchParams
   const laCalendar = view === 'calendar'
   const laBoard = view === 'board'
   const now = new Date()
@@ -37,15 +38,20 @@ export default async function XemLichKyThuatPage({
   const tuanSau = iso(new Date(t2.getTime() + 7 * 86400000))
 
   const dsKt = await dsKyThuat(true)
-  const rows = laBoard
+  const rowsAll = laBoard
     ? await dsLichKyThuat(days[0], days[6], kt || undefined)
     : laCalendar
       ? await dsLichKyThuat(`${thang}-01`, `${thang}-31`, kt || undefined)
       : await dsLichKyThuat(tu, den, kt || undefined)
+  // Lọc theo loại việc: giữ chuyến có ÍT NHẤT 1 việc thuộc loại đó.
+  const rows = loai ? rowsAll.filter((r) => r.viec.some((v) => v.loai_viec === loai)) : rowsAll
 
-  const giuKt = (extra: Record<string, string>) => new URLSearchParams({ ...(kt ? { kt } : {}), ...extra }).toString()
+  // Base params luôn mang theo: kt + loai (để đổi view / tuần / lọc KT không mất bộ lọc kia).
+  const giuLoc: Record<string, string> = { ...(kt ? { kt } : {}), ...(loai ? { loai } : {}) }
+  const giuKt = (extra: Record<string, string>) => new URLSearchParams({ ...giuLoc, ...extra }).toString()
   // Tham số cửa sổ thời gian theo view — để nút lọc KT giữ nguyên khoảng đang xem.
   const cuaSo: Record<string, string> = laBoard ? { tuan: days[0] } : laCalendar ? { thang } : { tu, den }
+  const chiLoai: Record<string, string> = loai ? { loai } : {}
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -62,21 +68,33 @@ export default async function XemLichKyThuatPage({
           </div>
         </header>
 
+        {/* Lọc theo kỹ thuật */}
         <div className="flex gap-1.5 flex-wrap">
-          <Link href={`/ky-thuat/lich?${new URLSearchParams({ view, ...cuaSo })}`}
+          <Link href={`/ky-thuat/lich?${new URLSearchParams({ view, ...chiLoai, ...cuaSo })}`}
             className={`px-2.5 py-1 rounded-lg text-xs border ${!kt ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>Tất cả KT</Link>
           {dsKt.map((k) => (
-            <Link key={k.id} href={`/ky-thuat/lich?${new URLSearchParams({ view, kt: k.id, ...cuaSo })}`}
+            <Link key={k.id} href={`/ky-thuat/lich?${new URLSearchParams({ view, kt: k.id, ...chiLoai, ...cuaSo })}`}
               className={`px-2.5 py-1 rounded-lg text-xs border ${kt === k.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>{k.ten}</Link>
+          ))}
+        </div>
+
+        {/* Lọc theo loại việc */}
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-[11px] text-slate-400 uppercase tracking-wide mr-0.5">Loại việc</span>
+          <Link href={`/ky-thuat/lich?${new URLSearchParams({ view, ...(kt ? { kt } : {}), ...cuaSo })}`}
+            className={`px-2.5 py-1 rounded-lg text-xs border ${!loai ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600'}`}>Tất cả</Link>
+          {LOAI_VIEC_KT.map((lv) => (
+            <Link key={lv.v} href={`/ky-thuat/lich?${new URLSearchParams({ view, ...(kt ? { kt } : {}), loai: lv.v, ...cuaSo })}`}
+              className={`px-2.5 py-1 rounded-lg text-xs border ${loai === lv.v ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-600'}`}>{lv.nhan}</Link>
           ))}
         </div>
 
         {laBoard ? (
           <>
             <div className="flex items-center justify-between gap-2">
-              <Link href={`/ky-thuat/lich?${new URLSearchParams({ view: 'board', tuan: tuanTruoc, ...(kt ? { kt } : {}) })}`} className="rounded-lg border px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">← Tuần trước</Link>
+              <Link href={`/ky-thuat/lich?${new URLSearchParams({ view: 'board', tuan: tuanTruoc, ...giuLoc })}`} className="rounded-lg border px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">← Tuần trước</Link>
               <span className="text-sm text-slate-600">Tuần {days[0].slice(8)}/{days[0].slice(5, 7)} – {days[6].slice(8)}/{days[6].slice(5, 7)}</span>
-              <Link href={`/ky-thuat/lich?${new URLSearchParams({ view: 'board', tuan: tuanSau, ...(kt ? { kt } : {}) })}`} className="rounded-lg border px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">Tuần sau →</Link>
+              <Link href={`/ky-thuat/lich?${new URLSearchParams({ view: 'board', tuan: tuanSau, ...giuLoc })}`} className="rounded-lg border px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">Tuần sau →</Link>
             </div>
             <BangDieuPhoiKT kts={kt ? dsKt.filter((k) => k.id === kt) : dsKt} rows={rows} days={days} />
           </>
@@ -89,6 +107,7 @@ export default async function XemLichKyThuatPage({
               <label>Đến<br /><input type="date" name="den" defaultValue={den} className="mt-0.5 rounded border px-2 py-1 text-sm" /></label>
               <input type="hidden" name="view" value="list" />
               {kt && <input type="hidden" name="kt" value={kt} />}
+              {loai && <input type="hidden" name="loai" value={loai} />}
               <button className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm">Lọc</button>
             </form>
             <LichKyThuatList rows={rows} />

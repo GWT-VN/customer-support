@@ -24,6 +24,7 @@ function FormDangNhap() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [thongBao, setThongBao] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const searchParams = useSearchParams()
 
@@ -63,6 +64,18 @@ function FormDangNhap() {
     // "Đang vào…" dù server đã trả trang chủ 200. Tải lại nguyên trang thì server
     // dựng '/' với đúng session, proxy cho qua, hết đường treo.
     window.location.assign('/')
+  }
+
+  async function quenMatKhau() {
+    setErr(null); setThongBao(null)
+    if (!email) { setErr('Nhập email rồi bấm "Quên mật khẩu?".'); return }
+    setBusy(true)
+    const { error } = await taoClient().auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/doi-mat-khau`,
+    })
+    setBusy(false)
+    if (error) { setErr(error.message); return }
+    setThongBao('Đã gửi email đặt lại mật khẩu (nếu email có tài khoản). Kiểm tra hộp thư + spam.')
   }
 
   async function dangNhapGoogle() {
@@ -111,6 +124,13 @@ function FormDangNhap() {
           />
         </label>
 
+        <div className="text-right -mt-1">
+          <button type="button" onClick={quenMatKhau} disabled={busy} className="text-xs text-sky-700 underline disabled:opacity-50">Quên mật khẩu?</button>
+        </div>
+
+        {thongBao && (
+          <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">{thongBao}</p>
+        )}
         {(err ?? loiTuUrl) && (
           <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err ?? loiTuUrl}</p>
         )}
