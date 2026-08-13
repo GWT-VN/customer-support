@@ -6,13 +6,14 @@ import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { NutQuayLai } from '@/components/NutQuayLai'
+import { laQuanLy } from '@/lib/supabase'
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines, kenh, baoTri] = await Promise.all([
-    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id),
+  const [tickets, machines, kenh, baoTri, quanLy] = await Promise.all([
+    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id), laQuanLy(),
   ])
   const btDaXong = baoTri.filter((v) => v.completed_at).length
 
@@ -55,7 +56,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </section>
 
         <section className="bg-white rounded-xl border p-5">
-          <h2 className="font-medium text-slate-900 mb-3">Lịch bảo trì ({btDaXong}/{baoTri.length} đã làm)</h2>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="font-medium text-slate-900">Lịch bảo trì ({btDaXong}/{baoTri.length} đã làm)</h2>
+            {quanLy && (
+              <Link href={`/bao-tri/len-lich?kh=${customer.id}`} prefetch={false} className="text-xs text-sky-700 underline whitespace-nowrap">
+                ＋ Tạo lịch bảo trì
+              </Link>
+            )}
+          </div>
           {baoTri.length === 0 ? (
             <p className="text-sm text-slate-400">Khách này chưa có lịch bảo trì.</p>
           ) : (

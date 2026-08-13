@@ -16,9 +16,14 @@ const NHAN_TT: Record<string, string> = { hen: 'Đã hẹn', xong: 'Xong', huy: 
 export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
 
   async function dat(id: string, tt: 'hen' | 'xong' | 'huy') {
-    setBusy(id); await datTrangThaiLichKT(id, tt); setBusy(null); router.refresh()
+    setBusy(id); setMsg(null)
+    const r = await datTrangThaiLichKT(id, tt)
+    setBusy(null)
+    if (r.ok && tt === 'xong' && r.cap_nhat > 0) setMsg(`Đã hoàn thành + cập nhật ${r.cap_nhat} việc (bảo trì/thay lõi/ticket).`)
+    router.refresh()
   }
   async function xoa(id: string) {
     if (!window.confirm('Xoá chuyến này?')) return
@@ -33,6 +38,7 @@ export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
 
   return (
     <div className="space-y-4">
+      {msg && <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">{msg}</p>}
       {[...theoNgay.entries()].map(([ngay, list]) => (
         <div key={ngay}>
           <h3 className="text-sm font-medium text-slate-700 mb-1.5">{vnDate(ngay)} ({list.length} chuyến)</h3>

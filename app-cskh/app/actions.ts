@@ -1324,11 +1324,36 @@ export async function taoLichKyThuat(input: {
   revalidatePath('/ky-thuat'); return { ok: true, id: lichId }
 }
 
-export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' | 'huy'): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * Đổi trạng thái chuyến. Khi XONG -> cascade cập nhật việc thật đã gán:
+ *  bảo trì (ref=visit) -> đánh dấu lượt xong theo ngày chuyến;
+ *  thay lõi (ref=serial, mã lõi trong mô tả) -> ghi 1 dòng lịch sử thay lõi;
+ *  ticket (ref=mã) -> chuyển state='Done'.
+ */
+export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' | 'huy'): Promise<{ ok: true; cap_nhat: number } | { ok: false; error: string }> {
   await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
-  const { error } = await dataClient().from('lich_ky_thuat').update({ trang_thai: trangThai, updated_at: new Date().toISOString() }).eq('id', id)
+  const db = dataClient()
+  const { error } = await db.from('lich_ky_thuat').update({ trang_thai: trangThai, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/ky-thuat'); return { ok: true }
+  let capNhat = 0
+  if (trangThai === 'xong') {
+    const { data: lich } = await db.from('lich_ky_thuat').select('ngay').eq('id', id).maybeSingle()
+    const ngay = (lich as { ngay: string } | null)?.ngay ?? new Date().toISOString().slice(0, 10)
+    const { data: viec } = await db.from('lich_ky_thuat_viec').select('loai_viec, ref, mo_ta').eq('lich_id', id)
+    for (const v of (viec ?? []) as { loai_viec: string; ref: string | null; mo_ta: string | null }[]) {
+      if (v.loai_viec === 'bao_tri' && v.ref) {
+        await db.from('maintenance_visit').update({ completed_at: ngay }).eq('id', v.ref).is('completed_at', null); capNhat++
+      } else if (v.loai_viec === 'thay_loi' && v.ref) {
+        const code = v.mo_ta?.match(/\(([^)]+)\)\s*$/)?.[1] ?? v.mo_ta ?? 'lõi'
+        await db.from('filter_replacement').insert({ serial: v.ref, filter_code: code, replaced_at: ngay, note: 'Kỹ thuật thay khi đi hiện trường' }); capNhat++
+      } else if (v.loai_viec === 'ticket' && v.ref) {
+        await db.from('tickets').update({ state: 'Done' }).eq('ticket_code', v.ref).eq('state', 'Open'); capNhat++
+      }
+    }
+    revalidatePath('/bao-tri'); revalidatePath('/ticket'); revalidatePath('/loi')
+    await ghiAudit('hoan_thanh_lich_kt', `lich:${id}`, { ngay, cap_nhat: capNhat })
+  }
+  revalidatePath('/ky-thuat'); return { ok: true, cap_nhat: capNhat }
 }
 
 export async function xoaLichKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {

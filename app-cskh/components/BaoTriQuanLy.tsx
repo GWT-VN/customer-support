@@ -19,8 +19,9 @@ const CHU_KY = [
  *  · Lên lịch: chọn ngày bắt đầu (mặc định ngày lắp) + chu kỳ + số lần + vùng
  *    (né T7/CN theo miền); hệ tự sinh các mốc.
  */
-export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all' }: {
+export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach }: {
   chuaMap: PlanChuaMap[]; daMap: PlanDaMap[]; sapHet: SapHetGoi[]; phan?: 'map' | 'lenlich' | 'all'
+  moTaoKhach?: { id: string; ctx: BoiCanhKhach }
 }) {
   const hienMap = phan === 'map' || phan === 'all'
   const hienLen = phan === 'lenlich' || phan === 'all'
@@ -29,14 +30,14 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all' }: {
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   // form tạo lịch MỚI (tặng / mua trực tiếp)
-  const [moTao, setMoTao] = useState(false)
-  const [tKhach, setTKhach] = useState('')
+  const [moTao, setMoTao] = useState(!!moTaoKhach)
+  const [tKhach, setTKhach] = useState(moTaoKhach?.id ?? '')
   const [tBoMay, setTBoMay] = useState('')
   const [tNgay, setTNgay] = useState('')
   const [tChuKy, setTChuKy] = useState('3')
   const [tLan, setTLan] = useState('4')
   const [tVung, setTVung] = useState('')
-  const [tCtx, setTCtx] = useState<BoiCanhKhach | null>(null)
+  const [tCtx, setTCtx] = useState<BoiCanhKhach | null>(moTaoKhach?.ctx ?? null)
   const [tDates, setTDates] = useState<string[]>([])   // mốc CS sửa tay (rỗng = dùng auto)
 
   async function tChonKhach(id: string) {
