@@ -40,7 +40,8 @@ function nhomBaoTri(laQuanLy: boolean): Nhom {
     ...(laQuanLy ? [
       { href: '/bao-tri/map', nhan: 'Map khách' },
       { href: '/bao-tri/len-lich', nhan: 'Lên lịch & gói' },
-      { href: '/ky-thuat', nhan: 'Lịch kỹ thuật' },
+      { href: '/ky-thuat', nhan: 'Gán lịch kỹ thuật' },
+      { href: '/ky-thuat/lich', nhan: 'Xem lịch kỹ thuật' },
     ] : []),
   ] }
 }
