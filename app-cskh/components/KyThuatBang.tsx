@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, type KyThuat, type ViecInput, type BoiCanhKhach } from '@/app/actions'
+import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, capNhatDiaChiMay, type KyThuat, type ViecInput, type BoiCanhKhach } from '@/app/actions'
 import { LOAI_VIEC_KT } from '@/lib/danhSach'
+import { TINH_VN } from '@/lib/tinh'
 import { KhachPicker } from '@/components/KhachPicker'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
@@ -28,15 +29,18 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
   const [ngay, setNgay] = useState(HOM_NAY())
   const [khachId, setKhachId] = useState('')
   const [diaChi, setDiaChi] = useState('')
+  const [tinh, setTinh] = useState('')
+  const [capMay, setCapMay] = useState(false)   // cập nhật địa chỉ mới cho máy của khách
   const [ghiChu, setGhiChu] = useState('')
   const [viec, setViec] = useState<ViecInput[]>([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }])
   const [ctx, setCtx] = useState<BoiCanhKhach | null>(null)
 
   async function chonKhach(id: string) {
-    setKhachId(id)
+    setKhachId(id); setCapMay(false)
     const c = await boiCanhKhach(id)
     setCtx(c)
-    if (c.dia_chi) setDiaChi(c.dia_chi)   // địa chỉ tự theo địa chỉ lắp của máy
+    if (c.dia_chi) setDiaChi(c.dia_chi)   // địa chỉ: máy -> khách -> tự điền
+    if (c.tinh) setTinh(c.tinh)
   }
 
   async function themKt() {
@@ -63,10 +67,18 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
   }
   async function taoChuyen() {
     setBusy(true); setErr(null); setMsg(null)
-    const r = await taoLichKyThuat({ kyThuatId: ktId, ngay, customerId: khachId || undefined, diaChi: diaChi || undefined, ghiChu: ghiChu || undefined, viec })
+    const r = await taoLichKyThuat({ kyThuatId: ktId, ngay, customerId: khachId || undefined, diaChi: diaChi || undefined, tinh: tinh || undefined, ghiChu: ghiChu || undefined, viec })
+    if (!r.ok) { setBusy(false); setErr(r.error); return }
+    // Khách chuyển địa chỉ mới -> cập nhật cho máy (có xác nhận).
+    let themMsg = ''
+    if (capMay && khachId && diaChi.trim()) {
+      if (window.confirm(`Cập nhật địa chỉ "${diaChi.trim()}" cho MỌI máy đang lắp của khách này?`)) {
+        const r2 = await capNhatDiaChiMay(khachId, diaChi)
+        if (r2.ok) themMsg = ` Đã cập nhật địa chỉ ${r2.so} máy.`
+      }
+    }
     setBusy(false)
-    if (!r.ok) { setErr(r.error); return }
-    setMsg('Đã tạo chuyến.'); setKhachId(''); setCtx(null); setDiaChi(''); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }]); router.refresh()
+    setMsg('Đã tạo chuyến.' + themMsg); setKhachId(''); setCtx(null); setDiaChi(''); setTinh(''); setCapMay(false); setGhiChu(''); setViec([{ loai_viec: 'bao_tri', mo_ta: '', ref: '' }]); router.refresh()
   }
 
   const oInput = 'rounded border px-2 py-1 text-sm text-slate-900 bg-white'
@@ -88,10 +100,22 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
           <label className="text-xs text-slate-600">Ngày<br />
             <input type="date" value={ngay} onChange={(e) => setNgay(e.target.value)} className={`${oInput} mt-0.5`} />
           </label>
-          <label className="text-xs text-slate-600 flex-1 min-w-40">Địa chỉ (tuỳ chọn)<br />
+          <label className="text-xs text-slate-600">Tỉnh/TP<br />
+            <select value={tinh} onChange={(e) => setTinh(e.target.value)} className={`${oInput} mt-0.5`}>
+              <option value="">— Chọn tỉnh —</option>
+              {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-slate-600 flex-1 min-w-40">Địa chỉ (tự theo máy → khách; sửa được)<br />
             <input value={diaChi} onChange={(e) => setDiaChi(e.target.value)} className={`${oInput} mt-0.5 w-full`} />
           </label>
         </div>
+        {khachId && diaChi.trim() && ctx?.dia_chi !== diaChi.trim() && (
+          <label className="flex items-center gap-1.5 text-xs text-amber-700">
+            <input type="checkbox" checked={capMay} onChange={(e) => setCapMay(e.target.checked)} />
+            Khách chuyển địa chỉ mới — cập nhật địa chỉ này cho máy của khách (sẽ hỏi xác nhận)
+          </label>
+        )}
         <div>
           <p className="text-xs text-slate-600 mb-1">Khách (chọn để tự lấy địa chỉ + bộ/máy/ticket):</p>
           {khachId ? <p className="text-xs text-emerald-700">✓ đã chọn <button onClick={() => { setKhachId(''); setCtx(null) }} className="underline text-slate-500 ml-1">bỏ</button></p> : <KhachPicker onPick={(id) => chonKhach(id)} />}
@@ -112,7 +136,7 @@ export function KyThuatBang({ dsKt }: { dsKt: KyThuat[] }) {
               ) : v.loai_viec === 'thay_loi' && ctx && ctx.machines.length > 0 ? (
                 <select value={v.ref ?? ''} onChange={(e) => { const m = ctx.machines.find((x) => x.serial === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: m?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>
                   <option value="">— Chọn máy thay lõi —</option>
-                  {ctx.machines.map((m) => <option key={m.serial} value={m.serial}>{m.nhan}</option>)}
+                  {ctx.machines.map((m) => <option key={m.serial} value={m.serial}>{m.nhan}{m.dia_chi ? ` — ${m.dia_chi}` : ''}</option>)}
                 </select>
               ) : v.loai_viec === 'ticket' && ctx && ctx.tickets.length > 0 ? (
                 <select value={v.ref ?? ''} onChange={(e) => { const t = ctx.tickets.find((x) => x.code === e.target.value); setViecAt(i, { ref: e.target.value, mo_ta: t?.nhan ?? '' }) }} className={`${oInput} flex-1 min-w-48`}>

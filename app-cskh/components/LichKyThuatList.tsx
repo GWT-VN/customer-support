@@ -45,6 +45,7 @@ export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
                     <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${MAU_TT[r.trang_thai] ?? ''}`}>{NHAN_TT[r.trang_thai] ?? r.trang_thai}</span>
                     <div className="text-xs text-slate-500 mt-0.5">
                       {r.customer_id ? <Link href={`/khach/${r.customer_id}`} prefetch={false} className="underline text-slate-700">{r.ten_khach ?? 'khách'}</Link> : (r.ten_khach ?? '—')}
+                      {r.tinh && <span> · {r.tinh}</span>}
                       {r.dia_chi && <span> · {r.dia_chi}</span>}
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
