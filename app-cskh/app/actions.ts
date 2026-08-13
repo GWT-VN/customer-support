@@ -846,6 +846,56 @@ export async function unmarkMaintenanceDone(visitId: string) {
   return { ok: true as const }
 }
 
+export type KetQuaDo = {
+  ngay: string; ghi_chu?: string
+  tds_truoc?: number; tds_sau?: number; ph_truoc?: number; ph_sau?: number
+  do_cung_truoc?: number; do_cung_sau?: number; clo_truoc?: number; clo_sau?: number
+}
+
+/**
+ * Ghi KẾT QUẢ ĐO khi bảo trì (TDS/pH/độ cứng/Clo dư trước-sau lọc) + đánh dấu xong theo NGÀY
+ * THỰC, rồi DỜI LỊCH DÂY CHUYỀN: các lượt sau (chưa làm) tính lại từ ngày thực (né cuối tuần).
+ * VD lịch 1/8 nhưng làm 10/8 -> lượt sau thành 10/11 thay vì 1/11.
+ */
+export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ ok: true; doi: number } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(kq.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
+  const db = dataClient()
+  const num = (x?: number) => (typeof x === 'number' && !Number.isNaN(x) ? x : null)
+  const { data: v } = await db.from('maintenance_visit').select('plan_id, lan_thu').eq('id', visitId).maybeSingle()
+  const vv = v as { plan_id: string | null; lan_thu: number | null } | null
+  if (!vv) return { ok: false, error: 'Không thấy lượt bảo trì.' }
+  const { error } = await db.from('maintenance_visit').update({
+    completed_at: kq.ngay, ket_qua_ghi_chu: kq.ghi_chu?.trim() || null,
+    tds_truoc: num(kq.tds_truoc), tds_sau: num(kq.tds_sau), ph_truoc: num(kq.ph_truoc), ph_sau: num(kq.ph_sau),
+    do_cung_truoc: num(kq.do_cung_truoc), do_cung_sau: num(kq.do_cung_sau), clo_truoc: num(kq.clo_truoc), clo_sau: num(kq.clo_sau),
+  }).eq('id', visitId)
+  if (error) return { ok: false, error: error.message }
+  // Dời lịch dây chuyền cho các lượt SAU chưa làm.
+  let doi = 0
+  if (vv.plan_id && vv.lan_thu != null) {
+    const { data: plan } = await db.from('maintenance_plan').select('customer_id, chu_ky_thang, vung').eq('id', vv.plan_id).maybeSingle()
+    const p = plan as { customer_id: string | null; chu_ky_thang: number | null; vung: Vung | null } | null
+    const chuKy = p?.chu_ky_thang ?? 0
+    if (p && chuKy > 0) {
+      const { data: sau } = await db.from('maintenance_visit').select('id')
+        .eq('plan_id', vv.plan_id).is('completed_at', null).gt('lan_thu', vv.lan_thu).order('lan_thu')
+      const ds = (sau ?? []) as { id: string }[]
+      if (ds.length) {
+        const { data: kh } = await db.from('cs_customers').select('province').eq('id', p.customer_id ?? '').maybeSingle()
+        const vung: Vung = p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
+        const ngayMoi = sinhLichBaoTri(kq.ngay, chuKy, ds.length + 1, vung).slice(1)  // mốc sau ngày thực
+        for (let i = 0; i < ds.length && i < ngayMoi.length; i++) {
+          await db.from('maintenance_visit').update({ due_date: ngayMoi[i] }).eq('id', ds[i].id); doi++
+        }
+      }
+    }
+  }
+  await ghiAudit('ghi_ket_qua_bao_tri', `visit:${visitId}`, { ngay: kq.ngay, doi_lich: doi })
+  revalidatePath('/bao-tri')
+  return { ok: true, doi }
+}
+
 // ── Đợt 1: nền lịch bảo trì tự động + map khách bảo trì với khách kích hoạt máy ──
 
 /** 9 số cuối để so SĐT (bỏ mã vùng/0 đầu, mọi ký tự không phải số). */
