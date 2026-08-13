@@ -9,8 +9,15 @@
 
 export const DOMAIN_CONG_TY = '@gwt.vn'
 
-/** Vai trò được vào app CSKH. Sales thuần / chưa gán vai trò CS -> chặn. */
+/** Vai trò nhân sự CSKH (nghiệp vụ chăm sóc khách). */
 export const VAI_TRO_CSKH = ['admin', 'cs', 'cs_manager'] as const
+
+/**
+ * Vai trò được PHÉP vào cửa app. Gồm nhân sự CSKH + kỹ thuật hiện trường.
+ * Kỹ thuật vào được nhưng bị ép về giao diện rút gọn ở tầng app (chỉ lịch của mình).
+ * Sales thuần / chưa gán vai trò nào trong danh sách này -> chặn.
+ */
+export const VAI_TRO_VAO_APP = [...VAI_TRO_CSKH, 'ky_thuat'] as const
 
 /** Dòng tương ứng trong staff, hoặc null nếu chưa có ai ghi */
 export type DongStaff = { hoat_dong: boolean; vai_tro: string[] } | null
@@ -31,10 +38,10 @@ export function xetLuatVaoCua(email: string, dong: DongStaff): KetQuaVaoCua {
   // đó chính là cơ chế khoá người nghỉ việc.
   if (dong) {
     if (!dong.hoat_dong) return { duocVao: false, lyDo: 'bi_khoa' }
-    // Đang bật NHƯNG phải có vai trò CS mới vào app CSKH — chặn Sales thuần
-    // (sales/sales_manager) và người chưa được gán vai trò CS nào.
-    const laNhanSuCs = dong.vai_tro.some((r) => (VAI_TRO_CSKH as readonly string[]).includes(r))
-    if (!laNhanSuCs) return { duocVao: false, lyDo: 'ngoai_cs' }
+    // Đang bật NHƯNG phải có vai trò được phép vào cửa (CS hoặc kỹ thuật) —
+    // chặn Sales thuần (sales/sales_manager) và người chưa được gán vai trò nào.
+    const duocVaoCua = dong.vai_tro.some((r) => (VAI_TRO_VAO_APP as readonly string[]).includes(r))
+    if (!duocVaoCua) return { duocVao: false, lyDo: 'ngoai_cs' }
     return { duocVao: true, nguon: 'staff' }
   }
 

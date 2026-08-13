@@ -6,7 +6,8 @@ import { PhanTrang } from '@/bang'
 import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
-import { laQuanLy } from '@/lib/supabase'
+import { redirect } from 'next/navigation'
+import { laChiKyThuatVien, laQuanLy } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
 import { BangMay } from '@/components/BangMay'
@@ -16,6 +17,8 @@ export default async function Home({
 }: {
   searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; sp?: string; bh?: string; ngtu?: string; ngden?: string }>
 }) {
+  // Kỹ thuật hiện trường: không có nghiệp vụ ở trang máy — đưa thẳng về lịch của họ.
+  if (await laChiKyThuatVien()) redirect('/ky-thuat/cua-toi')
   const { q = '', trang: trangRaw, cot, chieu, sp, bh, ngtu, ngden } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
   const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([

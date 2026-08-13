@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chuanHoaVaiTro, coQuyenQuanLy, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe } from './quyen'
+import { chuanHoaVaiTro, coQuyenQuanLy, kiemTraSuaNhanVien, laChiKyThuat, laKyThuat, laQuyenAdmin, laVaiTroHopLe } from './quyen'
 
 const NGUOI_SUA = 'admin-1'
 const NGUOI_KHAC = 'nv-2'
@@ -19,6 +19,28 @@ describe('chuanHoaVaiTro — đọc được cả chuỗi cũ lẫn mảng mới
     expect(chuanHoaVaiTro(undefined)).toEqual([])
     expect(chuanHoaVaiTro('')).toEqual([])
     expect(chuanHoaVaiTro([])).toEqual([])
+  })
+})
+
+describe('vai trò ky_thuat — hợp lệ nhưng KHÔNG có quyền CS/quản lý', () => {
+  it('ky_thuat là vai trò hợp lệ, giữ nguyên khi chuẩn hoá', () => {
+    expect(laVaiTroHopLe('ky_thuat')).toBe(true)
+    expect(chuanHoaVaiTro(['ky_thuat'])).toEqual(['ky_thuat'])
+  })
+  it('ky_thuat KHÔNG phải admin, KHÔNG phải quản lý', () => {
+    expect(laQuyenAdmin(['ky_thuat'])).toBe(false)
+    expect(coQuyenQuanLy(['ky_thuat'])).toBe(false)
+  })
+  it('laKyThuat đúng khi có role ky_thuat', () => {
+    expect(laKyThuat(['ky_thuat'])).toBe(true)
+    expect(laKyThuat(['cs', 'ky_thuat'])).toBe(true)
+    expect(laKyThuat(['cs'])).toBe(false)
+  })
+  it('laChiKyThuat: chỉ ky_thuat, không kiêm CS/admin', () => {
+    expect(laChiKyThuat(['ky_thuat'])).toBe(true)
+    expect(laChiKyThuat(['cs', 'ky_thuat'])).toBe(false) // kiêm CS -> vẫn full app
+    expect(laChiKyThuat(['admin', 'ky_thuat'])).toBe(false)
+    expect(laChiKyThuat(['cs'])).toBe(false)
   })
 })
 

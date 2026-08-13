@@ -1,5 +1,6 @@
 'use server'
 
+import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { dataClient, laAdmin, laQuanLy, layNhanVien, requireStaff } from '@/lib/supabase'
 import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, laVaiTroHopLe, type VaiTro } from '@/lib/quyen'
@@ -1196,6 +1197,17 @@ export async function dsKyThuat(chiHoatDong = false): Promise<KyThuat[]> {
   return (data ?? []) as KyThuat[]
 }
 
+/** Hồ sơ kỹ thuật của NGƯỜI ĐANG ĐĂNG NHẬP (khớp theo email). null nếu không phải KT. */
+export async function kyThuatCuaToi(): Promise<KyThuat | null> {
+  await requireStaff()
+  const nv = await layNhanVien()
+  const email = (nv?.email ?? '').trim().toLowerCase()
+  if (!email) return null
+  const { data } = await dataClient().from('ky_thuat')
+    .select('id, ten, sdt, vung, email, la_ctv, hoat_dong').eq('email', email).maybeSingle()
+  return (data as KyThuat) ?? null
+}
+
 export async function taoKyThuat(input: KyThuatInput): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
   if (!input.ten.trim()) return { ok: false, error: 'Thiếu tên kỹ thuật.' }
@@ -1224,6 +1236,89 @@ export async function xoaKyThuat(id: string): Promise<{ ok: true } | { ok: false
   const { error } = await dataClient().from('ky_thuat').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   await ghiAudit('xoa_ky_thuat', `ky-thuat:${id}`); revalidatePath('/ky-thuat'); return { ok: true }
+}
+
+// ── Cấp tài khoản đăng nhập cho kỹ thuật (email ngoài) — CHỈ ADMIN ────────────
+// Kỹ thuật đăng nhập app nhưng CHỈ thấy lịch chuyến của mình. Cấp quyền = tạo
+// auth user (mật khẩu tạm hiện 1 lần cho admin chuyển đi) + staff row có role
+// ky_thuat, bật hoạt động. Link theo email: ky_thuat.email == staff.email.
+// Thu quyền = gỡ role ky_thuat; nếu không còn role nào thì khoá luôn.
+
+export type TrangThaiTaiKhoanKT = { co_login: boolean; hoat_dong: boolean }
+
+/** Map email(kỹ thuật) -> trạng thái tài khoản đăng nhập, để roster hiển thị. */
+export async function trangThaiTaiKhoanKT(): Promise<Record<string, TrangThaiTaiKhoanKT>> {
+  await requireStaff()
+  const db = dataClient()
+  const { data: kt } = await db.from('ky_thuat').select('email').not('email', 'is', null)
+  const emails = [...new Set(((kt ?? []) as { email: string | null }[])
+    .map((k) => (k.email ?? '').trim().toLowerCase()).filter(Boolean))]
+  if (!emails.length) return {}
+  const { data: st } = await db.from('staff').select('email, hoat_dong').in('email', emails)
+  const map: Record<string, TrangThaiTaiKhoanKT> = {}
+  for (const s of (st ?? []) as { email: string; hoat_dong: boolean }[]) {
+    map[s.email.toLowerCase()] = { co_login: true, hoat_dong: s.hoat_dong }
+  }
+  return map
+}
+
+/** Cấp quyền đăng nhập cho 1 kỹ thuật (theo email của họ). CHỈ ADMIN. */
+export async function capTaiKhoanKyThuat(
+  kyThuatId: string,
+): Promise<{ ok: true; mat_khau_tam: string | null; da_co_auth: boolean } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: kt } = await db.from('ky_thuat').select('id, ten, email').eq('id', kyThuatId).maybeSingle()
+  const row = kt as { id: string; ten: string; email: string | null } | null
+  if (!row) return { ok: false, error: 'Không tìm thấy kỹ thuật.' }
+  const email = (row.email ?? '').trim().toLowerCase()
+  if (!email) return { ok: false, error: 'Kỹ thuật chưa có email — thêm email trước khi cấp đăng nhập.' }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: 'Email không hợp lệ.' }
+
+  // 1) Tạo auth user (nếu chưa có). Mật khẩu tạm chỉ hiện 1 lần cho admin chuyển đi.
+  let matKhauTam: string | null = randomBytes(9).toString('base64url')
+  let daCoAuth = false
+  const { error: eAuth } = await db.auth.admin.createUser({ email, password: matKhauTam, email_confirm: true })
+  if (eAuth) {
+    // Đã có auth user (đăng nhập Google, hoặc cấp trước đó) -> không đổi mật khẩu, không lộ.
+    if (!/already|registered|exists|duplicate/i.test(eAuth.message)) {
+      return { ok: false, error: `Tạo tài khoản đăng nhập lỗi: ${eAuth.message}` }
+    }
+    daCoAuth = true; matKhauTam = null
+  }
+
+  // 2) Upsert staff row: thêm role ky_thuat + bật hoạt động, KHÔNG ghi đè role khác.
+  const { data: st } = await db.from('staff').select('id, vai_tro').eq('email', email).maybeSingle()
+  const cu = st as { id: string; vai_tro: string[] | string | null } | null
+  const roles = new Set(chuanHoaVaiTro(cu?.vai_tro)); roles.add('ky_thuat')
+  const err = cu
+    ? (await db.from('staff').update({ vai_tro: [...roles], hoat_dong: true }).eq('id', cu.id)).error
+    : (await db.from('staff').insert({ ten: row.ten, email, vai_tro: [...roles], hoat_dong: true })).error
+  if (err) return { ok: false, error: err.message }
+
+  await ghiAudit('cap_tai_khoan_kt', `ky-thuat:${kyThuatId}`, { email })
+  revalidatePath('/ky-thuat'); revalidatePath('/nhan-vien')
+  return { ok: true, mat_khau_tam: matKhauTam, da_co_auth: daCoAuth }
+}
+
+/** Thu quyền đăng nhập của 1 kỹ thuật: gỡ role ky_thuat; hết role thì khoá. CHỈ ADMIN. */
+export async function thuTaiKhoanKyThuat(kyThuatId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff(); if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: kt } = await db.from('ky_thuat').select('email').eq('id', kyThuatId).maybeSingle()
+  const email = ((kt as { email: string | null } | null)?.email ?? '').trim().toLowerCase()
+  if (!email) return { ok: false, error: 'Kỹ thuật chưa có email.' }
+  const { data: st } = await db.from('staff').select('id, vai_tro').eq('email', email).maybeSingle()
+  const cu = st as { id: string; vai_tro: string[] | string | null } | null
+  if (!cu) return { ok: true }
+  const conLai = chuanHoaVaiTro(cu.vai_tro).filter((r) => r !== 'ky_thuat')
+  // Còn vai trò khác (kiêm CS) -> chỉ gỡ ky_thuat, vẫn đăng nhập được. Hết -> khoá.
+  const capNhat = conLai.length ? { vai_tro: conLai } : { vai_tro: [] as string[], hoat_dong: false }
+  const { error } = await db.from('staff').update(capNhat).eq('id', cu.id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('thu_tai_khoan_kt', `ky-thuat:${kyThuatId}`, { email })
+  revalidatePath('/ky-thuat'); revalidatePath('/nhan-vien')
+  return { ok: true }
 }
 
 export type ViecInput = { loai_viec: string; mo_ta?: string; ref?: string; so_tien?: number }
@@ -1331,8 +1426,16 @@ export async function taoLichKyThuat(input: {
  *  ticket (ref=mã) -> chuyển state='Done'.
  */
 export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' | 'huy'): Promise<{ ok: true; cap_nhat: number } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff()
   const db = dataClient()
+  // Quản lý làm được mọi trạng thái. Kỹ thuật CHỈ được đổi chuyến CỦA MÌNH sang
+  // xong/hẹn-lại (không tự huỷ chuyến — đó là quyết định của quản lý).
+  if (!(await laQuanLy())) {
+    const me = await kyThuatCuaToi()
+    const { data: owner } = await db.from('lich_ky_thuat').select('ky_thuat_id').eq('id', id).maybeSingle()
+    const chuChuyen = !!me && (owner as { ky_thuat_id: string | null } | null)?.ky_thuat_id === me.id
+    if (!chuChuyen || trangThai === 'huy') return { ok: false, error: KHONG_DU_QUYEN }
+  }
   const { error } = await db.from('lich_ky_thuat').update({ trang_thai: trangThai, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) return { ok: false, error: error.message }
   let capNhat = 0
@@ -1399,6 +1502,18 @@ export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string)
     trang_thai: l.trang_thai, customer_id: l.customer_id, ten_khach: l.customer_id ? khMap.get(l.customer_id) ?? null : null,
     dia_chi: l.dia_chi, tinh: l.tinh, ghi_chu: l.ghi_chu, viec: vMap.get(l.id) ?? [],
   }))
+}
+
+/**
+ * Lịch CỦA CHÍNH kỹ thuật đang đăng nhập trong khoảng ngày. Trả {kt, rows}.
+ * kt=null nghĩa là người này không phải kỹ thuật (không có hồ sơ ky_thuat khớp email).
+ */
+export async function lichCuaToi(tu: string, den: string): Promise<{ kt: KyThuat | null; rows: LichKyThuatRow[] }> {
+  await requireStaff()
+  const kt = await kyThuatCuaToi()
+  if (!kt) return { kt: null, rows: [] }
+  const rows = await dsLichKyThuat(tu, den, kt.id)
+  return { kt, rows }
 }
 
 export type NghiKyThuat = { id: string; ngay: string; ly_do: string | null }

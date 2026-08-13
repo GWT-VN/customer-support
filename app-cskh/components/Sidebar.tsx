@@ -1,4 +1,4 @@
-import { laAdmin, laQuanLy, layNguoiDung } from '@/lib/supabase'
+import { laAdmin, laChiKyThuatVien, laQuanLy, layNguoiDung } from '@/lib/supabase'
 import { SidebarNav } from './SidebarNav'
 
 /**
@@ -11,6 +11,6 @@ import { SidebarNav } from './SidebarNav'
 export async function Sidebar() {
   const user = await layNguoiDung()
   if (!user) return null
-  const [admin, quanLy] = await Promise.all([laAdmin(), laQuanLy()])
-  return <SidebarNav laAdmin={admin} laQuanLy={quanLy} />
+  const [admin, quanLy, chiKyThuat] = await Promise.all([laAdmin(), laQuanLy(), laChiKyThuatVien()])
+  return <SidebarNav laAdmin={admin} laQuanLy={quanLy} chiKyThuat={chiKyThuat} />
 }

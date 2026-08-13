@@ -30,6 +30,16 @@ describe('xetLuatVaoCua', () => {
       .toEqual({ duocVao: false, lyDo: 'bi_khoa' })
   })
 
+  it('KỸ THUẬT: email ngoài, đang bật + vai trò ky_thuat thì được vào cửa', () => {
+    expect(xetLuatVaoCua('tho@gmail.com', { hoat_dong: true, vai_tro: ['ky_thuat'] }))
+      .toEqual({ duocVao: true, nguon: 'staff' })
+  })
+
+  it('KỸ THUẬT bị khoá thì vẫn chặn', () => {
+    expect(xetLuatVaoCua('tho@gmail.com', { hoat_dong: false, vai_tro: ['ky_thuat'] }))
+      .toEqual({ duocVao: false, lyDo: 'bi_khoa' })
+  })
+
   it('CHẶN SALES: đang bật nhưng chỉ có vai trò sales/sales_manager -> ngoai_cs', () => {
     expect(xetLuatVaoCua('sale@gwt.vn', { hoat_dong: true, vai_tro: ['sales'] }))
       .toEqual({ duocVao: false, lyDo: 'ngoai_cs' })

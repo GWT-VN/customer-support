@@ -8,7 +8,7 @@
  * kiêm nhiệm). Xem migration `33_staff_vai_tro_mang.sql`.
  */
 
-export const VAI_TRO = ['admin', 'cs_manager', 'cs', 'sales_manager', 'sales'] as const
+export const VAI_TRO = ['admin', 'cs_manager', 'cs', 'sales_manager', 'sales', 'ky_thuat'] as const
 export type VaiTro = (typeof VAI_TRO)[number]
 
 export const NHAN_VAI_TRO: Record<VaiTro, string> = {
@@ -17,6 +17,7 @@ export const NHAN_VAI_TRO: Record<VaiTro, string> = {
   cs: 'Nhân viên CSKH',
   sales_manager: 'Trưởng Sales',
   sales: 'Nhân viên Sales',
+  ky_thuat: 'Kỹ thuật',
 }
 
 export function laVaiTroHopLe(v: string): v is VaiTro {
@@ -55,6 +56,23 @@ export function laQuyenAdmin(vaiTro: string | string[] | null | undefined): bool
 export function coQuyenQuanLy(vaiTro: string | string[] | null | undefined): boolean {
   const r = chuanHoaVaiTro(vaiTro)
   return r.includes('admin') || r.includes('cs_manager')
+}
+
+/**
+ * Là kỹ thuật hiện trường (đi lắp/bảo trì/thay lõi). Vai trò HẠN CHẾ: đăng nhập
+ * app nhưng chỉ xem lịch chuyến của mình, không đụng nghiệp vụ CS.
+ *
+ * Lưu ý: một người CÓ THỂ vừa là cs vừa là ky_thuat. laChiKyThuat() mới là
+ * điều kiện để ép về giao diện rút gọn (không có role CS/quản lý nào khác).
+ */
+export function laKyThuat(vaiTro: string | string[] | null | undefined): boolean {
+  return chuanHoaVaiTro(vaiTro).includes('ky_thuat')
+}
+
+/** CHỈ là kỹ thuật — không kiêm admin/cs/cs_manager. Dùng để ép giao diện rút gọn. */
+export function laChiKyThuat(vaiTro: string | string[] | null | undefined): boolean {
+  const r = chuanHoaVaiTro(vaiTro)
+  return r.includes('ky_thuat') && !r.some((x) => x === 'admin' || x === 'cs' || x === 'cs_manager')
 }
 
 export type YeuCauSua = {

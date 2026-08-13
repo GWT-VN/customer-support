@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
-import { chuanHoaVaiTro, coQuyenQuanLy, laQuyenAdmin, type VaiTro } from './quyen'
+import { chuanHoaVaiTro, coQuyenQuanLy, laChiKyThuat, laQuyenAdmin, type VaiTro } from './quyen'
 
 /**
  * Hai client TÁCH BIỆT — đừng trộn lẫn:
@@ -161,6 +161,15 @@ export async function laAdmin(): Promise<boolean> {
  */
 export async function laQuanLy(): Promise<boolean> {
   return coQuyenQuanLy((await layNhanVien())?.vai_tro)
+}
+
+/**
+ * CHỈ là kỹ thuật (không kiêm CS/admin) — dùng để ép giao diện rút gọn: chỉ thấy
+ * lịch chuyến của mình, ẩn mọi menu CS. Người kiêm cả CS lẫn kỹ thuật vẫn dùng
+ * app đầy đủ như CS.
+ */
+export async function laChiKyThuatVien(): Promise<boolean> {
+  return laChiKyThuat((await layNhanVien())?.vai_tro)
 }
 
 /**

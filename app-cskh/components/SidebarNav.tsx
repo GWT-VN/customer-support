@@ -42,6 +42,7 @@ function nhomBaoTri(laQuanLy: boolean): Nhom {
       { href: '/bao-tri/len-lich', nhan: 'Lên lịch & gói' },
       { href: '/ky-thuat', nhan: 'Gán lịch kỹ thuật' },
       { href: '/ky-thuat/lich', nhan: 'Xem lịch kỹ thuật' },
+      { href: '/ky-thuat/nhan-su', nhan: 'Danh sách kỹ thuật' },
     ] : []),
   ] }
 }
@@ -68,11 +69,16 @@ function mucDangMo(pathname: string, hrefs: string[]): string | null {
   return CHA.find(([tienTo]) => pathname.startsWith(tienTo))?.[1] ?? null
 }
 
-export function SidebarNav({ laAdmin, laQuanLy }: { laAdmin: boolean; laQuanLy: boolean }) {
+// Kỹ thuật hiện trường (chỉ vai trò ky_thuat): giao diện rút gọn, chỉ lịch của mình.
+const NHOM_KY_THUAT: Nhom = { ten: 'Kỹ thuật', muc: [
+  { href: '/ky-thuat/cua-toi', nhan: 'Lịch của tôi' },
+] }
+
+export function SidebarNav({ laAdmin, laQuanLy, chiKyThuat = false }: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat?: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  // admin cũng là quản lý -> thấy cả 2 nhóm. cs_manager chỉ thấy nhóm Quản lý.
-  const nhom = [
+  // Chỉ kỹ thuật -> menu rút gọn. Ngược lại: admin cũng là quản lý -> thấy cả 2 nhóm.
+  const nhom = chiKyThuat ? [NHOM_KY_THUAT] : [
     ...NHOM,
     nhomBaoTri(laQuanLy),
     ...(laQuanLy ? [NHOM_QUANLY] : []),
