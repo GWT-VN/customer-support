@@ -32,6 +32,16 @@ describe('docTenPlan', () => {
   it('bỏ qua ngày vô lý (32/13) thay vì sinh ngày sai', () => {
     expect(docTenPlan('X_Lắp 32/13/2025').ngayLap).toBeNull()
   })
+
+  it('không nhầm số nhà (115A, 215A) với bộ máy WH15A/WH30A', () => {
+    expect(docTenPlan('Anh Thế_115A_Hà Nội').boMay).toBeNull()
+    expect(docTenPlan('Chị Hiền_215A_Nguyễn Huệ_Hà Nội').boMay).toBeNull()
+  })
+
+  it('tìm tên tỉnh với word boundary, không nhầm substring', () => {
+    // "Hà Tĩnh" không nên match khi chỉ xuất hiện xuyên các từ (nha + tinh từ khác từ)
+    expect(docTenPlan('Anh X_nha tinh te').tinh).toBeNull()
+  })
 })
 
 const KHACH: KhachUngVien[] = [

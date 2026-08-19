@@ -14,19 +14,32 @@ import { TINH_VN } from './tinh'
 
 export type ManhMoiPlan = { tinh: string | null; boMay: string | null; ngayLap: string | null }
 
-/** Tỉnh dài đứng trước để "Hà Nội" không nuốt mất "Hà Nam"… khi so chuỗi con. */
+/** Sắp xếp tỉnh theo độ dài giảm (boDau) để khớp từ dài nhất trước.
+ *  Điều này đảm bảo tính chính xác khi tìm tỉnh, đặc biệt khi danh sách có tên lồng nhau.
+ */
 const TINH_THEO_DO_DAI = [...TINH_VN].sort((a, b) => boDau(b).length - boDau(a).length)
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function docTinh(s: string): string | null {
-  for (const t of TINH_THEO_DO_DAI) if (s.includes(boDau(t))) return t
+  for (const t of TINH_THEO_DO_DAI) {
+    // Tìm tên tỉnh với word boundary (không phải substring của từ khác).
+    const pattern = new RegExp(`(?<![a-z0-9])${escapeRegex(boDau(t))}(?![a-z0-9])`, 'i')
+    if (pattern.test(s)) return t
+  }
   return null
 }
 
-/** WH15A/WH30A, viết tắt 15A/30A, có thể kèm ECO (liền hoặc cách). */
+/** WH15A/WH30A, viết tắt 15A/30A, có thể kèm ECO (liền hoặc cách).
+ *  Word boundary: không phải substring của từ khác (phòng nhầm số nhà 115A, 215A).
+ */
 function docBoMay(s: string): string | null {
-  const m = /(?:wh)?\s*(15a|30a)\s*(eco)?/.exec(s)
+  const m = /(?<![a-z0-9])(?:wh)?\s*(15a|30a)(?:\s*eco)?(?![a-z0-9])/i.exec(s)
   if (!m) return null
-  return `WH${m[1].toUpperCase()}${m[2] ? ' ECO' : ''}`
+  const hasEco = /eco/i.test(m[0])
+  return `WH${m[1].toUpperCase()}${hasEco ? ' ECO' : ''}`
 }
 
 /** d/m/yyyy hoặc d-m-yyyy. Ngày vô lý -> null (không sinh ngày sai). */
