@@ -52,6 +52,11 @@ Spec này viết khi Work còn định là **app riêng** (`apps/work-app`). Sau
 | 5 | Panel chi tiết: trạng thái, assignee, comment, nhật ký | ✅ `ChiTietViec` |
 | 6 | Deploy Vercel, RLS bật, ghi/đọc qua `service_role` | ✅ |
 
+**Bẫy đã dính, đừng dẫm lại:** đổi CHỮ KÝ một RPC (thêm/bớt tham số, `drop` rồi
+`create`) mà không chạy `notify pgrst, 'reload schema';` thì PostgREST vẫn giữ chữ ký
+cũ trong cache ⇒ app production gọi vào nhận `PGRST202` và gãy IM LẶNG dù DB đúng
+hoàn toàn. `create or replace` giữ nguyên chữ ký thì không sao.
+
 Còn nợ (GĐ1+): Calendar/Timeline, dependencies UI, subtask tạo từ giao diện,
 merge/follow-up, auto-sinh từ ERP, Discord, Drive.
 

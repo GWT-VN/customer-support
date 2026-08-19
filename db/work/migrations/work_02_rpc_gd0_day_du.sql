@@ -363,3 +363,11 @@ begin
     execute format('grant execute on function %s to service_role;', f);
   end loop;
 end $$;
+
+-- ── BẮT BUỘC khi ĐỔI CHỮ KÝ hàm (thêm/bớt tham số, drop rồi tạo lại) ────────
+-- PostgREST cache danh sách hàm + chữ ký của chúng. Đổi chữ ký mà không nạp lại
+-- thì app đang chạy gọi vào hàm PostgREST "không còn thấy" và trả PGRST202 —
+-- production gãy im lặng dù DB hoàn toàn đúng. (Đã dính 19/08: nút "Thêm việc"
+-- chết cho tới khi chạy dòng này.)
+-- Chỉ `create or replace` giữ nguyên chữ ký thì KHÔNG cần.
+notify pgrst, 'reload schema';
