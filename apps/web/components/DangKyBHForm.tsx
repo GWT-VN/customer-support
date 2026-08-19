@@ -9,6 +9,7 @@ import {
 import { SerialPicker } from '@/components/SerialPicker'
 import { KhachPicker } from '@/components/KhachPicker'
 import { ChonCatalog } from '@/components/ChonCatalog'
+import { ChonTinh } from '@/components/ChonTinh'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)
 
@@ -35,6 +36,7 @@ export function DangKyBHForm() {
   const [khachAddr, setKhachAddr] = useState<string | null>(null)
   const [dungDcKhach, setDungDcKhach] = useState(true)
   const [dcLap, setDcLap] = useState('')
+  const [tinhLap, setTinhLap] = useState('')
 
   const [ngay, setNgay] = useState(HOM_NAY())
   const [busy, setBusy] = useState(false)
@@ -95,7 +97,12 @@ export function DangKyBHForm() {
   }
 
   const daKichHoat = info?.bh_kich_hoat === true
-  const dcLapCuoi = dungDcKhach ? (khachAddr ?? '') : dcLap
+  // Tỉnh là ô riêng trên giao diện cho CS khỏi gõ lẫn, nhưng `installed_base` chỉ
+  // có MỘT cột địa chỉ chữ trơn — nên ghép lại khi lưu thay vì đổi schema.
+  // Dùng địa chỉ khách thì thôi, địa chỉ đó đã có tỉnh của khách rồi.
+  const dcLapCuoi = dungDcKhach
+    ? (khachAddr ?? '')
+    : [dcLap.trim(), tinhLap.trim()].filter(Boolean).join(', ')
   // dsMayCoSerial (v_may_kho) đã LỌC chỉ máy (bỏ lõi/vỏ) -> danh sách typeahead chỉ có máy.
   const catalogMay: CatalogChon[] = useMemo(
     () => dsMay.map((m) => ({
@@ -114,7 +121,7 @@ export function DangKyBHForm() {
     if (!r.ok) { setErr(r.error); return }
     setMsg(`Đã đăng ký + kích hoạt BH cho serial ${serial}.`)
     setMayCode(''); setSerial(''); setSerialQ(''); setSerialOpen(false); setInfo(null); setSerialList([])
-    setKhachId(''); setKhachAddr(null); setDcLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
+    setKhachId(''); setKhachAddr(null); setDcLap(''); setTinhLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
     router.refresh()
   }
 
@@ -209,8 +216,17 @@ export function DangKyBHForm() {
           Dùng địa chỉ khách làm địa chỉ lắp
         </label>
         {!dungDcKhach && (
-          <input value={dcLap} onChange={(e) => setDcLap(e.target.value)} placeholder="Địa chỉ lắp khác…"
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+          <>
+            <input value={dcLap} onChange={(e) => setDcLap(e.target.value)} placeholder="Số nhà, thôn/xã, quận/huyện…"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+            <div className="mt-2">
+              <span className="text-sm font-medium text-slate-700">Tỉnh / TP</span>
+              <ChonTinh value={tinhLap} onChange={setTinhLap} />
+              <p className="text-xs text-slate-400 mt-1">
+                Ô riêng để khỏi gõ lẫn vào địa chỉ — địa chỉ lắp có thể khác địa chỉ khách.
+              </p>
+            </div>
+          </>
         )}
       </div>
 
