@@ -63,6 +63,7 @@ export function TopNavClient({
   const cskhTrang: MucTrang[] = chiKyThuat
     ? [{ nhan: 'Lịch của tôi', href: '/ky-thuat/cua-toi' }]
     : [
+        { nhan: 'Tổng quan', href: '/tong-quan' },
         { nhan: 'Máy & khách', trang: [
           { nhan: 'Máy đã lắp', href: '/' }, { nhan: 'Kho serial', href: '/serial' },
           { nhan: 'Khách hàng', href: '/khach-hang' }, { nhan: 'Khách cần dọn', href: '/khach' },
