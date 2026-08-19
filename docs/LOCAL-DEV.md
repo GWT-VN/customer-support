@@ -15,14 +15,24 @@ Branch Supabase dựng schema từ migration đi qua GitHub, **KHÔNG có data p
 brew install supabase/tap/supabase
 ```
 
-## Lấy schema prod về làm nền (một lần, cần mật khẩu DB prod)
-Schema CS được áp dần qua MCP nên chưa nằm trong `supabase/migrations/`. Baseline một phát:
+## Schema nền (baseline) — ĐÃ có sẵn trong repo
+`supabase/migrations/` đã có sẵn:
+- `19990101000000_extensions.sql` — extensions (`pg_trgm`, `unaccent` ở schema `public`) + role `fdw_masterdata` (baseline có GRANT tới nó).
+- `20250101000000_baseline.sql` — **toàn bộ schema prod** (CS `public` + `work` + RPC), chụp bằng `supabase db dump`. **Chỉ schema, KHÔNG có data khách → an toàn PII.**
+
+→ Dev mới **không cần** `db pull`/mật khẩu DB nữa. Chỉ cần `supabase start` (mục dưới) là có đủ schema.
+
+> ⚠️ **zsh:** dán **từng lệnh một**, KHÔNG kèm ghi chú `#...` cùng dòng (zsh mặc định không coi `#` là comment). Bật 1 lần: `echo 'setopt interactive_comments' >> ~/.zshrc`. Luôn `cd` bằng **đường dẫn đầy đủ**.
+
+### Nếu cần TẠO LẠI baseline (khi schema prod đổi nhiều)
+`db pull` sẽ vướng vì lịch sử migration prod không khớp local → dùng `db dump`:
 ```bash
-cd "Customer Support"
-supabase link --project-ref bwzmqfbcgouhvhoslmmm      # hỏi DB password (Dashboard → Settings → Database)
-supabase db pull                                       # tạo supabase/migrations/<ts>_remote_schema.sql = toàn bộ schema prod (CS+Work+RPC)
+supabase link --project-ref bwzmqfbcgouhvhoslmmm
 ```
-> `db pull` chỉ kéo **cấu trúc** (schema), KHÔNG kéo data khách. An toàn.
+```bash
+supabase db dump --schema public,work -f supabase/migrations/20250101000000_baseline.sql
+```
+> `db dump` chỉ chụp **cấu trúc**. Nếu prod thêm extension/role mới → bổ sung vào `19990101000000_extensions.sql`.
 
 ## Chạy hằng ngày
 ```bash
