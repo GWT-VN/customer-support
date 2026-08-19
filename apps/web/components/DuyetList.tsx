@@ -16,10 +16,14 @@ const NHAN_COT: Record<string, string> = {
   phone: 'SĐT', contact_name: 'Tên', role: 'Vai trò', zalo_ok: 'Zalo',
   customer_id: 'Khách (id)', install_date: 'Ngày lắp', install_address: 'Địa chỉ lắp', serial_moi: 'Serial mới',
 }
-const NHAN_LOAI: Record<string, string> = { xoa: 'XOÁ', sua: 'SỬA', doi_serial: 'ĐỔI SERIAL' }
+const NHAN_LOAI: Record<string, string> = { xoa: 'XOÁ', sua: 'SỬA', doi_serial: 'ĐỔI SERIAL', gop: 'GỘP' }
 
 function tomTat(y: YeuCauThayDoi): string {
   if (y.loai === 'xoa') return 'Xoá'
+  // Gộp khách: payload chỉ có gop_id (uuid) — hiện UUID thô cho người duyệt là vô nghĩa.
+  // ly_do đã là câu tiếng Việt mô tả đúng việc sắp làm (xem moTaGop() ở lib/gopKhach.ts),
+  // dùng lại thay vì bịa tóm tắt khác từ payload.
+  if (y.loai === 'gop') return y.ly_do || 'Gộp 2 hồ sơ khách trùng thành một.'
   const p = y.payload ?? {}
   return Object.entries(p)
     .filter(([k]) => k !== 'needs_phone' && k !== 'notes')
@@ -110,13 +114,16 @@ export function DuyetList({ items }: { items: YeuCauThayDoi[] }) {
               <div className="text-slate-900">
                 <span className={
                   'text-[10px] font-medium px-1.5 py-0.5 rounded mr-1.5 ' +
-                  (y.loai === 'xoa' ? 'bg-red-100 text-red-700'
+                  // Gộp khách ẩn mềm + dời dữ liệu 5 bảng — không đảo ngược dễ dàng như SỬA,
+                  // nên xếp cùng màu "nguy hiểm" với XOÁ thay vì màu SỬA trung tính.
+                  (y.loai === 'xoa' || y.loai === 'gop' ? 'bg-red-100 text-red-700'
                     : y.loai === 'doi_serial' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-700')
                 }>{NHAN_LOAI[y.loai] ?? y.loai}</span>
                 {NHAN_BANG[y.doi_tuong] ?? y.doi_tuong}
               </div>
               <div className="text-slate-600 mt-0.5 break-words">{tomTat(y)}</div>
-              {y.ly_do && <div className="text-xs text-slate-400 mt-0.5">{y.ly_do}</div>}
+              {/* Với gop, ly_do đã hiện làm dòng tóm tắt chính ở trên — không lặp lại nhỏ xám bên dưới. */}
+              {y.ly_do && y.loai !== 'gop' && <div className="text-xs text-slate-400 mt-0.5">{y.ly_do}</div>}
               <div className="text-[11px] text-slate-400 mt-0.5">
                 {y.nguoi_gui ?? '—'} · {new Date(y.created_at).toLocaleString('vi-VN', { hour12: false })}
               </div>
