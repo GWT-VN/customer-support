@@ -1,0 +1,39 @@
+# Supabase CLI — cấu hình môi trường LOCAL cho nền tảng GWT (CS + Work + module sau).
+# Chạy Postgres + Auth + Studio ngay trên máy để code/test KHÔNG chạm production.
+# Xem hướng dẫn: ../docs/LOCAL-DEV.md
+
+project_id = "gwt-platform"
+
+[api]
+enabled = true
+port = 54321
+# Các schema PostgREST phục vụ ở LOCAL. Prod chỉ expose 'public' — ở local ta để rộng
+# hơn cho tiện dev; app vẫn đọc work qua RPC public nên không bắt buộc.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17          # khớp Postgres 17 của prod
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+jwt_expiry = 3600
+enable_signup = true        # LOCAL thôi; prod đã TẮT đăng ký công khai
+
+# Google OAuth ở local (tuỳ chọn) — điền nếu muốn test đăng nhập Google.
+# Mặc định dev nên tạo user email/mật khẩu ở Studio (http://localhost:54323).
+[auth.external.google]
+enabled = false
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
