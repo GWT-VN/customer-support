@@ -6,7 +6,7 @@
 **Bối cảnh nền:**
 - File cá nhân CEO: `Planning/Planning 2026.xlsx` (10 sheet: 2026 goals, Work-Week, Personal-Week, To-do, Daily, AI, Travel…)
 - Module Sales: `Sales Tracking/gwt-sales` (Next.js 16 + Supabase)
-- Module CSKH: `Customer Support/app-cskh` + `supabase-cskh` (production, ~336 khách, ~465 máy, ~90 ticket)
+- Module CSKH: `Customer Support/apps/web` + `db/cs` (production, ~336 khách, ~465 máy, ~90 ticket)
 - Cùng 1 Postgres: Supabase `GWT-SalesTracking` (`bwzmqfbcgouhvhoslmmm`)
 
 ---
@@ -40,7 +40,7 @@ Kế thừa đúng "văn hoá kỹ thuật" đã dùng cho Sales/CS — không p
 
 | Hạng mục | Quyết định | Lý do |
 |---|---|---|
-| Kiến trúc | **Module trong monorepo ERP**, Next.js 16 + Supabase + Vercel | Giống `gwt-sales`, `app-cskh`; 1 stack, 1 đội bảo trì |
+| Kiến trúc | **Module trong monorepo ERP**, Next.js 16 + Supabase + Vercel | Giống `gwt-sales`, `apps/web`; 1 stack, 1 đội bảo trì |
 | Database | **Chung project `GWT-SalesTracking`**, GWT Work sở hữu bảng riêng (prefix `wk_`) | Join thẳng khách/ticket/đơn, không sync chéo |
 | Ranh giới | Work chỉ **ĐỌC** bảng Sales/CS; **GHI** qua RPC `security definer` | Đúng luật đang áp: Sheet/CS là nguồn chân lý, không ghi đè |
 | Đăng nhập | Supabase Auth **Google `@gwt.vn`**, gác cổng ở `requireStaff()` | Dùng lại nguyên `staff` (email, `vai_tro text[]`, `hoat_dong`) |
@@ -165,7 +165,7 @@ erDiagram
 | **Chia theo project** (build app, series podcast nước…) ✅ | `project.kind='initiative'` | Project xuyên team hoặc thuộc 1 team |
 | **4 chế độ xem: List · Board · Calendar · Timeline** ✅ | Cùng bảng `work.task`; Calendar/Timeline đọc `start_at`/`due_at`, Timeline thêm `task_dependency` | List+Board ở GĐ0–1; Calendar+Timeline ở GĐ1–2 |
 
-Toàn bộ đã đưa vào migration GĐ0 — xem [../GWT Work/supabase-work/migrations/work_00_init.sql](../GWT%20Work/supabase-work/migrations/work_00_init.sql).
+Toàn bộ đã đưa vào migration GĐ0 — xem [../db/work/migrations/work_00_init.sql](../GWT%20Work/db/work/migrations/work_00_init.sql).
 
 ## 6. Yêu cầu #2 — Kết nối Google Drive (lấy tài liệu)
 
@@ -250,7 +250,7 @@ Nhờ chung hệ: một việc team ("gặp khách Trang Bùi") có thể **hi�
 
 | GĐ | Phạm vi | Kết quả dùng được | Ước lượng |
 |---|---|---|---|
-| **0 — Khung** 🚧 | Repo `GWT Work`, schema `work` + RLS (✅ migration xong), auth Google `@gwt.vn`, CRUD task + "Việc của tôi" | Nội bộ tạo/giao/đánh dấu việc trên web | ~1–1.5 tuần |
+| **0 — Khung** 🚧 | Repo `GWT-App`, schema `work` + RLS (✅ migration xong), auth Google `@gwt.vn`, CRUD task + "Việc của tôi" | Nội bộ tạo/giao/đánh dấu việc trên web | ~1–1.5 tuần |
 | **1 — Team core** | Multi-assignee (RACI), project, subtask, comment/@mention, bảng team, bộ lọc/tìm | Thay được Excel rời rạc của nhân viên | ~1.5–2 tuần |
 | **2 — Discord** | Bot + webhook: nhắc giao việc, báo cáo Done, digest sáng, nút Done | Đúng yêu cầu #3 | ~1 tuần |
 | **3 — ERP link** | Gắn task vào khách/ticket/đơn; chân dung 360 trong task; RPC ghi ngược | Đúng yêu cầu #4 (thủ công) | ~1.5 tuần |
@@ -314,9 +314,9 @@ Câu hỏi: "có nên mua/tách project riêng, tối ưu chi phí trước mắ
 
 ## 13. Bước kế tiếp nếu duyệt
 
-1. Tạo repo `gwt-work` (mono, `apps/work-app`) theo khuôn `gwt-sales`.
+1. Tạo repo `gwt-work` (mono, `apps/web`) theo khuôn `gwt-sales`.
 2. Viết migration `wk_00_init` (bảng `wk_*` + RLS) — bản nháp schema ở §4.
 3. Dựng auth + CRUD + "Việc của tôi" (GĐ 0), deploy Vercel, cho 2–3 nhân viên test thật.
 4. Chốt sự kiện Discord & event ERP muốn auto-sinh (điền từ sheet `AI` của CEO — đã có sẵn danh sách).
 
-> Ghi chú: tài liệu này chỉ là **định hướng kiến trúc**. Khi duyệt, mình sẽ tách thành spec thi công từng GĐ (như cách `app-cskh`/`gwt-sales` đã làm) kèm DDL đầy đủ và bộ test.
+> Ghi chú: tài liệu này chỉ là **định hướng kiến trúc**. Khi duyệt, mình sẽ tách thành spec thi công từng GĐ (như cách `apps/web`/`gwt-sales` đã làm) kèm DDL đầy đủ và bộ test.

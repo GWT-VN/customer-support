@@ -2,7 +2,7 @@
 
 **Ngày:** 18/08/2026 · **Trạng thái:** đang làm
 **Tài liệu nền:** [../../Planning/2026-08-18-gwt-work-cto-plan.md](../../Planning/2026-08-18-gwt-work-cto-plan.md) (kế hoạch CTO)
-**Migration:** [../supabase-work/migrations/work_00_init.sql](../supabase-work/migrations/work_00_init.sql)
+**Migration:** [../db/work/migrations/work_00_init.sql](../db/work/migrations/work_00_init.sql)
 
 ---
 
@@ -11,7 +11,7 @@
 Có một app chạy được để **tạo / giao / xem việc** và màn **"Việc của tôi"** — đủ cho 2–3 nhân viên test thật. Chưa Discord, chưa auto-sinh, chưa Drive (các GĐ sau).
 
 **Định nghĩa "xong GĐ0":**
-1. Đăng nhập Google `@gwt.vn` (dùng lại luật `requireStaff()` như app-cskh).
+1. Đăng nhập Google `@gwt.vn` (dùng lại luật `requireStaff()` như apps/web).
 2. Tạo việc: tiêu đề, mô tả, ưu tiên, hạn, team, gán ≥1 người (RACI), gắn ≤1 project.
 3. Màn **Việc của tôi**: gộp Quá hạn / Hôm nay / Tuần này / Sắp tới; tick xong.
 4. Màn **Bảng team** (List + Board) lọc theo team/assignee.
@@ -22,12 +22,12 @@ Ngoài phạm vi GĐ0: Calendar/Timeline view, dependencies UI, merge, follow-up
 
 ---
 
-## 2. Tech stack (giống hệt gwt-sales / app-cskh)
+## 2. Tech stack (giống hệt gwt-sales / apps/web)
 
 - **Next.js 16** App Router + **React 19** + **Tailwind v4** + TypeScript.
 - **Supabase** project `GWT-SalesTracking` (`bwzmqfbcgouhvhoslmmm`), **schema `work`**.
 - Auth **Google `@gwt.vn`**; 2 client: `authClient()` (anon, chỉ hỏi "ai đăng nhập") + `dataClient()` (**service_role, chỉ server**, sau `requireStaff()`).
-- Deploy **Vercel**, Root Directory = `apps/work-app`.
+- Deploy **Vercel**, Root Directory = `apps/web`.
 
 ## 3. Cấu trúc repo
 
@@ -45,9 +45,9 @@ GWT Work/
 └─ README.md
 ```
 
-> App chưa scaffold trên đĩa (chạy `npx create-next-app@latest apps/work-app` khi bắt đầu code)
+> App chưa scaffold trên đĩa (chạy `npx create-next-app@latest apps/web` khi bắt đầu code)
 > để không tạo `node_modules` thủ công. Copy `src/lib/supabase/*`, `src/lib/auth.ts`, `src/proxy.ts`
-> từ **app-cskh** — luật đăng nhập giữ nguyên, chỉ đổi tên bảng.
+> từ **apps/web** — luật đăng nhập giữ nguyên, chỉ đổi tên bảng.
 
 ## 4. Mô hình dữ liệu (đã tạo trong migration)
 
@@ -100,4 +100,4 @@ order by t.priority, t.due_at nulls last;
 
 ## 9. Bước kế (sau khi migration chạy ở dev)
 
-`create-next-app` → copy auth/supabase từ app-cskh → CRUD task + "Việc của tôi" → deploy preview Vercel → cho 2–3 người test.
+`create-next-app` → copy auth/supabase từ apps/web → CRUD task + "Việc của tôi" → deploy preview Vercel → cho 2–3 người test.

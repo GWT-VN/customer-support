@@ -11,7 +11,7 @@
 --     vì các bảng mirror này bị XOÁ-GHI-LẠI mỗi lần sync từ Google Sheet.
 --   • CHỈ FK cứng vào public.staff (id uuid, bảng ổn định) và trong nội bộ schema work.
 --   • RLS bật hết; app đọc/ghi bằng service_role phía server sau requireStaff()
---     (đúng mô hình app-cskh). Lọc quyền xem bằng work.visible_task_ids().
+--     (đúng mô hình apps/web). Lọc quyền xem bằng work.visible_task_ids().
 -- Idempotent ở mức tạo mới (create if not exists / on conflict).
 -- ============================================================================
 
@@ -248,7 +248,7 @@ create table if not exists work.staff_channel (
 );
 
 -- ============================================================
--- RLS: bật hết, KHÔNG policy cho anon/authenticated (giống app-cskh).
+-- RLS: bật hết, KHÔNG policy cho anon/authenticated (giống apps/web).
 --   App dùng service_role phía server sau requireStaff(); lọc quyền bằng
 --   work.visible_task_ids(). Policy chi tiết để migration sau khi chốt auth↔staff.
 -- ============================================================
