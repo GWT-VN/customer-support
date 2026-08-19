@@ -11,6 +11,7 @@ import { gomTheoHan, nhomTheoHan } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { FormTaoViec } from './FormTaoViec'
 import { ChiTietViec } from './ChiTietViec'
+import { ThanhHangLoat } from './ThanhHangLoat'
 import { TieuDeNhom, OThongKe } from './ui'
 
 export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nenTang: NenTang }) {
@@ -18,6 +19,24 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
   const [pending, start] = useTransition()
   const [mo, setMo] = useState<number | null>(null)
   const [loi, setLoi] = useState<string | null>(null)
+  const [chon, setChon] = useState<Set<number>>(new Set())
+  const [thongBao, setThongBao] = useState<string | null>(null)
+
+  function doiChon(id: number, c: boolean) {
+    setChon((cu) => {
+      const moi = new Set(cu)
+      if (c) moi.add(id); else moi.delete(id)
+      return moi
+    })
+  }
+  /** Tick ở đầu nhóm: chọn/bỏ cả nhóm một lần. */
+  function chonCaNhom(ids: number[], c: boolean) {
+    setChon((cu) => {
+      const moi = new Set(cu)
+      ids.forEach((i) => (c ? moi.add(i) : moi.delete(i)))
+      return moi
+    })
+  }
 
   const nhom = gomTheoHan(rowsBanDau)
 
@@ -67,6 +86,12 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
           style={{ color: 'var(--red)', background: 'var(--red-wash)', border: '1px solid var(--red)' }}
         >{loi}</p>
       )}
+      {thongBao && (
+        <p
+          className="text-sm px-3 py-2 rounded-lg"
+          style={{ color: 'var(--green)', background: 'var(--green-wash)', border: '1px solid var(--green)' }}
+        >{thongBao}</p>
+      )}
 
       {nhom.length === 0 ? (
         <div
@@ -81,7 +106,18 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
       ) : (
         nhom.map((g) => (
           <section key={g.nhom}>
-            <TieuDeNhom nhan={g.nhan} so={g.viec.length} khan={g.nhom === 'qua_han'} />
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={g.viec.every((v) => chon.has(v.id))}
+                onChange={(e) => chonCaNhom(g.viec.map((v) => v.id), e.target.checked)}
+                aria-label={`Chọn cả nhóm ${g.nhan}`}
+                style={{ width: 14, height: 14, accentColor: 'var(--accent)' }}
+              />
+              <div className="flex-1">
+                <TieuDeNhom nhan={g.nhan} so={g.viec.length} khan={g.nhom === 'qua_han'} />
+              </div>
+            </div>
             <ul
               className="overflow-hidden list-none p-0 m-0"
               style={{
@@ -94,6 +130,7 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
                   key={v.id} v={v} pending={pending}
                   onDoiTrangThai={doi} onMo={setMo}
                   cuoi={i === g.viec.length - 1}
+                  dangChon={chon.has(v.id)} onChon={doiChon}
                 />
               ))}
             </ul>
@@ -102,6 +139,17 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
       )}
 
       {pending && <p style={{ fontSize: 12, color: 'var(--faint)' }}>Đang lưu…</p>}
+
+      {chon.size > 0 && (
+        <ThanhHangLoat
+          ids={[...chon]}
+          nenTang={nenTang}
+          onBoChon={() => setChon(new Set())}
+          onXong={(tb) => { setThongBao(tb); setChon(new Set()); router.refresh() }}
+        />
+      )}
+      {/* chừa chỗ để thanh hàng loạt không che dòng cuối */}
+      {chon.size > 0 && <div style={{ height: 72 }} aria-hidden />}
 
       {mo !== null && (
         <ChiTietViec

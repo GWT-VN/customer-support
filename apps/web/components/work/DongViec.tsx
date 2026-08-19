@@ -26,13 +26,16 @@ export type ViecHienThi = {
 }
 
 export function DongViec({
-  v, pending, onDoiTrangThai, onMo, cuoi = false,
+  v, pending, onDoiTrangThai, onMo, cuoi = false, dangChon, onChon,
 }: {
   v: ViecHienThi
   pending: boolean
   onDoiTrangThai: (id: number, status: string) => void
   onMo: (id: number) => void
   cuoi?: boolean
+  /** Có ô chọn hay không — truyền onChon thì ô hiện ra. */
+  dangChon?: boolean
+  onChon?: (id: number, chon: boolean) => void
 }) {
   const han = nhanHan(v.due_at)
   const quaHan = han.startsWith('Quá hạn')
@@ -42,7 +45,10 @@ export function DongViec({
   return (
     <li
       className="flex items-stretch gap-3 relative"
-      style={{ borderBottom: cuoi ? 'none' : '1px solid var(--border)' }}
+      style={{
+        borderBottom: cuoi ? 'none' : '1px solid var(--border)',
+        background: dangChon ? 'var(--accent-wash)' : undefined,
+      }}
     >
       {/* thanh ưu tiên chạy hết chiều cao dòng — đọc lướt là thấy việc gấp */}
       <span
@@ -52,6 +58,16 @@ export function DongViec({
       />
 
       <span className="flex items-center gap-3 flex-1 min-w-0 py-3 pr-4">
+        {onChon && (
+          <input
+            type="checkbox"
+            checked={!!dangChon}
+            onChange={(e) => onChon(v.id, e.target.checked)}
+            aria-label={`Chọn việc ${v.title}`}
+            className="flex-none"
+            style={{ width: 15, height: 15, accentColor: 'var(--accent)' }}
+          />
+        )}
         <button
           onClick={() => onDoiTrangThai(v.id, xong ? 'todo' : 'done')}
           disabled={pending}

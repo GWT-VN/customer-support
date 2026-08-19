@@ -222,3 +222,39 @@ export async function doiNguoiNhan(key: string, staffId: string | null): Promise
   await goi<void>('work_doi_nguoi_nhan', { p_key: key, p_staff_id: staffId })
   revalidatePath('/work/tu-sinh')
 }
+
+// ── Thao tác hàng loạt ──────────────────────────────────────────────────────
+export type KetQuaHangLoat = { da_sua: number; bo_qua: number }
+
+/**
+ * Sửa nhiều việc một lượt. Trường nào bỏ trống thì không đụng tới.
+ * Việc không có quyền sửa bị bỏ qua và đếm vào `bo_qua` — không ném lỗi,
+ * vì chọn 20 việc mà 2 cái không có quyền thì vẫn nên làm 18 cái kia.
+ */
+export async function hangLoat(ids: number[], input: {
+  status?: string | null
+  gan_ai?: string | null
+  gan_vai?: string
+  bo_ai?: string | null
+  priority?: number | null
+  due?: string | null
+  xoa_due?: boolean
+  team_id?: number | null
+  xoa_team?: boolean
+}): Promise<KetQuaHangLoat> {
+  const kq = await goi<KetQuaHangLoat>('work_hang_loat', {
+    p_ids: ids,
+    p_status: input.status ?? null,
+    p_gan_ai: input.gan_ai ?? null,
+    p_gan_vai: input.gan_vai ?? 'doer',
+    p_bo_ai: input.bo_ai ?? null,
+    p_priority: input.priority ?? null,
+    p_due: input.due ?? null,
+    p_xoa_due: input.xoa_due ?? false,
+    p_team_id: input.team_id ?? null,
+    p_xoa_team: input.xoa_team ?? false,
+  })
+  lamMoi()
+  revalidatePath('/work/tu-sinh')
+  return kq
+}

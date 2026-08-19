@@ -14,6 +14,7 @@ import { TRANG_THAI, NHAN_TRANG_THAI, nhanHan } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { ChiTietViec } from './ChiTietViec'
 import { FormTaoViec } from './FormTaoViec'
+import { ThanhHangLoat } from './ThanhHangLoat'
 import { Chip, ChongAvatar, Nut, oNhap, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
 
 type Che = 'list' | 'board'
@@ -28,6 +29,16 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
   const [mo, setMo] = useState<number | null>(null)
   const [loi, setLoi] = useState<string | null>(null)
   const [pending, start] = useTransition()
+  const [chon, setChon] = useState<Set<number>>(new Set())
+  const [thongBao, setThongBao] = useState<string | null>(null)
+
+  function doiChon(id: number, c: boolean) {
+    setChon((cu) => {
+      const moi = new Set(cu)
+      if (c) moi.add(id); else moi.delete(id)
+      return moi
+    })
+  }
 
   /** Nạp lại theo bộ lọc hiện tại — gọi sau mỗi lần lọc hoặc ghi. */
   function nap(moi?: { team?: string; ai?: string; tu?: string }) {
@@ -133,6 +144,12 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
           style={{ fontSize: 13, color: 'var(--red)', background: 'var(--red-wash)', border: '1px solid var(--red)' }}
         >{loi}</p>
       )}
+      {thongBao && (
+        <p
+          className="px-3 py-2 rounded-lg"
+          style={{ fontSize: 13, color: 'var(--green)', background: 'var(--green-wash)', border: '1px solid var(--green)' }}
+        >{thongBao}</p>
+      )}
 
       {rows.length === 0 ? (
         <div
@@ -145,6 +162,16 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
           Không có việc nào khớp bộ lọc.
         </div>
       ) : che === 'list' ? (
+        <>
+        <label className="flex items-center gap-2 px-1" style={{ fontSize: 12, color: 'var(--muted)' }}>
+          <input
+            type="checkbox"
+            checked={rows.length > 0 && rows.every((v) => chon.has(v.id))}
+            onChange={(e) => setChon(e.target.checked ? new Set(rows.map((v) => v.id)) : new Set())}
+            style={{ width: 14, height: 14, accentColor: 'var(--accent)' }}
+          />
+          Chọn tất cả {rows.length} việc đang hiện
+        </label>
         <ul
           className="overflow-hidden list-none p-0 m-0"
           style={{
@@ -156,9 +183,11 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
             <DongViec
               key={v.id} v={v} pending={pending}
               onDoiTrangThai={doi} onMo={setMo} cuoi={i === rows.length - 1}
+              dangChon={chon.has(v.id)} onChon={doiChon}
             />
           ))}
         </ul>
+        </>
       ) : (
         <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-5 items-start">
           {TRANG_THAI.map((cot) => {
@@ -233,6 +262,16 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
       )}
 
       {pending && <p style={{ fontSize: 12, color: 'var(--faint)' }}>Đang tải…</p>}
+
+      {chon.size > 0 && (
+        <ThanhHangLoat
+          ids={[...chon]}
+          nenTang={nenTang}
+          onBoChon={() => setChon(new Set())}
+          onXong={(tb) => { setThongBao(tb); setChon(new Set()); nap(); router.refresh() }}
+        />
+      )}
+      {chon.size > 0 && <div style={{ height: 72 }} aria-hidden />}
 
       {mo !== null && (
         <ChiTietViec
