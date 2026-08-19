@@ -99,7 +99,9 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
     let diem = 0
     const lyDo: string[] = []
 
-    if (sdtPlan && sdtChuan(k.sdt) === sdtPlan) { diem += 100; lyDo.push('trùng SĐT') }
+    // SĐT chỉ được tính là bằng chứng cứng nếu nó đủ dài (≥9 chữ số).
+    // Nếu SĐT < 9 chữ số, coi như nó không hợp lệ (dữ liệu tạm hoặc bẩn) → không so khớp.
+    if (sdtPlan && sdtPlan.length >= 9 && sdtChuan(k.sdt) === sdtPlan) { diem += 100; lyDo.push('trùng SĐT') }
     if (manhMoi.tinh && k.tinh && boDau(k.tinh) === boDau(manhMoi.tinh)) {
       diem += 20; lyDo.push(`cùng tỉnh ${manhMoi.tinh}`)
     }

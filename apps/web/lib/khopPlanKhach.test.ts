@@ -85,4 +85,15 @@ describe('xepGoiY', () => {
     const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null }, KHACH, 1)
     expect(r.length).toBe(1)
   })
+
+  it('SĐT quá ngắn (< 9 số) không được tính là bằng chứng trùng khách, mặc dù dữ liệu giống hệt', () => {
+    // Khách giả định có SĐT tạm "12345" (5 chữ số - không phải SĐT thực)
+    const khachGiaDinh: KhachUngVien[] = [
+      { id: 'k_temp', ten: 'Khách Tạm', sdt: '12345', tinh: null, ngayLapSomNhat: null }, // pii-ok: test data
+    ]
+    // Plan từ Asana cũng có SĐT tạm "12345"
+    const r = xepGoiY({ source_customer_name: 'X', source_phone: '12345', bo_may: null }, khachGiaDinh)
+    // Kết quả: không có gợi ý nào (0 điểm vì SĐT không hợp lệ + không có tỉnh/ngày)
+    expect(r).toEqual([])
+  })
 })
