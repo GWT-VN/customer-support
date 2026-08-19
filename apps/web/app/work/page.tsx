@@ -13,11 +13,11 @@ export default async function WorkPage() {
   const [rows, nt] = await Promise.all([vieCcuaToi(), nenTang()])
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
+    <main data-khu="work" className="min-h-screen">
+      <div className="max-w-5xl mx-auto px-5 py-5 sm:px-6 space-y-5">
         <header>
-          <h1 className="text-xl font-semibold text-slate-900">Việc của tôi</h1>
-          <p className="text-sm text-slate-500">
+          <h1 style={{ fontSize: 20, fontWeight: 670, letterSpacing: "-.02em", margin: 0 }}>Việc của tôi</h1>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
             Công việc bạn phụ trách hoặc cùng làm — xuyên mọi phòng ban.
           </p>
         </header>
