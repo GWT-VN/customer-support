@@ -211,9 +211,12 @@ export function DangKyBHForm() {
       <div>
         <label className="text-sm font-medium text-slate-700">4. Địa chỉ lắp đặt</label>
         <p className="text-xs text-slate-400">Địa chỉ khách: {khachAddr || '—'}</p>
+        {/* Hỏi theo chiều KHẲNG ĐỊNH: mặc định lắp tại nhà khách, tick khi khác.
+            Bản trước hỏi ngược ("dùng địa chỉ khách", mặc định đã tick) nên tick
+            vào lại làm ẩn mất ô nhập — đúng ngược ý người dùng đang định làm. */}
         <label className="flex items-center gap-1.5 text-sm text-slate-700 mt-1">
-          <input type="checkbox" checked={dungDcKhach} onChange={(e) => setDungDcKhach(e.target.checked)} />
-          Dùng địa chỉ khách làm địa chỉ lắp
+          <input type="checkbox" checked={!dungDcKhach} onChange={(e) => setDungDcKhach(!e.target.checked)} />
+          Địa chỉ lắp khác địa chỉ khách
         </label>
         {!dungDcKhach && (
           <>

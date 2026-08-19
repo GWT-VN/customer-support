@@ -147,7 +147,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             { khoa: 'may', nhan: `Máy (${machines.length})`, noiDung: khoiMay },
             { khoa: 'ticket', nhan: `Ticket (${tickets.length})`, noiDung: khoiTicket },
             { khoa: 'baotri', nhan: `Bảo trì (${baoTri.length})`, noiDung: khoiBaoTri },
-            { khoa: 'thongtin', nhan: 'Thông tin & kênh', noiDung: khoiThongTin },
+            { khoa: 'thongtin', nhan: '✎ Sửa thông tin', noiDung: khoiThongTin },
           ]}
         />
       </div>

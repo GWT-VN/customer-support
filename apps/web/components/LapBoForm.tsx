@@ -6,6 +6,7 @@ import {
   comboChon, linhKienCombo, serialsTheoMay, lapBoCombo,
   type LinhKienCombo, type SerialKho, type KhachTom,
 } from '@/app/actions'
+import { ChonTinh } from '@/components/ChonTinh'
 import { KhachPicker } from '@/components/KhachPicker'
 import { SerialRo } from '@/components/SerialRo'
 
@@ -89,6 +90,7 @@ export function LapBoForm() {
   const [khachAddr, setKhachAddr] = useState<string | null>(null)
   const [dungDcKhach, setDungDcKhach] = useState(true)
   const [dcLap, setDcLap] = useState('')
+  const [tinhLap, setTinhLap] = useState('')
   const [ngay, setNgay] = useState(HOM_NAY())
   const [busy, setBusy] = useState(false)
   const [maBo, setMaBo] = useState<string | null>(null)
@@ -112,7 +114,11 @@ export function LapBoForm() {
       ten: lk.so_luong > 1 ? `${lk.ten ?? lk.internal_code} (${i + 1}/${lk.so_luong})` : lk.ten,
     }))), [linhKien])
 
-  const dcLapCuoi = dungDcKhach ? (khachAddr ?? '') : dcLap
+  // Tỉnh là ô riêng trên giao diện cho CS khỏi gõ lẫn, nhưng `installed_base` chỉ
+  // có MỘT cột địa chỉ chữ trơn — nên ghép lại khi lưu thay vì đổi schema.
+  const dcLapCuoi = dungDcKhach
+    ? (khachAddr ?? '')
+    : [dcLap.trim(), tinhLap.trim()].filter(Boolean).join(', ')
   const duSerial = slots.length > 0 && slots.every((s) => (chon[s.key] ?? '').trim())
   const sanSang = !!combo && !!khachId && duSerial && /^\d{4}-\d{2}-\d{2}$/.test(ngay)
 
@@ -133,7 +139,7 @@ export function LapBoForm() {
     if (!r.ok) { setErr(r.error); return }
     setMaBo(r.ma_bo)
     setCombo(''); setLinhKien([]); setChon({}); setKhachId(''); setKhachAddr(null)
-    setDcLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
+    setDcLap(''); setTinhLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
     router.refresh()
   }
 
@@ -175,13 +181,23 @@ export function LapBoForm() {
       <div>
         <label className="text-sm font-medium text-slate-700">4. Địa chỉ lắp đặt</label>
         <p className="text-xs text-slate-400">Địa chỉ khách: {khachAddr || '—'}</p>
+        {/* Hỏi theo chiều KHẲNG ĐỊNH — xem chú thích cùng khối ở DangKyBHForm. */}
         <label className="flex items-center gap-1.5 text-sm text-slate-700 mt-1">
-          <input type="checkbox" checked={dungDcKhach} onChange={(e) => setDungDcKhach(e.target.checked)} />
-          Dùng địa chỉ khách làm địa chỉ lắp
+          <input type="checkbox" checked={!dungDcKhach} onChange={(e) => setDungDcKhach(!e.target.checked)} />
+          Địa chỉ lắp khác địa chỉ khách
         </label>
         {!dungDcKhach && (
-          <input value={dcLap} onChange={(e) => setDcLap(e.target.value)} placeholder="Địa chỉ lắp khác…"
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+          <>
+            <input value={dcLap} onChange={(e) => setDcLap(e.target.value)} placeholder="Số nhà, thôn/xã, quận/huyện…"
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+            <div className="mt-2">
+              <span className="text-sm font-medium text-slate-700">Tỉnh / TP</span>
+              <ChonTinh value={tinhLap} onChange={setTinhLap} />
+              <p className="text-xs text-slate-400 mt-1">
+                Ô riêng để khỏi gõ lẫn vào địa chỉ — địa chỉ lắp có thể khác địa chỉ khách.
+              </p>
+            </div>
+          </>
         )}
       </div>
 
