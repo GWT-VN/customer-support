@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { docTenPlan, xepGoiY, sdtChuan, tinCayThap, NGUONG_TIN_CAY_THAP, type KhachUngVien } from './khopPlanKhach'
+import {
+  docTenPlan, docTenTuThuMuc, xepGoiY, sdtChuan, tinCayThap, NGUONG_TIN_CAY_THAP, type KhachUngVien,
+} from './khopPlanKhach'
 
 describe('docTenPlan', () => {
   it('đọc đủ tỉnh + bộ máy + ngày lắp từ tên thư mục', () => {
@@ -44,6 +46,26 @@ describe('docTenPlan', () => {
   })
 })
 
+describe('docTenTuThuMuc', () => {
+  it('bỏ tiền tố số thứ tự Asana + ghi chú trong ngoặc, giữ lại tên', () => {
+    expect(docTenTuThuMuc('23A Anh Minh (khách cũ)')).toBe('Anh Minh')
+  })
+
+  it('bỏ tiền tố + phần mô tả sau dấu gạch ngang', () => {
+    expect(docTenTuThuMuc('05B Chị Hoa - lắp thêm 2 giàn')).toBe('Chị Hoa')
+  })
+
+  it('tiền tố chỉ có số, không chữ cái đi kèm', () => {
+    expect(docTenTuThuMuc('7 Anh Sơn')).toBe('Anh Sơn')
+  })
+
+  it('chuỗi rỗng hoặc null thì trả null, không đoán bừa', () => {
+    expect(docTenTuThuMuc('')).toBeNull()
+    expect(docTenTuThuMuc(null)).toBeNull()
+    expect(docTenTuThuMuc(undefined)).toBeNull()
+  })
+})
+
 const KHACH: KhachUngVien[] = [
   { id: 'k1', ten: 'Anh Long',  sdt: '0900000001', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2025-08-28' },
   { id: 'k2', ten: 'Chị Bình', sdt: '0900000002', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2024-01-05' },
@@ -60,42 +82,42 @@ describe('sdtChuan', () => {
 
 describe('xepGoiY', () => {
   it('SĐT trùng thì đứng đầu và luôn được gợi ý', () => {
-    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null }, KHACH)
+    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null, source_folder: null }, KHACH)
     expect(r[0].id).toBe('k1')
     expect(r[0].lyDo).toContain('trùng SĐT')
   })
 
   it('không có SĐT thì khớp theo tỉnh + ngày lắp gần nhau (ca Anh Ng)', () => {
-    const r = xepGoiY({ source_customer_name: 'Anh Ng_30A_Hà Tĩnh_Lắp 23/08/2025', source_phone: null, bo_may: 'WH30A' }, KHACH)
+    const r = xepGoiY({ source_customer_name: 'Anh Ng_30A_Hà Tĩnh_Lắp 23/08/2025', source_phone: null, bo_may: 'WH30A', source_folder: null }, KHACH)
     expect(r[0].id).toBe('k1')
     expect(r[0].lyDo).toEqual(expect.arrayContaining(['cùng tỉnh Hà Tĩnh', 'ngày lắp lệch 5 ngày']))
   })
 
   it('cùng tỉnh nhưng ngày lắp lệch quá xa thì KHÔNG tính là khớp ngày', () => {
-    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh_Lắp 23/08/2025', source_phone: null, bo_may: null }, KHACH)
+    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh_Lắp 23/08/2025', source_phone: null, bo_may: null, source_folder: null }, KHACH)
     const k2 = r.find((x) => x.id === 'k2')
     expect(k2?.lyDo.some((l) => l.startsWith('ngày lắp'))).toBe(false)
   })
 
   it('không có manh mối nào thì trả mảng rỗng, không gợi ý bừa', () => {
-    expect(xepGoiY({ source_customer_name: 'Anh Cường', source_phone: null, bo_may: null }, KHACH)).toEqual([])
+    expect(xepGoiY({ source_customer_name: 'Anh Cường', source_phone: null, bo_may: null, source_folder: null }, KHACH)).toEqual([])
   })
 
   it('giới hạn số gợi ý trả về', () => {
-    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null }, KHACH, 1)
+    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null, source_folder: null }, KHACH, 1)
     expect(r.length).toBe(1)
   })
 
   it('gợi ý chỉ khớp tỉnh (1 tín hiệu mềm duy nhất) có điểm dưới ngưỡng tin cậy', () => {
     // Không có ngày lắp trong tên plan -> chỉ còn tín hiệu "cùng tỉnh" (20 điểm).
-    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null }, KHACH)
+    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null, source_folder: null }, KHACH)
     const k2 = r.find((x) => x.id === 'k2')
     expect(k2?.diem).toBe(20)
     expect(k2 && tinCayThap(k2.diem)).toBe(true)
   })
 
   it('gợi ý trùng SĐT hoặc đủ 2 tín hiệu mềm không bị coi là yếu', () => {
-    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null }, KHACH)
+    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null, source_folder: null }, KHACH)
     expect(r[0].diem).toBeGreaterThanOrEqual(100) // trùng SĐT (+ cộng thêm nếu khớp thêm tỉnh)
     expect(tinCayThap(r[0].diem)).toBe(false)
   })
@@ -103,12 +125,76 @@ describe('xepGoiY', () => {
   it('SĐT quá ngắn (< 9 số) không được tính là bằng chứng trùng khách, mặc dù dữ liệu giống hệt', () => {
     // Khách giả định có SĐT tạm "12345" (5 chữ số - không phải SĐT thực)
     const khachGiaDinh: KhachUngVien[] = [
-      { id: 'k_temp', ten: 'Khách Tạm', sdt: '12345', tinh: null, ngayLapSomNhat: null }, // pii-ok: test data
+      { id: 'k_temp', ten: 'Khách Tạm', sdt: '12345', tinh: null, ngayLapSomNhat: null },
     ]
     // Plan từ Asana cũng có SĐT tạm "12345"
-    const r = xepGoiY({ source_customer_name: 'X', source_phone: '12345', bo_may: null }, khachGiaDinh)
+    const r = xepGoiY({ source_customer_name: 'X', source_phone: '12345', bo_may: null, source_folder: null }, khachGiaDinh)
     // Kết quả: không có gợi ý nào (0 điểm vì SĐT không hợp lệ + không có tỉnh/ngày)
     expect(r).toEqual([])
+  })
+
+  it('khớp tên chính xác & duy nhất một khách -> đứng đầu, tin cậy cao', () => {
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '10A Anh Long' },
+      KHACH,
+    )
+    expect(r[0].id).toBe('k1')
+    expect(r[0].diem).toBe(60)
+    expect(r[0].lyDo).toContain('trùng tên "Anh Long"')
+    expect(tinCayThap(r[0].diem)).toBe(false)
+  })
+
+  it('nhiều khách cùng tên với plan -> đều được đưa ra nhưng ở mức tin cậy yếu', () => {
+    const khachTrungTen: KhachUngVien[] = [
+      { id: 'k4', ten: 'Anh Kiên', sdt: null, tinh: null, ngayLapSomNhat: null },
+      { id: 'k5', ten: 'Anh Kiên', sdt: null, tinh: null, ngayLapSomNhat: null },
+      { id: 'k6', ten: 'Chị Đào', sdt: null, tinh: null, ngayLapSomNhat: null },
+    ]
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '12A Anh Kiên' },
+      khachTrungTen,
+      5,
+    )
+    const ids = r.map((x) => x.id)
+    expect(ids).toEqual(expect.arrayContaining(['k4', 'k5']))
+    expect(ids).not.toContain('k6')
+    for (const g of r) {
+      expect(g.diem).toBe(15)
+      expect(tinCayThap(g.diem)).toBe(true)
+    }
+  })
+
+  it('tên trích ra quá ngắn (chỉ còn tiếng xưng hô "Anh") thì KHÔNG gợi ý bừa', () => {
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '01A Anh' },
+      KHACH,
+    )
+    expect(r).toEqual([])
+  })
+
+  it('khớp SĐT vẫn đứng trên khớp tên (dù ứng viên khác nhau)', () => {
+    // k1 khớp SĐT plan (100 điểm), k3 chỉ khớp tên chính xác qua source_folder (60 điểm).
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: '0900000001', bo_may: null, source_folder: '02A Anh Cường' },
+      KHACH,
+    )
+    const k1 = r.find((x) => x.id === 'k1')
+    const k3 = r.find((x) => x.id === 'k3')
+    expect(k1?.diem).toBe(100)
+    expect(k3?.diem).toBe(60)
+    expect(r[0].id).toBe('k1')
+    expect(k1!.diem).toBeGreaterThan(k3!.diem)
+  })
+
+  it('khớp tên một phần (tiền tố) yếu hơn khớp tên chính xác', () => {
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '03A Anh Long Nguyễn' },
+      KHACH,
+    )
+    const k1 = r.find((x) => x.id === 'k1')
+    expect(k1?.diem).toBe(10)
+    expect(k1?.lyDo).toContain('tên gần giống "Anh Long Nguyễn"')
+    expect(tinCayThap(k1!.diem)).toBe(true)
   })
 })
 

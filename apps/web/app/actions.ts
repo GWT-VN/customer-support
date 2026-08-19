@@ -985,7 +985,7 @@ export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ 
 export type PlanChuaMap = {
   id: string; bo_may: string | null; loai_goi: string | null
   tong_lan: number | null; chu_ky_thang: number | null
-  source_customer_name: string | null; source_phone: string | null
+  source_customer_name: string | null; source_phone: string | null; source_folder: string | null
   /** Tối đa 3 khách khớp nhất, kèm lý do để CS tự kiểm chứng trước khi bấm gán. */
   goi_y: GoiYKhach[]
 }
@@ -994,14 +994,16 @@ export type PlanChuaMap = {
  * Plan bảo trì CHƯA map khách + gợi ý khách khớp.
  *
  * Trước đây chỉ dò SĐT nên 23/48 plan không có gợi ý nào (plan Asana phần lớn
- * thiếu SĐT). Nay dò thêm tỉnh + ngày lắp đọc từ tên thư mục — xem lib/khopPlanKhach.
+ * thiếu SĐT). Nay dò thêm tỉnh + ngày lắp đọc từ tên thư mục, và tên khách đọc
+ * từ source_folder (tín hiệu thực tế duy nhất có trên các plan thiếu SĐT) —
+ * xem lib/khopPlanKhach.
  */
 export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
   await requireStaff()
   const db = dataClient()
   const [{ data: plans }, { data: khach }, { data: may }] = await Promise.all([
     db.from('maintenance_plan')
-      .select('id, bo_may, loai_goi, tong_lan, chu_ky_thang, source_customer_name, source_phone')
+      .select('id, bo_may, loai_goi, tong_lan, chu_ky_thang, source_customer_name, source_phone, source_folder')
       .is('customer_id', null).order('source_customer_name'),
     db.from('cs_customers').select('id, full_name, primary_phone, province').neq('trang_thai', 'da_xoa'),
     db.from('installed_base').select('customer_id, install_date').eq('status', 'active'),

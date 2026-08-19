@@ -60,13 +60,40 @@ export function docTenPlan(ten: string | null | undefined): ManhMoiPlan {
   return { tinh: docTinh(s), boMay: docBoMay(s), ngayLap: docNgay(raw) }
 }
 
+/**
+ * Đọc TÊN KHÁCH gợi ý từ chuỗi thư mục Asana, vd "23A Anh Minh (khách cũ)"
+ * hay "05B Chị Hoa - lắp thêm 2 giàn" -> "Anh Minh" / "Chị Hoa".
+ *
+ * Khác với docTenPlan (đọc source_customer_name để dò tỉnh/bộ máy/ngày), hàm
+ * này đọc source_folder — field này KHÔNG chứa tỉnh hay ngày (đo thực tế trên
+ * dữ liệu sản xuất: 0/79 plan có), chỉ có tiền tố số thứ tự Asana rồi đến tên
+ * khách, đôi khi kèm ghi chú trong ngoặc hoặc phần mô tả sau dấu gạch ngang.
+ * Bỏ tiền tố + ghi chú để phần còn lại là tên có thể so với cs_customers.full_name.
+ */
+export function docTenTuThuMuc(folder: string | null | undefined): string | null {
+  const raw = (folder ?? '').trim()
+  if (!raw) return null
+  // Tiền tố Asana: số thứ tự + chữ cái tuỳ chọn (23A, 05B, 7...), có thể kèm dấu nối.
+  let s = raw.replace(/^\d+[A-Za-z]?[\s._-]*/, '')
+  // Ghi chú trong ngoặc không phải tên khách -> bỏ ("khách cũ", "lắp lại"...).
+  s = s.replace(/\([^)]*\)/g, ' ')
+  // Phần sau dấu gạch ngang là mô tả thêm ("- lắp thêm 2 giàn"), không phải tên.
+  s = s.split(/[-–—]/)[0]
+  s = s.replace(/\s+/g, ' ').trim()
+  return s || null
+}
+
 export type KhachUngVien = {
   id: string; ten: string; sdt: string | null
   tinh: string | null
   /** Ngày lắp SỚM NHẤT trong installed_base của khách — mốc so với ngày trong tên plan. */
   ngayLapSomNhat: string | null
 }
-export type PlanCanKhop = { source_customer_name: string | null; source_phone: string | null; bo_may: string | null }
+export type PlanCanKhop = {
+  source_customer_name: string | null; source_phone: string | null; bo_may: string | null
+  /** Chuỗi thư mục Asana gốc — nguồn duy nhất có tên khách (xem docTenTuThuMuc). */
+  source_folder: string | null
+}
 export type GoiYKhach = { id: string; ten: string; sdt: string | null; diem: number; lyDo: string[] }
 
 /** 9 số cuối để so SĐT (bỏ mã vùng/số 0 đầu, mọi ký tự không phải số). */
@@ -82,17 +109,54 @@ function soNgayLech(a: string, b: string): number {
   return Math.round(Math.abs(Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000)
 }
 
+// Tên trích từ thư mục phải còn lại ít nhất chừng này ký tự (bỏ dấu, bỏ khoảng
+// trắng) mới được coi là đủ đặc trưng để so khớp. Đo trên dữ liệu thật: các
+// tiền tố xưng hô một mình ("Anh", "Chị", "Cô"...) dài 3 chữ cái và collide với
+// rất nhiều khách — cho khớp theo chúng thì đúng là "đoán bừa" mà module này
+// cấm. 5 ký tự loại được các tiền tố xưng hô đơn lẻ (Anh=3, Chị=3, Cô=2, Chú=3,
+// Bác=3) mà vẫn giữ được tên 2 chữ ngắn nhất kiểu "Anh Hà" (AnhHa=5).
+const DO_DAI_TEN_TOI_THIEU = 5
+
+function tenKhongDauKhongCach(s: string): string {
+  return boDau(s).trim().replace(/\s+/g, '')
+}
+
 /**
  * Xếp hạng khách khớp với 1 plan chưa map.
  *
- * Thang điểm: SĐT trùng (100) áp đảo mọi thứ vì đó là bằng chứng cứng. Còn lại
- * cộng dồn tỉnh (20) + ngày lắp gần (40 nếu ≤7 ngày, 25 nếu ≤30 ngày). KHÔNG
- * chấm theo tên vì tên plan là chuỗi thư mục ("Anh Ng") trùng với hàng chục khách.
+ * Thang điểm: SĐT trùng (100) áp đảo mọi thứ vì đó là bằng chứng cứng. Tên
+ * đọc từ source_folder (xem docTenTuThuMuc) là tín hiệu MẠNH THỨ NHÌ — đo
+ * thực tế 23 plan không SĐT: 7/23 khớp đúng-một-khách, 4/23 khớp nhiều khách
+ * cùng tên (mơ hồ). Khớp tên chính xác & DUY NHẤT MỘT khách (60) nằm trên
+ * ngưỡng tin cậy thấp; nếu CÙNG tên đó khớp NHIỀU khách thì hạ xuống mức yếu
+ * (15) — vẫn đưa ra để CS chọn nhưng không được vẽ như gợi ý chắc chắn, vì
+ * bản thân việc trùng tên nhiều khách LÀ bằng chứng mơ hồ, không phải bằng
+ * chứng mạnh. Khớp một phần (tên plan là tiền tố/hậu tố của tên khách) yếu
+ * hơn khớp chính xác (10), vì đây gần như luôn là do tên bị cắt bớt trong
+ * thư mục chứ không chắc chắn cùng một người.
+ *
+ * Ngoài ra vẫn cộng dồn tỉnh (20) + ngày lắp gần (40 nếu ≤7 ngày, 25 nếu ≤30
+ * ngày) đọc từ source_customer_name (xem docTenPlan) — tín hiệu này đo được
+ * là 0/79 plan sản xuất có, giữ lại phòng khi dữ liệu Asana thay đổi format.
  * Điểm 0 thì không trả về — thà không gợi ý còn hơn để CS gán nhầm khách.
  */
 export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): GoiYKhach[] {
   const manhMoi = docTenPlan(plan.source_customer_name)
   const sdtPlan = sdtChuan(plan.source_phone)
+
+  const tenPlanGoc = docTenTuThuMuc(plan.source_folder)
+  const tenPlanChuan = tenPlanGoc ? tenKhongDauKhongCach(tenPlanGoc) : null
+  const tenHopLe = !!tenPlanChuan && tenPlanChuan.length >= DO_DAI_TEN_TOI_THIEU
+
+  // Đếm trước số khách trùng tên CHÍNH XÁC với plan, để phát hiện trường hợp
+  // mơ hồ (nhiều khách cùng tên) — xepGoiY nhận cả danh sách nên biết được.
+  let soKhachTrungTenChinhXac = 0
+  if (tenHopLe) {
+    for (const k of dsKhach) {
+      if (tenKhongDauKhongCach(k.ten) === tenPlanChuan) soKhachTrungTenChinhXac++
+    }
+  }
+
   const out: GoiYKhach[] = []
 
   for (const k of dsKhach) {
@@ -109,6 +173,18 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
       const lech = soNgayLech(manhMoi.ngayLap, k.ngayLapSomNhat)
       if (lech <= NGAY_RAT_GAN) { diem += 40; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
       else if (lech <= LECH_NGAY_TOI_DA) { diem += 25; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
+    }
+    if (tenHopLe) {
+      const tenKhachChuan = tenKhongDauKhongCach(k.ten)
+      if (tenKhachChuan === tenPlanChuan) {
+        if (soKhachTrungTenChinhXac > 1) {
+          diem += 15; lyDo.push(`trùng tên "${tenPlanGoc}" (nhiều khách cùng tên, kiểm tra kỹ)`)
+        } else {
+          diem += 60; lyDo.push(`trùng tên "${tenPlanGoc}"`)
+        }
+      } else if (tenKhachChuan.startsWith(tenPlanChuan!) || tenPlanChuan!.startsWith(tenKhachChuan)) {
+        diem += 10; lyDo.push(`tên gần giống "${tenPlanGoc}"`)
+      }
     }
 
     if (diem > 0) out.push({ id: k.id, ten: k.ten, sdt: k.sdt, diem, lyDo })
@@ -130,6 +206,12 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
  * = 45) cũng rơi vào mức tin cậy cao, đúng tinh thần "2 manh mối cùng khớp thì
  * đáng tin hơn 1 manh mối". Chỉ ĐÚNG 1 tín hiệu mềm (tỉnh HOẶC ngày xa, không
  * phải cả hai) mới bị coi là yếu.
+ *
+ * Cùng logic áp cho tên đọc từ source_folder: khớp tên chính xác & DUY NHẤT
+ * một khách (60) vượt mốc 40 -> tin cậy cao. Nhưng nếu CÙNG tên đó khớp NHIỀU
+ * khách (15) hoặc chỉ khớp một phần (10) thì đây chính là dạng "chỉ 1 tín hiệu
+ * yếu" -> nằm dưới mốc, hiện amber "gợi ý yếu, kiểm tra kỹ" thay vì trông như
+ * gợi ý chắc chắn.
  */
 export const NGUONG_TIN_CAY_THAP = 40
 export function tinCayThap(diem: number): boolean {
