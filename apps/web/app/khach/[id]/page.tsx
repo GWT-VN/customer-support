@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon, baoTriCuaKhach } from '@/app/actions'
 import { CustomerEditor } from '@/components/CustomerEditor'
+import { GopKhachButton } from '@/components/GopKhachButton'
 import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
@@ -32,6 +33,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </section>
 
         <CustomerEditor customer={customer} contacts={contacts} />
+
+        <div className="flex justify-end">
+          <GopKhachButton giuId={customer.id} tenGiu={customer.full_name} />
+        </div>
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Máy đã lắp ({machines.length})</h2>
