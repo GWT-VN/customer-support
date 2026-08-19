@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { danhSachDon } from './actions'
+import { FULFILL_OPTS, PAYMENT_OPTS } from './_types'
 
 export const metadata = { title: 'Đơn hàng · GWT Sales' }
 export const dynamic = 'force-dynamic'
@@ -22,12 +23,38 @@ const TABS = [
   { key: 'DON_TANG', label: 'Tặng' },
 ]
 
-export default async function SalesDonPage({ searchParams }: { searchParams: Promise<{ q?: string; tab?: string }> }) {
+export default async function SalesDonPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; tab?: string; tu?: string; den?: string; tt?: string; tp?: string }>
+}) {
   await requireNhanSu()
   if (!(await coTheVaoSales())) redirect('/?loi=khong_du_quyen')
-  const { q, tab } = await searchParams
+  const { q, tab, tu, den, tt, tp } = await searchParams
   const curTab = tab ?? ''
-  const rows = await danhSachDon(q ?? '', curTab)
+  const rows = await danhSachDon(q ?? '', curTab, tu ?? '', den ?? '', tt ?? '', tp ?? '')
+
+  // preset khoảng thời gian (tính ở server component — new Date OK)
+  const now = new Date()
+  const isoD = (d: Date) => d.toISOString().slice(0, 10)
+  const today = isoD(now)
+  const thang1 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  function presetHref(from: string) {
+    const p = new URLSearchParams()
+    if (q) p.set('q', q)
+    if (curTab) p.set('tab', curTab)
+    p.set('tu', from)
+    p.set('den', today)
+    if (tt) p.set('tt', tt)
+    if (tp) p.set('tp', tp)
+    return `/sales?${p.toString()}`
+  }
+  const presets = [
+    { label: 'Tháng này', from: thang1 },
+    { label: '30 ngày', from: isoD(new Date(now.getTime() - 30 * 864e5)) },
+    { label: '90 ngày', from: isoD(new Date(now.getTime() - 90 * 864e5)) },
+  ]
+  const coLoc = !!(tu || den || tt || tp)
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -42,6 +69,10 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
 
         <form className="flex gap-2">
           <input type="hidden" name="tab" value={curTab} />
+          <input type="hidden" name="tu" value={tu ?? ''} />
+          <input type="hidden" name="den" value={den ?? ''} />
+          <input type="hidden" name="tt" value={tt ?? ''} />
+          <input type="hidden" name="tp" value={tp ?? ''} />
           <input
             name="q"
             defaultValue={q ?? ''}
@@ -69,6 +100,38 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
             )
           })}
         </div>
+
+        <form className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="q" value={q ?? ''} />
+          <input type="hidden" name="tab" value={curTab} />
+          <label className="flex flex-col gap-1 text-xs text-slate-500">Từ ngày
+            <input type="date" name="tu" defaultValue={tu ?? ''} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-500">Đến ngày
+            <input type="date" name="den" defaultValue={den ?? ''} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-500">Tình trạng
+            <select name="tt" defaultValue={tt ?? ''} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800">
+              <option value="">Tất cả</option>
+              {FULFILL_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-500">Thanh toán
+            <select name="tp" defaultValue={tp ?? ''} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800">
+              <option value="">Tất cả</option>
+              {PAYMENT_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </label>
+          <button className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-900">Lọc</button>
+          {coLoc && (
+            <Link href={curTab ? `/sales?tab=${curTab}` : '/sales'} className="py-2 text-xs text-slate-500 hover:underline">Xoá lọc</Link>
+          )}
+          <span className="ml-auto flex items-center gap-1.5">
+            {presets.map((p) => (
+              <Link key={p.label} href={presetHref(p.from)} className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:border-slate-300">{p.label}</Link>
+            ))}
+          </span>
+        </form>
 
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">

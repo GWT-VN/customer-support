@@ -39,13 +39,16 @@ export type DonRow = {
 }
 
 /** Đơn TẶNG (DON_TANG) từ customer_purchases, gộp theo order_code. */
-async function donTang(s: string): Promise<DonRow[]> {
+async function donTang(s: string, tu = '', den = ''): Promise<DonRow[]> {
   const db = dataClient()
-  const { data } = await db
+  let gq = db
     .from('customer_purchases')
     .select('order_code, order_date, customer_code, quantity')
     .eq('source_tab', 'DON_TANG')
     .limit(2000)
+  if (tu) gq = gq.gte('order_date', tu)
+  if (den) gq = gq.lte('order_date', den)
+  const { data } = await gq
   const rows = (data ?? []) as Array<Record<string, unknown>>
   if (!rows.length) return []
   const codes = [...new Set(rows.map((r) => r.customer_code as string).filter(Boolean))]
@@ -78,12 +81,13 @@ async function donTang(s: string): Promise<DonRow[]> {
   return s ? all.filter((g) => g.order_code.toLowerCase().includes(sl) || (g.customer_name ?? '').toLowerCase().includes(sl)) : all
 }
 
-/** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng, lọc theo tab. */
-export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
+/** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng; lọc tab + ngày + trạng thái. */
+export async function danhSachDon(q = '', tab = '', tu = '', den = '', tt = '', tp = ''): Promise<DonRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
   const onlyTang = tab === 'DON_TANG'
+  const coLocTrangThai = !!(tt || tp)
   const map = new Map<string, DonRow>()
 
   if (!onlyTang) {
@@ -93,6 +97,10 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
       .order('order_date', { ascending: false, nullsFirst: false })
       .limit(5000)
     if (tab) mq = mq.eq('source_tab', tab)
+    if (tu) mq = mq.gte('order_date', tu)
+    if (den) mq = mq.lte('order_date', den)
+    if (tt) mq = mq.ilike('fulfillment_status', `%${tt}%`)
+    if (tp) mq = mq.ilike('payment_status', `%${tp}%`)
     if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
     const { data: lines, error } = await mq
     if (error) throw error
@@ -125,6 +133,10 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
       .order('order_date', { ascending: false, nullsFirst: false })
       .limit(2000)
     if (tab) aq = aq.eq('source_tab', tab)
+    if (tu) aq = aq.gte('order_date', tu)
+    if (den) aq = aq.lte('order_date', den)
+    if (tt) aq = aq.ilike('status', `%${tt}%`)
+    if (tp) aq = aq.ilike('payment_status', `%${tp}%`)
     const { data: apps } = await aq
     const sl = s.toLowerCase()
     for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
@@ -145,8 +157,8 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
     }
   }
 
-  if (!tab || onlyTang) {
-    for (const g of await donTang(s)) map.set(g.order_code, g)
+  if ((!tab || onlyTang) && !coLocTrangThai) {
+    for (const g of await donTang(s, tu, den)) map.set(g.order_code, g)
   }
 
   return [...map.values()]
