@@ -59,6 +59,10 @@ describe('docTenTuThuMuc', () => {
     expect(docTenTuThuMuc('7 Anh Sơn')).toBe('Anh Sơn')
   })
 
+  it('tên thật 2 chữ với xưng hô ngắn ("Cô") vẫn giữ nguyên, không bị cắt thêm', () => {
+    expect(docTenTuThuMuc('02A Cô Hà')).toBe('Cô Hà')
+  })
+
   it('chuỗi rỗng hoặc null thì trả null, không đoán bừa', () => {
     expect(docTenTuThuMuc('')).toBeNull()
     expect(docTenTuThuMuc(null)).toBeNull()
@@ -195,6 +199,68 @@ describe('xepGoiY', () => {
     expect(k1?.diem).toBe(10)
     expect(k1?.lyDo).toContain('tên gần giống "Anh Long Nguyễn"')
     expect(tinCayThap(k1!.diem)).toBe(true)
+  })
+
+  it('tên mơ hồ (trùng nhiều khách) CỘNG DỒN với ngày lắp gần vẫn không được vượt ngưỡng tin cậy', () => {
+    // k4/k5 cùng tên "Anh Kiên" (mơ hồ). k4 còn khớp ngày lắp gần (lệch 0 ngày, +40)
+    // -> nếu cộng dồn thẳng 15+40=55 sẽ vượt ngưỡng 40 và hiện như "chắc chắn" dù
+    // bằng chứng tên đang tự nói "không chắc". Phải bị chặn trần dưới ngưỡng.
+    const khachTrungTen: KhachUngVien[] = [
+      { id: 'k4', ten: 'Anh Kiên', sdt: null, tinh: null, ngayLapSomNhat: '2025-01-20' },
+      { id: 'k5', ten: 'Anh Kiên', sdt: null, tinh: null, ngayLapSomNhat: null },
+    ]
+    const r = xepGoiY(
+      {
+        source_customer_name: 'X_Lắp 20/01/2025', source_phone: null, bo_may: null,
+        source_folder: '12A Anh Kiên',
+      },
+      khachTrungTen,
+    )
+    const k4 = r.find((x) => x.id === 'k4')
+    expect(k4).toBeTruthy()
+    expect(k4!.lyDo.some((l) => l.startsWith('ngày lắp'))).toBe(true) // vẫn cộng ngày lắp vào lý do hiển thị
+    expect(k4!.diem).toBeLessThan(NGUONG_TIN_CAY_THAP) // nhưng điểm KHÔNG được vượt ngưỡng
+    expect(tinCayThap(k4!.diem)).toBe(true)
+  })
+
+  it('khớp tên một phần CỘNG DỒN với ngày lắp gần vẫn không được vượt ngưỡng tin cậy', () => {
+    // "Anh Long Nguyễn" chỉ khớp một phần với "Anh Long" (+10). Nếu k1 còn khớp
+    // ngày lắp gần (+40) thì tổng thẳng 50 sẽ vượt ngưỡng 40 — tên bị cắt bớt
+    // trong thư mục không phải bằng chứng đủ mạnh để "chắc chắn" dù cộng ngày.
+    const khachMotPhan: KhachUngVien[] = [
+      { id: 'k1', ten: 'Anh Long', sdt: null, tinh: null, ngayLapSomNhat: '2025-01-20' },
+    ]
+    const r = xepGoiY(
+      {
+        source_customer_name: 'X_Lắp 20/01/2025', source_phone: null, bo_may: null,
+        source_folder: '03A Anh Long Nguyễn',
+      },
+      khachMotPhan,
+    )
+    expect(r[0]?.diem).toBeLessThan(NGUONG_TIN_CAY_THAP)
+    expect(tinCayThap(r[0]!.diem)).toBe(true)
+  })
+
+  it('tên thật 2 chữ có xưng hô "Cô" (chỉ 2 ký tự) vẫn được nhận, không bị loại oan', () => {
+    const dsKhach: KhachUngVien[] = [
+      { id: 'kh1', ten: 'Cô Hà', sdt: null, tinh: null, ngayLapSomNhat: null },
+      { id: 'kh2', ten: 'Anh Long', sdt: null, tinh: null, ngayLapSomNhat: null },
+    ]
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '02A Cô Hà' },
+      dsKhach,
+    )
+    expect(r[0]?.id).toBe('kh1')
+    expect(r[0]?.diem).toBe(60)
+    expect(tinCayThap(r[0]!.diem)).toBe(false)
+  })
+
+  it('xưng hô đứng một mình ("Chị", không kèm tên) vẫn bị loại, không gợi ý bừa', () => {
+    const r = xepGoiY(
+      { source_customer_name: null, source_phone: null, bo_may: null, source_folder: '04A Chị' },
+      KHACH,
+    )
+    expect(r).toEqual([])
   })
 })
 

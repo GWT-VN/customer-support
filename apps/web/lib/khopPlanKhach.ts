@@ -111,11 +111,13 @@ function soNgayLech(a: string, b: string): number {
 
 // Tên trích từ thư mục phải còn lại ít nhất chừng này ký tự (bỏ dấu, bỏ khoảng
 // trắng) mới được coi là đủ đặc trưng để so khớp. Đo trên dữ liệu thật: các
-// tiền tố xưng hô một mình ("Anh", "Chị", "Cô"...) dài 3 chữ cái và collide với
-// rất nhiều khách — cho khớp theo chúng thì đúng là "đoán bừa" mà module này
-// cấm. 5 ký tự loại được các tiền tố xưng hô đơn lẻ (Anh=3, Chị=3, Cô=2, Chú=3,
-// Bác=3) mà vẫn giữ được tên 2 chữ ngắn nhất kiểu "Anh Hà" (AnhHa=5).
-const DO_DAI_TEN_TOI_THIEU = 5
+// tiền tố xưng hô một mình ("Anh", "Chị", "Chú", "Bác"...) dài 3 chữ cái và
+// collide với rất nhiều khách — cho khớp theo chúng thì đúng là "đoán bừa" mà
+// module này cấm. Chọn 4 (không phải 5): "Cô" chỉ có 2 chữ nên ngưỡng 5 từng
+// loại oan tên thật 2 chữ như "Cô Hà" ("CoHa" = 4 ký tự) — 4 vẫn chặn hết các
+// xưng hô đơn lẻ phổ biến (Anh=3, Chị=3, Cô=2, Chú=3, Bác=3) mà không cắt tên
+// thật ngắn nhất còn gặp trong dữ liệu.
+const DO_DAI_TEN_TOI_THIEU = 4
 
 function tenKhongDauKhongCach(s: string): string {
   return boDau(s).trim().replace(/\s+/g, '')
@@ -134,6 +136,12 @@ function tenKhongDauKhongCach(s: string): string {
  * chứng mạnh. Khớp một phần (tên plan là tiền tố/hậu tố của tên khách) yếu
  * hơn khớp chính xác (10), vì đây gần như luôn là do tên bị cắt bớt trong
  * thư mục chứ không chắc chắn cùng một người.
+ *
+ * Hai loại "tên yếu" đó (15, 10) KHÔNG được phép cộng dồn với tỉnh/ngày để
+ * vượt ngưỡng tin cậy thấp — chúng tự thân đã là lời thú nhận không chắc,
+ * không phải một manh mối độc lập củng cố thêm. Vì vậy điểm "mềm" (tỉnh +
+ * ngày + tên, tách khỏi SĐT) bị chặn trần dưới NGUONG_TIN_CAY_THAP khi tên
+ * mơ hồ/một phần — xem chặn trần trong thân hàm.
  *
  * Ngoài ra vẫn cộng dồn tỉnh (20) + ngày lắp gần (40 nếu ≤7 ngày, 25 nếu ≤30
  * ngày) đọc từ source_customer_name (xem docTenPlan) — tín hiệu này đo được
@@ -160,33 +168,49 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
   const out: GoiYKhach[] = []
 
   for (const k of dsKhach) {
-    let diem = 0
+    let diemSdt = 0
+    // Điểm "mềm": tỉnh + ngày lắp + tên — các tín hiệu này có thể chồng lên
+    // nhau đến mức vượt ngưỡng tin cậy thấp (xem chặn trần bên dưới).
+    let diemMem = 0
+    // true nếu tín hiệu tên mà khách này ăn điểm là MƠ HỒ (trùng tên nhiều
+    // khách) hoặc chỉ khớp MỘT PHẦN — tức bản thân nó đang nói "tôi không
+    // chắc", không phải một manh mối độc lập để cộng dồn cho chắc thêm.
+    let tenMoHoHoacMotPhan = false
     const lyDo: string[] = []
 
     // SĐT chỉ được tính là bằng chứng cứng nếu nó đủ dài (≥9 chữ số).
     // Nếu SĐT < 9 chữ số, coi như nó không hợp lệ (dữ liệu tạm hoặc bẩn) → không so khớp.
-    if (sdtPlan && sdtPlan.length >= 9 && sdtChuan(k.sdt) === sdtPlan) { diem += 100; lyDo.push('trùng SĐT') }
+    if (sdtPlan && sdtPlan.length >= 9 && sdtChuan(k.sdt) === sdtPlan) { diemSdt += 100; lyDo.push('trùng SĐT') }
     if (manhMoi.tinh && k.tinh && boDau(k.tinh) === boDau(manhMoi.tinh)) {
-      diem += 20; lyDo.push(`cùng tỉnh ${manhMoi.tinh}`)
+      diemMem += 20; lyDo.push(`cùng tỉnh ${manhMoi.tinh}`)
     }
     if (manhMoi.ngayLap && k.ngayLapSomNhat) {
       const lech = soNgayLech(manhMoi.ngayLap, k.ngayLapSomNhat)
-      if (lech <= NGAY_RAT_GAN) { diem += 40; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
-      else if (lech <= LECH_NGAY_TOI_DA) { diem += 25; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
+      if (lech <= NGAY_RAT_GAN) { diemMem += 40; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
+      else if (lech <= LECH_NGAY_TOI_DA) { diemMem += 25; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
     }
     if (tenHopLe) {
       const tenKhachChuan = tenKhongDauKhongCach(k.ten)
       if (tenKhachChuan === tenPlanChuan) {
         if (soKhachTrungTenChinhXac > 1) {
-          diem += 15; lyDo.push(`trùng tên "${tenPlanGoc}" (nhiều khách cùng tên, kiểm tra kỹ)`)
+          diemMem += 15; tenMoHoHoacMotPhan = true
+          lyDo.push(`trùng tên "${tenPlanGoc}" (nhiều khách cùng tên, kiểm tra kỹ)`)
         } else {
-          diem += 60; lyDo.push(`trùng tên "${tenPlanGoc}"`)
+          diemMem += 60; lyDo.push(`trùng tên "${tenPlanGoc}"`)
         }
       } else if (tenKhachChuan.startsWith(tenPlanChuan!) || tenPlanChuan!.startsWith(tenKhachChuan)) {
-        diem += 10; lyDo.push(`tên gần giống "${tenPlanGoc}"`)
+        diemMem += 10; tenMoHoHoacMotPhan = true; lyDo.push(`tên gần giống "${tenPlanGoc}"`)
       }
     }
 
+    // Trùng tên nhiều khách hay khớp một phần KHÔNG phải manh mối độc lập để
+    // cộng dồn cùng tỉnh/ngày cho "chắc thêm" — nó tự thân là lời thú nhận
+    // không chắc chắn. Cộng dồn cho nó vượt ngưỡng tin cậy thấp là đoán bừa
+    // trá hình dưới dạng nhiều tín hiệu. Chặn trần phần điểm mềm dưới ngưỡng
+    // (SĐT không bị ảnh hưởng — SĐT là bằng chứng cứng, độc lập với tên).
+    if (tenMoHoHoacMotPhan) diemMem = Math.min(diemMem, NGUONG_TIN_CAY_THAP - 1)
+
+    const diem = diemSdt + diemMem
     if (diem > 0) out.push({ id: k.id, ten: k.ten, sdt: k.sdt, diem, lyDo })
   }
 
@@ -211,7 +235,11 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
  * một khách (60) vượt mốc 40 -> tin cậy cao. Nhưng nếu CÙNG tên đó khớp NHIỀU
  * khách (15) hoặc chỉ khớp một phần (10) thì đây chính là dạng "chỉ 1 tín hiệu
  * yếu" -> nằm dưới mốc, hiện amber "gợi ý yếu, kiểm tra kỹ" thay vì trông như
- * gợi ý chắc chắn.
+ * gợi ý chắc chắn. Khác với tỉnh/ngày (có thể cộng dồn với NHAU để vượt mốc,
+ * vì đó là 2 manh mối độc lập), tên mơ hồ/một phần KHÔNG được phép cộng dồn
+ * với tỉnh/ngày để vượt mốc — xepGoiY chặn trần điều này ngay trong thân hàm,
+ * vì bản thân "tên mơ hồ" đã là lời thú nhận không chắc, không phải manh mối
+ * để củng cố thêm.
  */
 export const NGUONG_TIN_CAY_THAP = 40
 export function tinCayThap(diem: number): boolean {
