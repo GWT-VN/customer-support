@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { chiTietDon } from '../../actions'
+import { OrderActions } from '../../OrderActions'
 import { Field, StatusBadge, TabBadge, fmtDate, fmtQty, fmtVnd } from '../../_ui'
 
 export const metadata = { title: 'Chi tiết đơn · GWT Sales' }
@@ -31,6 +32,9 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Từ Google Sheet</span>
           )}
           {don.created_by && <span className="text-xs text-slate-400">bởi {don.created_by}</span>}
+          {don.is_app && (
+            <div className="ml-auto"><OrderActions orderCode={don.order_code} /></div>
+          )}
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
