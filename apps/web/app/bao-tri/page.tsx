@@ -9,6 +9,7 @@ import { KhungChon, ThanhDaChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
 import { BangBaoTri } from '@/components/BangBaoTri'
+import { DauTrang } from '@/components/DauTrang'
 import { LichBaoTriThang } from '@/components/LichBaoTriThang'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
@@ -45,9 +46,10 @@ export default async function BaoTriPage({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-900">Lịch bảo trì</h1>
-        </header>
+        <DauTrang
+          tieuDe="Lịch bảo trì"
+          phuDe="Gói bảo trì theo hợp đồng · bấm “Đã bảo trì” sau mỗi chuyến"
+        />
 
         <Suspense>
           <OTimKiem placeholder="Gõ tên khách, SĐT, bộ máy, công trình…" />

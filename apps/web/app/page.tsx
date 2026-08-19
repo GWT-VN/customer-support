@@ -11,6 +11,7 @@ import { laChiKyThuatVien, laQuanLy, coTheVaoCS } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
 import { BangMay } from '@/components/BangMay'
+import { DauTrang } from '@/components/DauTrang'
 
 export default async function Home({
   searchParams,
@@ -55,9 +56,10 @@ export default async function Home({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-900">Máy đã lắp</h1>
-        </header>
+        <DauTrang
+          tieuDe="Máy đã lắp"
+          phuDe={`${tong.toLocaleString('vi-VN')} máy · lọc theo sản phẩm, bảo hành, ngày lắp`}
+        />
 
         <Suspense>
           <OTimKiem placeholder="Gõ SĐT, serial hoặc tên khách…" />
