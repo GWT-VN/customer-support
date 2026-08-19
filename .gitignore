@@ -86,3 +86,6 @@ migrate/_out/
 # Obsidian editor config
 .obsidian/
 /BACKLOG.md
+
+# Claude worktrees (không commit)
+.claude/worktrees/
