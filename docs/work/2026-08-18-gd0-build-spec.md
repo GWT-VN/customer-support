@@ -1,6 +1,6 @@
 # Spec thi công — GWT Work · GĐ0 (Khung + Việc của tôi)
 
-**Ngày:** 18/08/2026 · **Trạng thái:** đang làm
+**Ngày:** 18/08/2026 · **Trạng thái:** GĐ0 xong phần code (19/08) — chờ người dùng thật kiểm
 **Tài liệu nền:** [../../Planning/2026-08-18-gwt-work-cto-plan.md](../../Planning/2026-08-18-gwt-work-cto-plan.md) (kế hoạch CTO)
 **Migration:** [../db/work/migrations/work_00_init.sql](../db/work/migrations/work_00_init.sql)
 
@@ -28,6 +28,32 @@ Ngoài phạm vi GĐ0: Calendar/Timeline view, dependencies UI, merge, follow-up
 - **Supabase** project `GWT-SalesTracking` (`bwzmqfbcgouhvhoslmmm`), **schema `work`**.
 - Auth **Google `@gwt.vn`**; 2 client: `authClient()` (anon, chỉ hỏi "ai đăng nhập") + `dataClient()` (**service_role, chỉ server**, sau `requireStaff()`).
 - Deploy **Vercel**, Root Directory = `apps/web`.
+
+## 2b. ĐÃ THAY ĐỔI so với spec gốc (19/08/2026)
+
+Spec này viết khi Work còn định là **app riêng** (`apps/work-app`). Sau đó CEO chốt
+**P1: một app chung** — Work là **route-group trong `apps/web`**, dùng lại nguyên
+đăng nhập / TopNav / deploy của app CS. Không scaffold `create-next-app` nữa.
+
+| Spec gốc | Thực tế |
+|---|---|
+| `GWT Work/apps/work-app/` | `apps/web/app/work/` + `apps/web/components/work/` |
+| `supabase-work/migrations/` | `db/work/migrations/` |
+| App gọi thẳng bảng `work.*` | App gọi **RPC `public.work_*`** — PostgREST chỉ phục vụ schema được expose, `work` cố tình không expose |
+
+**Trạng thái từng mục của "xong GĐ0":**
+
+| # | Mục | Trạng thái |
+|---|---|---|
+| 1 | Đăng nhập Google `@gwt.vn` | ✅ dùng lại `requireNhanSu()` |
+| 2 | Tạo việc đủ trường + gán người (RACI) | ✅ `FormTaoViec` + RPC `work_tao_viec` |
+| 3 | Việc của tôi gộp Quá hạn/Hôm nay/Tuần này/Sắp tới | ✅ `lib/work.ts` (19 test) |
+| 4 | Bảng team List + Board, lọc team/người | ✅ `/work/team` |
+| 5 | Panel chi tiết: trạng thái, assignee, comment, nhật ký | ✅ `ChiTietViec` |
+| 6 | Deploy Vercel, RLS bật, ghi/đọc qua `service_role` | ✅ |
+
+Còn nợ (GĐ1+): Calendar/Timeline, dependencies UI, subtask tạo từ giao diện,
+merge/follow-up, auto-sinh từ ERP, Discord, Drive.
 
 ## 3. Cấu trúc repo
 

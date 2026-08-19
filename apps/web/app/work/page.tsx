@@ -1,6 +1,6 @@
 import { requireNhanSu } from '@/lib/supabase'
-import { vieCcuaToi } from './actions'
-import { ViecCuaToi } from '@/components/ViecCuaToi'
+import { vieCcuaToi, nenTang } from './actions'
+import { ViecCuaToi } from '@/components/work/ViecCuaToi'
 
 export const metadata = { title: 'Việc của tôi · GWT Work' }
 
@@ -10,7 +10,7 @@ export const metadata = { title: 'Việc của tôi · GWT Work' }
  */
 export default async function WorkPage() {
   await requireNhanSu()
-  const rows = await vieCcuaToi()
+  const [rows, nt] = await Promise.all([vieCcuaToi(), nenTang()])
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -21,7 +21,7 @@ export default async function WorkPage() {
             Công việc bạn phụ trách hoặc cùng làm — xuyên mọi phòng ban.
           </p>
         </header>
-        <ViecCuaToi rowsBanDau={rows} />
+        <ViecCuaToi rowsBanDau={rows} nenTang={nt} />
       </div>
     </main>
   )
