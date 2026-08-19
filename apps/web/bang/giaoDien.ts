@@ -66,63 +66,71 @@ export type GiaoDienBang = {
   chon_chuaCoHanhDong: string
 }
 
-/** Bản mặc định — tông xám/slate của Tailwind. */
+/**
+ * Tông của nền tảng GWT (theo mockup Sales/CSKH đã duyệt 20/08/2026): nền teal
+ * nhạt, thẻ trắng bo 10–12px, accent teal #0e8c9a, tiêu đề cột chữ nhỏ in hoa.
+ * Đổi giao diện TOÀN BỘ trang danh sách = sửa DUY NHẤT ở đây.
+ */
 export const GIAO_DIEN_MAC_DINH: GiaoDienBang = {
   oTimKiem_khung: 'relative',
-  oTimKiem_input: 'w-full rounded-lg border px-4 py-2.5 pr-10 text-slate-900 bg-white',
+  oTimKiem_input:
+    'w-full rounded-[10px] border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-[#0e8c9a] focus:ring-2 focus:ring-[#e2f2f3]',
   oTimKiem_nutXoa: 'absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900',
 
   dangLoc_khung: 'flex items-center justify-between gap-3 flex-wrap text-sm',
   dangLoc_nhomChip: 'flex items-center gap-2 flex-wrap',
-  dangLoc_chip: 'inline-flex items-center gap-1 py-1 rounded-full bg-slate-100 text-slate-700 text-xs',
+  dangLoc_chip:
+    'inline-flex items-center gap-1 py-1 rounded-full border border-[#bfe2e5] bg-[#e2f2f3] text-[#0a6771] text-xs font-medium',
   // Đệm hai bên phải CÂN MẮT: dấu × là ô 16px, nét chữ chỉ chiếm giữa nên lề
   // phải bóp còn pr-1.5 mới ra ~10.5px tới nét chữ, khớp pl-2.5 (10px) bên trái.
   dangLoc_chipCoNutGo: 'pl-2.5 pr-1.5',
   dangLoc_chipTron: 'px-2.5',
   dangLoc_nutGoChip:
-    'flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-900',
+    'flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-[#0a6771]/60 hover:bg-[#bfe2e5] hover:text-[#0a6771]',
   dangLoc_soDong: 'text-slate-500',
   dangLoc_nutXoaLoc: 'text-slate-600 underline hover:text-slate-900 flex-none',
 
-  sapXep_chip: 'inline-flex items-center gap-1.5 py-1 rounded-full bg-sky-50 text-sky-900 text-xs',
+  sapXep_chip:
+    'inline-flex items-center gap-1.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700 text-xs font-medium',
   sapXep_chipCoNutGo: 'pl-2.5 pr-1.5',
   sapXep_chipTron: 'px-2.5',
-  sapXep_muiTen: 'text-sky-500',
-  sapXep_ghiChu: 'text-sky-700',
+  sapXep_muiTen: 'text-[#0e8c9a]',
+  sapXep_ghiChu: 'text-slate-500',
   sapXep_nutGo:
-    'flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-sky-400 hover:bg-sky-200 hover:text-sky-900',
+    'flex-none grid place-items-center w-4 h-4 rounded-full leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-900',
 
-  tieuDe_o: 'text-left px-4 py-3 font-medium',
-  tieuDe_oDangSap: 'bg-white text-slate-900',
-  tieuDe_link: 'inline-flex items-center gap-1 hover:text-slate-900',
-  tieuDe_linkDangSap: 'font-semibold text-slate-900',
-  tieuDe_muiTenDangSap: 'text-slate-900',
+  tieuDe_o: 'text-left px-4 py-2.5 font-semibold text-[10.5px] uppercase tracking-wider text-slate-400',
+  tieuDe_oDangSap: 'bg-white text-slate-700',
+  tieuDe_link: 'inline-flex items-center gap-1 hover:text-slate-700',
+  tieuDe_linkDangSap: 'font-bold text-slate-800',
+  tieuDe_muiTenDangSap: 'text-[#0e8c9a]',
   tieuDe_muiTenThuong: 'text-slate-300',
 
   phanTrang_khung: 'flex items-center justify-center gap-3 text-sm',
-  phanTrang_nut: 'rounded-lg border bg-white text-slate-700 px-3 py-1.5 hover:bg-slate-50',
-  phanTrang_nutTat: 'rounded-lg border bg-white text-slate-300 px-3 py-1.5',
-  phanTrang_chuSo: 'text-slate-500',
+  phanTrang_nut:
+    'rounded-[9px] border border-slate-200 bg-white text-slate-700 px-3 py-1.5 shadow-sm hover:border-slate-300 hover:bg-slate-50',
+  phanTrang_nutTat: 'rounded-[9px] border border-slate-200 bg-white text-slate-300 px-3 py-1.5',
+  phanTrang_chuSo: 'text-slate-500 tabular-nums',
 
   boLoc_khung: 'relative inline-flex max-w-full',
   // appearance-none + tự vẽ mũi tên: mũi tên mặc định của trình duyệt nằm ngoài
   // tầm CSS, đặt padding-right bao nhiêu nó vẫn bám mép phải theo cách riêng.
   boLoc_select:
-    'w-48 max-w-full truncate appearance-none rounded-lg border bg-white pl-3 pr-8 py-1.5 text-sm text-slate-700',
+    'w-48 max-w-full truncate appearance-none rounded-[10px] border border-slate-200 bg-white pl-3 pr-8 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-[#0e8c9a] focus:ring-2 focus:ring-[#e2f2f3]',
   boLoc_muiTen: 'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400',
 
   chon_khung: 'space-y-4',
-  chon_oTh: 'w-10 px-4 py-3',
+  chon_oTh: 'w-10 px-4 py-2.5',
   chon_oTd: 'w-10 px-4 py-3',
-  chon_checkbox: 'align-middle accent-slate-900',
+  chon_checkbox: 'align-middle accent-[#0e8c9a]',
   chon_thanh:
-    'flex items-center gap-x-3 gap-y-1 flex-wrap rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm text-white',
-  chon_thanhPhuChu: 'text-slate-300',
+    'flex items-center gap-x-3 gap-y-1 flex-wrap rounded-[10px] border border-[#0c2a2e] bg-[#0c2a2e] px-3 py-2 text-sm text-white',
+  chon_thanhPhuChu: 'text-teal-100/70',
   chon_thanhCanhBao: 'text-amber-300',
   chon_nutChonToanBo:
-    'underline decoration-dotted underline-offset-2 text-sky-300 hover:text-white disabled:opacity-50',
-  chon_nutBoChon: 'text-slate-300 underline hover:text-white',
+    'underline decoration-dotted underline-offset-2 text-teal-200 hover:text-white disabled:opacity-50',
+  chon_nutBoChon: 'text-teal-100/70 underline hover:text-white',
   chon_loi: 'text-red-300',
   chon_khuHanhDong: 'flex items-center gap-2 flex-wrap ml-auto',
-  chon_chuaCoHanhDong: 'ml-auto text-xs text-slate-400',
+  chon_chuaCoHanhDong: 'ml-auto text-xs text-teal-100/50',
 }
