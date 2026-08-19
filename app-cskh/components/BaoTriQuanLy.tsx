@@ -29,6 +29,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [errTao, setErrTao] = useState<string | null>(null)   // lỗi của form "Tạo lịch mới" (hiện cạnh nút)
   // form tạo lịch MỚI (tặng / mua trực tiếp)
   const [moTao, setMoTao] = useState(!!moTaoKhach)
   const [tKhach, setTKhach] = useState(moTaoKhach?.id ?? '')
@@ -45,14 +46,14 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
     const c = await boiCanhKhach(id); setTCtx(c)
   }
   async function taoMoi(ngayList: string[]) {
-    setBusy('tao'); setErr(null); setMsg(null)
+    setBusy('tao'); setErr(null); setMsg(null); setErrTao(null)
     const r = await taoPlanBaoTri(tKhach, {
       boMay: tBoMay || undefined, chuKyThang: tChuKy === '0' ? null : Number(tChuKy),
       tongLan: Number(tLan) || 1, ngayBatDau: tNgay, vung: tVung === 'bac' || tVung === 'nam' ? tVung : undefined,
       ngayList,
     })
     setBusy(null)
-    if (!r.ok) { setErr(r.error); return }
+    if (!r.ok) { setErr(r.error); setErrTao(r.error); return }
     setMoTao(false); setTKhach(''); setTBoMay(''); setTCtx(null); setTDates([]); setMsg(`Đã tạo lịch mới ${r.so_lan} lượt.`); router.refresh()
   }
   const [chonTay, setChonTay] = useState<string | null>(null)     // plan id đang chọn khách tay
@@ -175,7 +176,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
             <h2 className="font-medium text-slate-900">📅 Lên lịch bảo trì ({daMap.length} plan đã map)</h2>
             <p className="text-xs text-slate-500">Bộ CŨ: lên lịch tự do. Chọn ngày bắt đầu + chu kỳ + số lần → hệ sinh mốc, né T7/CN theo miền.</p>
           </div>
-          <button onClick={() => { setMoTao(!moTao); setErr(null); setMsg(null) }} className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
+          <button onClick={() => { setMoTao(!moTao); setErr(null); setMsg(null); setErrTao(null) }} className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
             + Tạo lịch mới cho khách
           </button>
         </div>
@@ -235,12 +236,15 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                 </div>
               </div>
             ) : <p className="text-[11px] text-amber-600">Chọn ngày bắt đầu để xem trước.</p>}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button disabled={busy === 'tao' || !tKhach || preview.length === 0} onClick={() => taoMoi(preview)} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-50">
                 {busy === 'tao' ? 'Đang tạo…' : `Tạo lịch (${preview.length} lượt)`}
               </button>
               <button onClick={() => setMoTao(false)} className="text-xs text-slate-500 underline">Đóng</button>
             </div>
+            {/* Lỗi phải nằm NGAY CẠNH NÚT. Trước đây chỉ hiện ở đầu trang (cách đây cả
+                màn hình) nên tạo lịch hỏng mà CS vẫn tưởng đã xong. */}
+            {errTao && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1.5">Chưa tạo được lịch: {errTao}</p>}
           </div>
           )
         })()}
