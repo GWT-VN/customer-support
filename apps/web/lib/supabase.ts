@@ -170,11 +170,20 @@ export async function coTheVaoCS(): Promise<boolean> {
   return nv.vai_tro.some((r) => (VAI_TRO_VAO_APP as readonly string[]).includes(r))
 }
 
-/** Người đang đăng nhập có vào được KHU SALES không (admin|sales|sales_manager). */
+/** Vai trò vào được KHU SALES. */
+export const VAI_TRO_VAO_SALES = ['admin', 'sales', 'sales_manager'] as const
+
+/**
+ * Người đang đăng nhập có vào được KHU SALES không (admin|sales|sales_manager).
+ *
+ * Đọc hồ sơ qua CỔNG NỀN TẢNG (layNhanVienNenTang → requireNhanSu), KHÔNG dùng
+ * cổng CS (requireStaff): Sales thuần không có vai trò CS sẽ bị requireStaff đá ra
+ * /login?loi=ngoai_cs — chính là bug làm khu Sales không vào được.
+ */
 export async function coTheVaoSales(): Promise<boolean> {
-  const nv = await layNhanVien()
+  const nv = await layNhanVienNenTang()
   if (!nv) return false
-  return nv.vai_tro.some((r) => ['admin', 'sales', 'sales_manager'].includes(r))
+  return nv.vai_tro.some((r) => (VAI_TRO_VAO_SALES as readonly string[]).includes(r))
 }
 
 /**
@@ -187,6 +196,42 @@ export const layNhanVien = cache(async (): Promise<NhanVien | null> => {
   const user = await requireStaff()
   return layDongStaff(chuanHoaEmail(user.email))
 })
+
+/**
+ * Hồ sơ nhân viên đọc qua CỔNG NỀN TẢNG (requireNhanSu) thay vì cổng CS.
+ *
+ * Vì sao cần bản này: layNhanVien() gọi requireStaff() (cổng CS) — người KHÔNG
+ * thuộc CS (Sales/Marketing thuần) bị đá ra /login?loi=ngoai_cs. Nhưng họ vẫn là
+ * nhân sự hợp lệ của NỀN TẢNG. TopNav + trang gốc + module ngoài-CS phải đọc hồ sơ
+ * qua đây để KHÔNG đá nhầm họ. Enforcement khu CS vẫn dùng requireStaff/laQuanLy.
+ */
+export const layNhanVienNenTang = cache(async (): Promise<NhanVien | null> => {
+  const user = await requireNhanSu()
+  return layDongStaff(chuanHoaEmail(user.email))
+})
+
+/**
+ * Bộ cờ quyền tính qua CỔNG NỀN TẢNG — an toàn cho MỌI nhân sự (không đá non-CS).
+ * TopNav và trang gốc phải dùng bộ này thay vì gọi lẻ laAdmin/laQuanLy/coTheVaoCS…
+ * (các helper đó đi qua requireStaff nên đá người ngoài CS ngay khi render nav).
+ */
+export async function quyenNenTang(): Promise<{
+  admin: boolean
+  quanLy: boolean
+  chiKyThuat: boolean
+  vaoCS: boolean
+  vaoSales: boolean
+}> {
+  const nv = await layNhanVienNenTang()
+  const vt = nv?.vai_tro ?? []
+  return {
+    admin: laQuyenAdmin(vt),
+    quanLy: coQuyenQuanLy(vt),
+    chiKyThuat: laChiKyThuat(vt),
+    vaoCS: vt.some((r) => (VAI_TRO_VAO_APP as readonly string[]).includes(r)),
+    vaoSales: vt.some((r) => (VAI_TRO_VAO_SALES as readonly string[]).includes(r)),
+  }
+}
 
 /** Dùng cho cả chặn ở server LẪN ẩn nút trên giao diện. */
 export async function laAdmin(): Promise<boolean> {
