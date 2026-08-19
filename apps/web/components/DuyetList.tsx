@@ -31,7 +31,9 @@ export function DuyetList({ items }: { items: YeuCauThayDoi[] }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
+  // kind quyết định màu: thành công toàn bộ (emerald), có phần lỗi (amber),
+  // thất bại toàn bộ (red) — để người dùng nhận ra kết quả mà không cần đọc số.
+  const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'partial' | 'fail' } | null>(null)
   const [chon, setChon] = useState<Set<string>>(new Set())
 
   // Danh sách items đổi sau mỗi lần duyệt (đơn lẻ hoặc hàng loạt), có thể còn id
@@ -60,8 +62,15 @@ export function DuyetList({ items }: { items: YeuCauThayDoi[] }) {
     if (!window.confirm(`Duyệt ${ids.length} yêu cầu đã chọn? Thao tác này áp thay đổi thật lên dữ liệu.`)) return
     setBusy('hangloat'); setErr(null); setMsg(null)
     const r = await duyetNhieuYeuCau(ids)
-    setBusy(null); setChon(new Set())
-    setMsg(`Đã duyệt ${r.da_duyet}/${ids.length} yêu cầu.`)
+    setBusy(null)
+    // Không xoá lựa chọn ở đây: duyetNhieuYeuCau chỉ trả số lượng + thông điệp lỗi,
+    // không trả id nào lỗi, nên không thể biết chính xác mục nào vẫn còn "cho_duyet".
+    // Cứ để nguyên `chon` — mục đã duyệt xong sẽ tự rớt khỏi `items` sau router.refresh(),
+    // và chonHopLe (useMemo phía trên) tự lọc theo items mới nên mục lỗi vẫn giữ được chọn
+    // để bấm duyệt lại ngay, mục đã xong thì không còn trong danh sách để mà chọn nhầm.
+    const kind: 'ok' | 'partial' | 'fail' =
+      r.loi.length === 0 ? 'ok' : r.da_duyet === 0 ? 'fail' : 'partial'
+    setMsg({ text: `Đã duyệt ${r.da_duyet}/${ids.length} yêu cầu.`, kind })
     if (r.loi.length) setErr(`${r.loi.length} yêu cầu lỗi: ${r.loi.join(' · ')}`)
     router.refresh()
   }
@@ -70,7 +79,13 @@ export function DuyetList({ items }: { items: YeuCauThayDoi[] }) {
   return (
     <div className="space-y-2">
       {err && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
-      {msg && <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">{msg}</p>}
+      {msg && (
+        <p className={
+          'text-sm rounded-lg px-3 py-2 ' +
+          (msg.kind === 'ok' ? 'text-emerald-700 bg-emerald-50'
+            : msg.kind === 'fail' ? 'text-red-600 bg-red-50' : 'text-amber-800 bg-amber-50')
+        }>{msg.text}</p>
+      )}
       {items.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap text-sm">
           <label className="flex items-center gap-1.5 text-slate-600">
