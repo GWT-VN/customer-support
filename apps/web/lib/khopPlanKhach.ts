@@ -46,3 +46,58 @@ export function docTenPlan(ten: string | null | undefined): ManhMoiPlan {
   const s = boDau(raw)
   return { tinh: docTinh(s), boMay: docBoMay(s), ngayLap: docNgay(raw) }
 }
+
+export type KhachUngVien = {
+  id: string; ten: string; sdt: string | null
+  tinh: string | null
+  /** Ngày lắp SỚM NHẤT trong installed_base của khách — mốc so với ngày trong tên plan. */
+  ngayLapSomNhat: string | null
+}
+export type PlanCanKhop = { source_customer_name: string | null; source_phone: string | null; bo_may: string | null }
+export type GoiYKhach = { id: string; ten: string; sdt: string | null; diem: number; lyDo: string[] }
+
+/** 9 số cuối để so SĐT (bỏ mã vùng/số 0 đầu, mọi ký tự không phải số). */
+export function sdtChuan(s: string | null | undefined): string {
+  const d = (s ?? '').replace(/\D/g, '')
+  return d.length >= 9 ? d.slice(-9) : d
+}
+
+const LECH_NGAY_TOI_DA = 30          // quá 30 ngày thì coi như không liên quan
+const NGAY_RAT_GAN = 7               // trong 7 ngày thì gần như chắc chắn
+
+function soNgayLech(a: string, b: string): number {
+  return Math.round(Math.abs(Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000)
+}
+
+/**
+ * Xếp hạng khách khớp với 1 plan chưa map.
+ *
+ * Thang điểm: SĐT trùng (100) áp đảo mọi thứ vì đó là bằng chứng cứng. Còn lại
+ * cộng dồn tỉnh (20) + ngày lắp gần (40 nếu ≤7 ngày, 25 nếu ≤30 ngày). KHÔNG
+ * chấm theo tên vì tên plan là chuỗi thư mục ("Anh Ng") trùng với hàng chục khách.
+ * Điểm 0 thì không trả về — thà không gợi ý còn hơn để CS gán nhầm khách.
+ */
+export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): GoiYKhach[] {
+  const manhMoi = docTenPlan(plan.source_customer_name)
+  const sdtPlan = sdtChuan(plan.source_phone)
+  const out: GoiYKhach[] = []
+
+  for (const k of dsKhach) {
+    let diem = 0
+    const lyDo: string[] = []
+
+    if (sdtPlan && sdtChuan(k.sdt) === sdtPlan) { diem += 100; lyDo.push('trùng SĐT') }
+    if (manhMoi.tinh && k.tinh && boDau(k.tinh) === boDau(manhMoi.tinh)) {
+      diem += 20; lyDo.push(`cùng tỉnh ${manhMoi.tinh}`)
+    }
+    if (manhMoi.ngayLap && k.ngayLapSomNhat) {
+      const lech = soNgayLech(manhMoi.ngayLap, k.ngayLapSomNhat)
+      if (lech <= NGAY_RAT_GAN) { diem += 40; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
+      else if (lech <= LECH_NGAY_TOI_DA) { diem += 25; lyDo.push(`ngày lắp lệch ${lech} ngày`) }
+    }
+
+    if (diem > 0) out.push({ id: k.id, ten: k.ten, sdt: k.sdt, diem, lyDo })
+  }
+
+  return out.sort((a, b) => b.diem - a.diem || a.ten.localeCompare(b.ten, 'vi')).slice(0, toiDa)
+}
