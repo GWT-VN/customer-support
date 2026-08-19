@@ -1,7 +1,19 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales, dataClient, requireNhanSu } from '@/lib/supabase'
+import {
+  createSalesOrder,
+  updateSalesOrder,
+  deleteSalesOrder,
+  searchCustomersForPicker,
+  findCustomerByPhone,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+} from './_db'
+import type { NewOrderInput, CustomerInput } from './_types'
 
 /** Gác khu Sales: nền tảng (mọi nhân sự) + phải có vai trò Sales. */
 async function chanSales() {
@@ -26,71 +38,120 @@ export type DonRow = {
   is_app: boolean
 }
 
-/** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) theo order_code. */
-export async function danhSachDon(q = ''): Promise<DonRow[]> {
-  await chanSales()
+/** Đơn TẶNG (DON_TANG) từ customer_purchases, gộp theo order_code. */
+async function donTang(s: string): Promise<DonRow[]> {
   const db = dataClient()
-  const s = sach(q)
-
-  let mq = db
-    .from('sales_order_lines')
-    .select('order_code, order_date, source_tab, customer_name, province, fulfillment_status, payment_status, amount_vat')
-    .order('order_date', { ascending: false, nullsFirst: false })
-    .limit(5000)
-  if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
-  const { data: lines, error } = await mq
-  if (error) throw error
-
+  const { data } = await db
+    .from('customer_purchases')
+    .select('order_code, order_date, customer_code, quantity')
+    .eq('source_tab', 'DON_TANG')
+    .limit(2000)
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  if (!rows.length) return []
+  const codes = [...new Set(rows.map((r) => r.customer_code as string).filter(Boolean))]
+  const nameByCode = new Map<string, string>()
+  if (codes.length) {
+    const { data: custs } = await db.from('customers').select('customer_code, name').in('customer_code', codes)
+    for (const c of (custs ?? []) as Array<Record<string, unknown>>) nameByCode.set(c.customer_code as string, (c.name as string) ?? '')
+  }
   const map = new Map<string, DonRow>()
-  for (const r of (lines ?? []) as Array<Record<string, unknown>>) {
+  for (const r of rows) {
     const key = (r.order_code as string) || '(không mã)'
-    const amt = Number(r.amount_vat) || 0
     const cur = map.get(key)
     if (!cur) {
       map.set(key, {
         order_code: key,
         order_date: (r.order_date as string) ?? null,
-        source_tab: (r.source_tab as string) ?? null,
-        customer_name: (r.customer_name as string) ?? null,
-        province: (r.province as string) ?? null,
-        fulfillment_status: (r.fulfillment_status as string) ?? null,
-        payment_status: (r.payment_status as string) ?? null,
+        source_tab: 'DON_TANG',
+        customer_name: r.customer_code ? nameByCode.get(r.customer_code as string) ?? null : null,
+        province: null,
+        fulfillment_status: null,
+        payment_status: null,
         line_count: 1,
-        total_vat: amt,
+        total_vat: 0,
         is_app: false,
       })
-    } else {
-      cur.line_count += 1
-      cur.total_vat += amt
+    } else cur.line_count += 1
+  }
+  const sl = s.toLowerCase()
+  const all = [...map.values()]
+  return s ? all.filter((g) => g.order_code.toLowerCase().includes(sl) || (g.customer_name ?? '').toLowerCase().includes(sl)) : all
+}
+
+/** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng, lọc theo tab. */
+export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
+  await chanSales()
+  const db = dataClient()
+  const s = sach(q)
+  const onlyTang = tab === 'DON_TANG'
+  const map = new Map<string, DonRow>()
+
+  if (!onlyTang) {
+    let mq = db
+      .from('sales_order_lines')
+      .select('order_code, order_date, source_tab, customer_name, province, fulfillment_status, payment_status, amount_vat')
+      .order('order_date', { ascending: false, nullsFirst: false })
+      .limit(5000)
+    if (tab) mq = mq.eq('source_tab', tab)
+    if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
+    const { data: lines, error } = await mq
+    if (error) throw error
+    for (const r of (lines ?? []) as Array<Record<string, unknown>>) {
+      const key = (r.order_code as string) || '(không mã)'
+      const amt = Number(r.amount_vat) || 0
+      const cur = map.get(key)
+      if (!cur) {
+        map.set(key, {
+          order_code: key,
+          order_date: (r.order_date as string) ?? null,
+          source_tab: (r.source_tab as string) ?? null,
+          customer_name: (r.customer_name as string) ?? null,
+          province: (r.province as string) ?? null,
+          fulfillment_status: (r.fulfillment_status as string) ?? null,
+          payment_status: (r.payment_status as string) ?? null,
+          line_count: 1,
+          total_vat: amt,
+          is_app: false,
+        })
+      } else {
+        cur.line_count += 1
+        cur.total_vat += amt
+      }
+    }
+
+    let aq = db
+      .from('sales_orders')
+      .select('order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
+      .order('order_date', { ascending: false, nullsFirst: false })
+      .limit(2000)
+    if (tab) aq = aq.eq('source_tab', tab)
+    const { data: apps } = await aq
+    const sl = s.toLowerCase()
+    for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
+      const code = o.order_code as string
+      if (s && !(code.toLowerCase().includes(sl) || String(o.customer_name ?? '').toLowerCase().includes(sl))) continue
+      map.set(code, {
+        order_code: code,
+        order_date: (o.order_date as string) ?? null,
+        source_tab: (o.source_tab as string) ?? null,
+        customer_name: (o.customer_name as string) ?? null,
+        province: (o.province as string) ?? null,
+        fulfillment_status: (o.status as string) ?? null,
+        payment_status: (o.payment_status as string) ?? null,
+        line_count: 0,
+        total_vat: Number(o.total_vat) || 0,
+        is_app: true,
+      })
     }
   }
 
-  const { data: apps } = await db
-    .from('sales_orders')
-    .select('order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
-    .order('order_date', { ascending: false, nullsFirst: false })
-    .limit(2000)
-  const sl = s.toLowerCase()
-  for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
-    const code = o.order_code as string
-    if (s && !(code.toLowerCase().includes(sl) || String(o.customer_name ?? '').toLowerCase().includes(sl))) continue
-    map.set(code, {
-      order_code: code,
-      order_date: (o.order_date as string) ?? null,
-      source_tab: (o.source_tab as string) ?? null,
-      customer_name: (o.customer_name as string) ?? null,
-      province: (o.province as string) ?? null,
-      fulfillment_status: (o.status as string) ?? null,
-      payment_status: (o.payment_status as string) ?? null,
-      line_count: 0,
-      total_vat: Number(o.total_vat) || 0,
-      is_app: true,
-    })
+  if (!tab || onlyTang) {
+    for (const g of await donTang(s)) map.set(g.order_code, g)
   }
 
   return [...map.values()]
     .sort((a, b) => (b.order_date ?? '').localeCompare(a.order_date ?? ''))
-    .slice(0, 200)
+    .slice(0, 300)
 }
 
 export type KhachRow = {
@@ -432,5 +493,106 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
     machines,
     maintenance,
     tickets,
+  }
+}
+
+// ═══════════════════════ GHI: đơn + khách (app-owned) ═══════════════════════
+type Kq<T = object> = ({ ok: true } & T) | { ok: false; error: string }
+
+async function emailHienTai(): Promise<string | null> {
+  return (await requireNhanSu()).email ?? null
+}
+
+function validateOrder(input: NewOrderInput): string | null {
+  if (!input.items?.length) return 'Chưa thêm sản phẩm nào.'
+  if (input.items.some((i) => !i.internal_code)) return 'Có dòng chưa chọn sản phẩm.'
+  if (!input.order_date) return 'Thiếu ngày đơn.'
+  if (!input.customer_code && !input.phone?.trim() && !input.customer_name?.trim())
+    return 'Chọn khách cũ hoặc nhập tên/SĐT khách mới.'
+  return null
+}
+
+export async function timKhachChoDon(q: string) {
+  await chanSales()
+  if (!q.trim()) return []
+  return searchCustomersForPicker(q)
+}
+
+export async function kiemTraSdt(phone: string) {
+  await chanSales()
+  if (!phone.trim()) return null
+  return findCustomerByPhone(phone)
+}
+
+export async function taoDon(input: NewOrderInput): Promise<Kq<{ order_code: string }>> {
+  await chanSales()
+  const err = validateOrder(input)
+  if (err) return { ok: false, error: err }
+  try {
+    const res = await createSalesOrder(input, await emailHienTai())
+    revalidatePath('/sales')
+    return { ok: true, order_code: res.order_code }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export async function suaDon(orderCode: string, input: NewOrderInput): Promise<Kq<{ order_code: string }>> {
+  await chanSales()
+  const err = validateOrder(input)
+  if (err) return { ok: false, error: err }
+  try {
+    const res = await updateSalesOrder(orderCode, input)
+    revalidatePath('/sales')
+    revalidatePath(`/sales/don/${orderCode}`)
+    return { ok: true, order_code: res.order_code }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export async function xoaDon(orderCode: string): Promise<Kq> {
+  await chanSales()
+  try {
+    await deleteSalesOrder(orderCode)
+    revalidatePath('/sales')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export async function taoKhach(input: CustomerInput): Promise<Kq<{ customer_code: string }>> {
+  await chanSales()
+  if (!input.name?.trim() && !input.phone?.trim()) return { ok: false, error: 'Cần ít nhất Tên hoặc SĐT.' }
+  try {
+    const res = await createCustomer(input)
+    revalidatePath('/sales/khach')
+    return { ok: true, customer_code: res.customer_code }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export async function suaKhach(code: string, input: CustomerInput): Promise<Kq<{ customer_code: string }>> {
+  await chanSales()
+  try {
+    await updateCustomer(code, input)
+    revalidatePath('/sales/khach')
+    revalidatePath(`/sales/khach/${code}`)
+    return { ok: true, customer_code: code }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export async function xoaKhach(code: string): Promise<Kq> {
+  await chanSales()
+  try {
+    await deleteCustomer(code)
+    revalidatePath('/sales/khach')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }

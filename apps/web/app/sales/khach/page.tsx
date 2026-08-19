@@ -21,9 +21,12 @@ export default async function SalesKhachPage({ searchParams }: { searchParams: P
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-[1100px] space-y-4 p-4 sm:p-6">
-        <header>
-          <h1 className="text-xl font-semibold text-slate-900">Khách hàng</h1>
-          <p className="text-sm text-slate-500">{rows.length} khách gần nhất</p>
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Khách hàng</h1>
+            <p className="text-sm text-slate-500">{rows.length} khách · <span className="font-mono">KH…</span> từ Sheet · <span className="font-mono">KA…</span> tạo trên app</p>
+          </div>
+          <Link href="/sales/khach/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Thêm khách</Link>
         </header>
 
         <form className="flex gap-2">

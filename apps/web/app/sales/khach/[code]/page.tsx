@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { chiTietKhach } from '../../actions'
+import { isAppCustomer } from '../../_db'
+import { CustomerActions } from '../../CustomerActions'
 import { Field, StatusBadge, TabBadge, fmtDate, fmtPhone, fmtQty } from '../../_ui'
 
 export const metadata = { title: 'Hồ sơ khách · GWT Sales' }
@@ -40,11 +42,18 @@ export default async function ChiTietKhachPage({ params }: { params: Promise<{ c
             <h1 className="text-2xl font-semibold text-slate-900">{c.name || '(chưa có tên)'}</h1>
             <p className="mt-1 font-mono text-xs text-slate-400">{c.customer_code}</p>
           </div>
-          {daNoiCS ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">● Đã nối hồ sơ CS</span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200">○ Chưa nối CS</span>
-          )}
+          <div className="flex flex-col items-end gap-2">
+            {daNoiCS ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">● Đã nối hồ sơ CS</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200">○ Chưa nối CS</span>
+            )}
+            {isAppCustomer(c.customer_code) ? (
+              <CustomerActions customerCode={c.customer_code} />
+            ) : (
+              <span className="text-xs text-slate-400">Khách từ Sheet — sửa ở Google Sheet</span>
+            )}
+          </div>
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
