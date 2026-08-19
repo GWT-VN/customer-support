@@ -26,6 +26,7 @@ const laNhom = (m: MucTrang): m is Nhom => 'trang' in m
 // Trang chi tiết -> mục cha nào sáng (không map bằng tiền tố URL bừa).
 const CHA: ReadonlyArray<readonly [string, string]> = [
   ['/may/', '/'], ['/ticket/', '/ticket'], ['/nhom-loi/', '/nhom-loi'], ['/khach/', '/khach-hang'],
+  ['/sales/don/', '/sales'], ['/sales/khach/', '/sales/khach'],
 ]
 function khopHref(pathname: string, href: string): boolean {
   if (pathname === href) return true
@@ -36,14 +37,15 @@ function khopHref(pathname: string, href: string): boolean {
 const ICON = {
   check: <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   headset: <path d="M4 13a8 8 0 0 1 16 0M4 13v4a2 2 0 0 0 2 2h1v-6H6a2 2 0 0 0-2 2Zm16 0v4a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2Z" />,
+  cart: <path d="M2.5 3.5h2l2.2 11a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L20 7H6M9 20.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />,
 } as const
 function Ic({ name, cls = 'w-4 h-4' }: { name: keyof typeof ICON; cls?: string }) {
   return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">{ICON[name]}</svg>
 }
 
 export function TopNavClient({
-  laAdmin, laQuanLy, chiKyThuat, coTheVaoCS, email,
-}: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat: boolean; coTheVaoCS: boolean; email: string | null }) {
+  laAdmin, laQuanLy, chiKyThuat, coTheVaoCS, coTheVaoSales, email,
+}: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat: boolean; coTheVaoCS: boolean; coTheVaoSales: boolean; email: string | null }) {
   const pathname = usePathname()
   const [moOpen, setMoOpen] = useState<string | null>(null) // 'launch' | 'gear' | 'g<idx>' | null
 
@@ -78,8 +80,26 @@ export function TopNavClient({
       ]
   const cskh: Module = { key: 'cskh', nhan: 'CSKH', mau: '#b5642a', href: chiKyThuat ? '/ky-thuat/cua-toi' : '/', icon: 'headset', trang: cskhTrang }
 
-  const MODULES: Module[] = [viec, ...(coTheVaoCS ? [cskh] : [])]
-  const moduleActive = pathname.startsWith('/work') ? 'viec' : (coTheVaoCS ? 'cskh' : 'viec')
+  const sales: Module = {
+    key: 'sales', nhan: 'Sales', mau: '#2f7d8a', href: '/sales', icon: 'cart',
+    trang: [
+      { nhan: 'Đơn hàng', href: '/sales' },
+      { nhan: 'Khách hàng', href: '/sales/khach' },
+      { nhan: 'Báo giá', href: '/sales', soon: true },
+      { nhan: 'Hợp đồng', href: '/sales', soon: true },
+      { nhan: 'Kênh / đối tác', href: '/sales', soon: true },
+      { nhan: 'Doanh số', href: '/sales', soon: true },
+    ],
+  }
+
+  const MODULES: Module[] = [viec, ...(coTheVaoCS ? [cskh] : []), ...(coTheVaoSales ? [sales] : [])]
+  const moduleActive = pathname.startsWith('/work')
+    ? 'viec'
+    : pathname.startsWith('/sales')
+      ? 'sales'
+      : coTheVaoCS
+        ? 'cskh'
+        : 'viec'
   const mod = MODULES.find((m) => m.key === moduleActive) ?? viec
 
   const gearItems: Trang[] = [
@@ -94,7 +114,7 @@ export function TopNavClient({
   const APPS: App[] = [
     { nhan: 'Việc', mau: '#0e8c9a', href: '/work', live: true, icon: 'check' },
     { nhan: 'CSKH', mau: '#b5642a', href: '/', live: coTheVaoCS, icon: 'headset' },
-    { nhan: 'Sales', mau: '#2f7d8a', live: false }, { nhan: 'Kho', mau: '#5560c9', live: false },
+    { nhan: 'Sales', mau: '#2f7d8a', href: '/sales', live: coTheVaoSales, icon: 'cart' }, { nhan: 'Kho', mau: '#5560c9', live: false },
     { nhan: 'Nhân sự', mau: '#b0518f', live: false }, { nhan: 'Kế toán', mau: '#3f8a6a', live: false },
     { nhan: 'Marketing', mau: '#8a52b8', live: false },
   ]

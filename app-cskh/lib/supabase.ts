@@ -170,6 +170,13 @@ export async function coTheVaoCS(): Promise<boolean> {
   return nv.vai_tro.some((r) => (VAI_TRO_VAO_APP as readonly string[]).includes(r))
 }
 
+/** Người đang đăng nhập có vào được KHU SALES không (admin|sales|sales_manager). */
+export async function coTheVaoSales(): Promise<boolean> {
+  const nv = await layNhanVien()
+  if (!nv) return false
+  return nv.vai_tro.some((r) => ['admin', 'sales', 'sales_manager'].includes(r))
+}
+
 /**
  * Hồ sơ nhân viên của người đang đăng nhập.
  *
