@@ -176,3 +176,49 @@ export async function themBinhLuan(taskId: number, body: string): Promise<void> 
   await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
   lamMoi()
 }
+
+// ── Việc tự sinh từ ERP ─────────────────────────────────────────────────────
+export type LuatTuSinh = {
+  key: string
+  name: string
+  mo_ta: string | null
+  nguon: string
+  active: boolean
+  priority: number
+  team_key: string | null
+  han_ngay: number
+  max_moi_lan: number
+  last_run_at: string | null
+  last_created: number
+  nguoi_nhan: string | null
+  nguoi_nhan_ten: string | null
+}
+
+export type ManTuSinh = {
+  luat: LuatTuSinh[]
+  la_quan_ly: boolean
+  nhan_su: { id: string; ten: string }[]
+  gan_day: (ViecTeamRow & { origin_ref: string | null; created_at: string })[]
+}
+
+export async function manTuSinh(): Promise<ManTuSinh> {
+  return goi<ManTuSinh>('work_luat_tu_sinh', {})
+}
+
+/** Chạy bộ quét ngay. Chỉ cấp quản lý — RPC tự chặn, đây chỉ là đường gọi. */
+export async function chayTuSinh(): Promise<{ luat: string; da_tao: number }[]> {
+  const kq = await goi<{ luat: string; da_tao: number }[]>('work_chay_tu_sinh', {})
+  lamMoi()
+  revalidatePath('/work/tu-sinh')
+  return kq ?? []
+}
+
+export async function batTatLuat(key: string, active: boolean): Promise<void> {
+  await goi<void>('work_bat_tat_luat', { p_key: key, p_active: active })
+  revalidatePath('/work/tu-sinh')
+}
+
+export async function doiNguoiNhan(key: string, staffId: string | null): Promise<void> {
+  await goi<void>('work_doi_nguoi_nhan', { p_key: key, p_staff_id: staffId })
+  revalidatePath('/work/tu-sinh')
+}
