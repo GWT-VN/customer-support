@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ganKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
 import { sinhLichBaoTri, vungTheoTinh, macDinhTheoBoMay, type Vung } from '@/lib/lichBaoTri'
+import { tinCayThap } from '@/lib/khopPlanKhach'
 import { KhachPicker } from '@/components/KhachPicker'
 import { vnDate } from '@/components/Badge'
 
@@ -149,13 +150,25 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                   <div className="flex items-center gap-2 flex-wrap">
                     {p.goi_y.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {p.goi_y.map((g) => (
-                          <button key={g.id} disabled={busy === p.id} onClick={() => gan(p.id, g.id)}
-                            className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm disabled:opacity-50 text-left">
-                            Gán: {g.ten}{g.sdt ? ` (${g.sdt})` : ''}
-                            <span className="block text-[10px] font-normal opacity-80">{g.lyDo.join(' · ')}</span>
-                          </button>
-                        ))}
+                        {p.goi_y.map((g) => {
+                          // Gợi ý chỉ dựa trên 1 tín hiệu mềm duy nhất (cùng tỉnh, hoặc ngày lắp
+                          // lệch xa) trông giống hệt gợi ý trùng SĐT nếu vẽ cùng màu emerald đặc —
+                          // CS dễ tưởng "chắc chắn" rồi gán nhầm khách. Đổi màu + chữ để phân biệt
+                          // rõ, thay vì ẩn hẳn (vẫn còn giá trị hơn phải mò tay trong 400 khách).
+                          const yeu = tinCayThap(g.diem)
+                          return (
+                            <button key={g.id} disabled={busy === p.id} onClick={() => gan(p.id, g.id)}
+                              className={
+                                'rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 text-left ' +
+                                (yeu ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-emerald-600 text-white')
+                              }>
+                              {yeu ? 'Có thể là: ' : 'Gán: '}{g.ten}{g.sdt ? ` (${g.sdt})` : ''}
+                              <span className={'block text-[10px] font-normal ' + (yeu ? 'text-amber-800' : 'opacity-80')}>
+                                {yeu ? 'gợi ý yếu, kiểm tra kỹ trước khi gán — ' : ''}{g.lyDo.join(' · ')}
+                              </span>
+                            </button>
+                          )
+                        })}
                       </div>
                     ) : (
                       <span className="text-xs text-amber-700">chưa đoán được khách — bấm &quot;Chọn khách khác&quot;</span>

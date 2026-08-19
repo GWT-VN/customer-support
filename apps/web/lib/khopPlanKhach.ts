@@ -116,3 +116,22 @@ export function xepGoiY(plan: PlanCanKhop, dsKhach: KhachUngVien[], toiDa = 3): 
 
   return out.sort((a, b) => b.diem - a.diem || a.ten.localeCompare(b.ten, 'vi')).slice(0, toiDa)
 }
+
+/**
+ * Ngưỡng phân biệt "gợi ý đáng tin" và "gợi ý yếu". Điểm sàn không-0 hiện có
+ * là 20 (chỉ cùng tỉnh) hoặc 25 (chỉ ngày lắp lệch 8-30 ngày) — MỘT tín hiệu
+ * mềm duy nhất, giữa hàng chục khách cùng tỉnh thì độ tin cậy thật sự rất thấp.
+ * UI trước đây vẽ mọi gợi ý (kể cả loại này) giống hệt gợi ý trùng SĐT (100
+ * điểm) -> CS dễ tưởng "chắc chắn" rồi gán nhầm, phá đúng nguyên tắc "KHÔNG
+ * đoán bừa" mà module này theo đuổi.
+ *
+ * Chọn mốc 40 = đúng điểm sàn của "ngày lắp lệch ≤7 ngày" (tín hiệu mạnh nhất
+ * sau trùng SĐT) -> mọi tổ hợp từ 2 tín hiệu trở lên (vd tỉnh 20 + ngày xa 25
+ * = 45) cũng rơi vào mức tin cậy cao, đúng tinh thần "2 manh mối cùng khớp thì
+ * đáng tin hơn 1 manh mối". Chỉ ĐÚNG 1 tín hiệu mềm (tỉnh HOẶC ngày xa, không
+ * phải cả hai) mới bị coi là yếu.
+ */
+export const NGUONG_TIN_CAY_THAP = 40
+export function tinCayThap(diem: number): boolean {
+  return diem > 0 && diem < NGUONG_TIN_CAY_THAP
+}

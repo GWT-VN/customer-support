@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { docTenPlan, xepGoiY, sdtChuan, type KhachUngVien } from './khopPlanKhach'
+import { docTenPlan, xepGoiY, sdtChuan, tinCayThap, NGUONG_TIN_CAY_THAP, type KhachUngVien } from './khopPlanKhach'
 
 describe('docTenPlan', () => {
   it('đọc đủ tỉnh + bộ máy + ngày lắp từ tên thư mục', () => {
@@ -86,6 +86,20 @@ describe('xepGoiY', () => {
     expect(r.length).toBe(1)
   })
 
+  it('gợi ý chỉ khớp tỉnh (1 tín hiệu mềm duy nhất) có điểm dưới ngưỡng tin cậy', () => {
+    // Không có ngày lắp trong tên plan -> chỉ còn tín hiệu "cùng tỉnh" (20 điểm).
+    const r = xepGoiY({ source_customer_name: 'X_Hà Tĩnh', source_phone: null, bo_may: null }, KHACH)
+    const k2 = r.find((x) => x.id === 'k2')
+    expect(k2?.diem).toBe(20)
+    expect(k2 && tinCayThap(k2.diem)).toBe(true)
+  })
+
+  it('gợi ý trùng SĐT hoặc đủ 2 tín hiệu mềm không bị coi là yếu', () => {
+    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null }, KHACH)
+    expect(r[0].diem).toBeGreaterThanOrEqual(100) // trùng SĐT (+ cộng thêm nếu khớp thêm tỉnh)
+    expect(tinCayThap(r[0].diem)).toBe(false)
+  })
+
   it('SĐT quá ngắn (< 9 số) không được tính là bằng chứng trùng khách, mặc dù dữ liệu giống hệt', () => {
     // Khách giả định có SĐT tạm "12345" (5 chữ số - không phải SĐT thực)
     const khachGiaDinh: KhachUngVien[] = [
@@ -95,5 +109,23 @@ describe('xepGoiY', () => {
     const r = xepGoiY({ source_customer_name: 'X', source_phone: '12345', bo_may: null }, khachGiaDinh)
     // Kết quả: không có gợi ý nào (0 điểm vì SĐT không hợp lệ + không có tỉnh/ngày)
     expect(r).toEqual([])
+  })
+})
+
+describe('tinCayThap', () => {
+  it('điểm 0 (không có gợi ý) không tính là "yếu" — nó là không có gợi ý gì cả', () => {
+    expect(tinCayThap(0)).toBe(false)
+  })
+
+  it('1 tín hiệu mềm duy nhất (chỉ tỉnh 20, hoặc chỉ ngày lệch xa 25) là yếu', () => {
+    expect(tinCayThap(20)).toBe(true)
+    expect(tinCayThap(25)).toBe(true)
+    expect(tinCayThap(NGUONG_TIN_CAY_THAP - 1)).toBe(true)
+  })
+
+  it('trùng SĐT, ngày lắp gần, hoặc đủ 2 tín hiệu mềm cộng dồn thì KHÔNG còn yếu', () => {
+    expect(tinCayThap(NGUONG_TIN_CAY_THAP)).toBe(false) // ngày lắp lệch ≤7 ngày (40)
+    expect(tinCayThap(45)).toBe(false) // tỉnh (20) + ngày lệch xa (25) cộng dồn
+    expect(tinCayThap(100)).toBe(false) // trùng SĐT
   })
 })
