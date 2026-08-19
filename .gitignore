@@ -85,3 +85,4 @@ migrate/_out/
 
 # Obsidian editor config
 .obsidian/
+/BACKLOG.md

@@ -74,16 +74,23 @@ const NHOM_KY_THUAT: Nhom = { ten: 'Kỹ thuật', muc: [
   { href: '/ky-thuat/cua-toi', nhan: 'Lịch của tôi' },
 ] }
 
-export function SidebarNav({ laAdmin, laQuanLy, chiKyThuat = false }: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat?: boolean }) {
+// Khu Công việc (Work) — hiện cho MỌI nhân sự, xuyên phòng ban.
+const NHOM_WORK: Nhom = { ten: 'Công việc', muc: [
+  { href: '/work', nhan: 'Việc của tôi' },
+] }
+
+export function SidebarNav({ laAdmin, laQuanLy, chiKyThuat = false, coTheVaoCS = true }: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat?: boolean; coTheVaoCS?: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  // Chỉ kỹ thuật -> menu rút gọn. Ngược lại: admin cũng là quản lý -> thấy cả 2 nhóm.
-  const nhom = chiKyThuat ? [NHOM_KY_THUAT] : [
+  // Khu Công việc luôn hiện. Nhóm CS chỉ hiện với người vào được khu CS (Sales thuần
+  // không thấy menu khách/ticket). Chỉ kỹ thuật -> menu rút gọn (chỉ lịch + việc).
+  const nhomCS = coTheVaoCS ? [
     ...NHOM,
     nhomBaoTri(laQuanLy),
     ...(laQuanLy ? [NHOM_QUANLY] : []),
     ...(laAdmin ? [NHOM_ADMIN] : []),
-  ]
+  ] : []
+  const nhom = chiKyThuat ? [NHOM_WORK, NHOM_KY_THUAT] : [NHOM_WORK, ...nhomCS]
   const dangMo = mucDangMo(pathname, nhom.flatMap((n) => n.muc.map((m) => m.href)))
 
   return (

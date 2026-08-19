@@ -2,8 +2,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThanhTaiKhoan } from "@/components/ThanhTaiKhoan";
-import { Sidebar } from "@/components/Sidebar";
+import { TopNav } from "@/components/TopNav";
 import { layNguoiDung } from "@/lib/supabase";
 import { CauHinhBang } from "@/bang";
 import { TEN_COT, NGHIA_SAP_XEP } from "@/lib/danhSach";
@@ -42,15 +41,8 @@ export default async function RootLayout({
           diện thì truyền đè vài khoá, xem bang/README.md.
         */}
         <CauHinhBang tenCot={TEN_COT} nghiaSapXep={NGHIA_SAP_XEP}>
-          <ThanhTaiKhoan />
-          {user ? (
-            <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-              <Sidebar />
-              <div className="flex-1 min-w-0">{children}</div>
-            </div>
-          ) : (
-            children
-          )}
+          {user ? <TopNav /> : null}
+          <div className="flex-1 min-w-0">{children}</div>
         </CauHinhBang>
       </body>
     </html>
