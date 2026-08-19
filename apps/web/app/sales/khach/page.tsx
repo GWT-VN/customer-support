@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { danhSachKhach } from '../actions'
@@ -56,8 +57,16 @@ export default async function SalesKhachPage({ searchParams }: { searchParams: P
                 ) : (
                   rows.map((c) => (
                     <tr key={c.customer_code} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-teal-700">{c.customer_code}</td>
-                      <td className="px-3 py-2.5 font-medium text-slate-800">{c.name || '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">
+                        <Link href={`/sales/khach/${encodeURIComponent(c.customer_code)}`} className="text-teal-700 hover:underline">
+                          {c.customer_code}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 font-medium text-slate-800">
+                        <Link href={`/sales/khach/${encodeURIComponent(c.customer_code)}`} className="hover:text-teal-700 hover:underline">
+                          {c.name || '—'}
+                        </Link>
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{c.phone || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-600">{c.province || '—'}</td>
                       <td className="px-3 py-2.5 text-right text-slate-700">{c.total_orders ?? 0}</td>
