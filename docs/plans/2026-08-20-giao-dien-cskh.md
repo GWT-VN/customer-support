@@ -714,12 +714,23 @@ export function sdtChuanMuc(raw: string | null | undefined): boolean {
 export function canhBaoSdt(raw: string | null | undefined): string | null {
   const goc = (raw ?? '').trim()
   if (goc === '') return null
-  if (sdtChuanMuc(goc)) return null
 
+  const so = goc.replace(/\D/g, '')
   const { chuan } = chuanHoaSdt(goc)
-  if (/^0\d{9}$/.test(chuan)) return `Nên ghi thành ${chuan} — SĐT chuẩn là 10 số bắt đầu bằng 0.`
-  return 'SĐT chuẩn là 10 số bắt đầu bằng 0 (vd 0900000001). Vẫn lưu được, nhưng nên sửa lại.'
+
+  if (sdtChuanMuc(goc)) {
+    // Quy đổi được về 10 số hợp lệ, nhưng người dùng gõ dạng khác (`84…`, thiếu
+    // số 0 đầu). CEO nói rõ không được bắt đầu bằng 84 hay 9 -> vẫn phải nhắc,
+    // kèm luôn dạng đúng để họ chỉ việc chép lại.
+    return so === chuan ? null : `Nên ghi thành ${chuan} — SĐT chuẩn là 10 số bắt đầu bằng 0.`
+  }
+  return 'SĐT chuẩn là 10 số bắt đầu bằng 0. Vẫn lưu được, nhưng nên sửa lại.'
 }
+```
+
+**Cạm bẫy đã vấp khi làm:** bản đầu chỉ `if (sdtChuanMuc(goc)) return null` — gõ `84…` sẽ chuẩn hoá thành 10 số hợp lệ nên **không cảnh báo gì**, trái ý CEO ("ko đc bắt đầu bằng 9 hay 84"). Phải so **chữ số thô người dùng gõ** với dạng chuẩn, khác nhau thì mới nhắc.
+
+```
 ```
 
 - [ ] **Step 4: Chạy test cho nó XANH**

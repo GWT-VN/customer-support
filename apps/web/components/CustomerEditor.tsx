@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addContact, deleteContact, updateCustomer, xoaKhach, type Contact, type Customer } from '@/app/actions'
 import { ChonTinh } from '@/components/ChonTinh'
+import { canhBaoSdt } from '@/lib/sdt'
 
 const ROLES: Record<string, string> = {
   owner: 'Chủ nhà',
@@ -71,6 +72,10 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
             <span className="text-sm text-slate-700">SĐT chính (khoá)</span>
             <input value={c.primary_phone ?? ''} onChange={(e) => setC({ ...c, primary_phone: e.target.value })}
               className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-slate-900" placeholder="0xxxxxxxxx" />
+            {/* Cảnh báo mềm — hồ sơ cũ dạng 84… vẫn lưu được, chỉ nhắc dạng chuẩn. */}
+            {canhBaoSdt(c.primary_phone) && (
+              <span className="block text-xs text-amber-600 mt-1">{canhBaoSdt(c.primary_phone)}</span>
+            )}
           </label>
           <label className="block">
             <span className="text-sm text-slate-700">Tỉnh/TP</span>
@@ -130,6 +135,9 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
             <span className="text-xs text-slate-600">SĐT</span>
             <input value={np.phone} onChange={(e) => setNp({ ...np, phone: e.target.value })}
               className="mt-1 w-36 rounded-lg border px-2 py-1.5 font-mono text-sm" placeholder="0xxxxxxxxx" />
+            {canhBaoSdt(np.phone) && (
+              <span className="block text-xs text-amber-600 mt-1 max-w-56">{canhBaoSdt(np.phone)}</span>
+            )}
           </label>
           <label className="block">
             <span className="text-xs text-slate-600">Tên</span>
