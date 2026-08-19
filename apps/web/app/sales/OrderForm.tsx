@@ -315,7 +315,7 @@ export function OrderForm({
             </select>
           </div>
           <div><label className={lbl}>Mã đơn đối tác</label><input className={inp} value={partnerCode} onChange={(e) => setPartnerCode(e.target.value)} placeholder="Shopee / HĐ…" /></div>
-          <div><label className={lbl}>Ngày lắp đặt <span className="font-normal text-slate-400">(không bắt buộc)</span></label><input type="date" className={inp} value={installDate} onChange={(e) => setInstallDate(e.target.value)} /></div>
+          <div><label className={lbl}>Ngày lắp đặt</label><input type="date" className={inp} value={installDate} onChange={(e) => setInstallDate(e.target.value)} /></div>
           <div><label className={lbl}>Tình trạng hàng</label><select className={inp} value={status} onChange={(e) => setStatus(e.target.value)}>{FULFILL_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div><label className={lbl}>Thanh toán</label><select className={inp} value={payment} onChange={(e) => setPayment(e.target.value)}>{PAYMENT_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div><label className={lbl}>Hình thức TT</label><select className={inp} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>{PAYMETHOD_OPTS.map((o) => <option key={o} value={o}>{o || '— chọn —'}</option>)}</select></div>
