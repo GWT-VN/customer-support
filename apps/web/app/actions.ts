@@ -9,6 +9,7 @@ import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
+import { kiemTraGop, moTaGop, type KhachGon } from '@/lib/gopKhach'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -282,7 +283,7 @@ export async function deleteContact(id: string, customerId: string) {
 
 // ── Đề xuất SỬA/XOÁ cần admin duyệt (yeu_cau_thay_doi) ─────────────────────
 type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts' | 'installed_base'
-type LoaiTD = 'sua' | 'xoa' | 'doi_serial'
+type LoaiTD = 'sua' | 'xoa' | 'doi_serial' | 'gop'
 const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
   cs_customers: ['full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone'],
   filter_replacement: ['filter_code', 'replaced_at', 'note'],
@@ -370,6 +371,15 @@ async function apDungThayDoi(
   loai: LoaiTD, payload?: Record<string, unknown> | null
 ) {
   if (doiTuong === 'installed_base') return apDungMay(db, banGhiId, loai, payload)
+  // Gộp khách: ban_ghi_id = bản GIỮ LẠI, payload.gop_id = bản bị gộp.
+  // Gọi RPC để 5 bảng tham chiếu + trộn trường + ẩn mềm nằm trong 1 transaction.
+  if (loai === 'gop') {
+    if (doiTuong !== 'cs_customers') return { error: { message: 'Chỉ gộp được hồ sơ khách.' } }
+    const gopId = payload?.gop_id
+    if (typeof gopId !== 'string' || !gopId) return { error: { message: 'Thiếu khách bị gộp.' } }
+    const { error } = await db.rpc('gop_khach', { p_giu: banGhiId, p_gop: gopId })
+    return { error: error ? { message: error.message } : null }
+  }
   if (loai === 'xoa') {
     // Khách: ẩn mềm (giữ máy/ticket). SĐT phụ + lịch thay lõi: xoá cứng (bảng lá).
     if (doiTuong === 'cs_customers') {
@@ -403,7 +413,9 @@ export async function guiYeuCauThayDoi(input: {
   const db = dataClient()
   // XOÁ thông tin khách phải qua ADMIN duyệt. Cấp quản lý (cs_manager) áp trực tiếp
   // các thay đổi KHÁC; riêng xoá khách của họ vẫn vào hàng chờ để admin duyệt.
-  const laXoaKhach = input.doi_tuong === 'cs_customers' && input.loai === 'xoa'
+  // XOÁ hoặc GỘP hồ sơ khách đều phải qua ADMIN duyệt: cả hai đều làm biến mất
+  // một hồ sơ khách khỏi danh sách, sai thì rất khó phát hiện.
+  const laXoaKhach = input.doi_tuong === 'cs_customers' && (input.loai === 'xoa' || input.loai === 'gop')
   const apTrucTiep = laXoaKhach ? await laAdmin() : await laQuanLy()
   if (apTrucTiep) {
     const { error } = await apDungThayDoi(db, input.doi_tuong, input.ban_ghi_id, input.loai, input.payload)
@@ -426,6 +438,42 @@ export async function guiYeuCauThayDoi(input: {
 export async function xoaKhach(id: string, lyDo?: string) {
   await requireStaff()
   return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'xoa', ly_do: lyDo })
+}
+
+/** Hồ sơ khách rút gọn + số lượng dữ liệu đính kèm — để cân nhắc chiều gộp. */
+export async function khachGon(id: string): Promise<KhachGon | null> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: k }, may, ticket, plan] = await Promise.all([
+    db.from('cs_customers').select('id, full_name, primary_phone, address').eq('id', id).maybeSingle(),
+    db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+  ])
+  if (!k) return null
+  const r = k as { id: string; full_name: string; primary_phone: string | null; address: string | null }
+  return {
+    ...r, so_may: may.count ?? 0, so_ticket: ticket.count ?? 0, so_plan: plan.count ?? 0,
+  }
+}
+
+/**
+ * Đề xuất GỘP 2 hồ sơ khách trùng. NV bấm -> vào hàng chờ; admin bấm -> áp ngay.
+ * `giuId` là bản giữ lại, `gopId` là bản bị gộp (sẽ bị ẩn mềm).
+ */
+export async function deXuatGopKhach(
+  giuId: string, gopId: string, lyDo?: string
+): Promise<{ ok: true; applied: boolean } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!giuId || !gopId) return { ok: false, error: 'Chọn đủ 2 khách.' }
+  const [giu, gop] = await Promise.all([khachGon(giuId), khachGon(gopId)])
+  if (!giu || !gop) return { ok: false, error: 'Không thấy một trong hai hồ sơ khách.' }
+  const kt = kiemTraGop(giu, gop)
+  if (!kt.ok) return { ok: false, error: kt.lyDo }
+  return guiYeuCauThayDoi({
+    doi_tuong: 'cs_customers', ban_ghi_id: giuId, loai: 'gop',
+    payload: { gop_id: gopId }, ly_do: lyDo?.trim() || moTaGop(giu, gop),
+  })
 }
 
 /** Xoá máy đã lắp -> trả serial về tồn kho (gỡ BH + lịch thay lõi). Qua admin duyệt. */
@@ -485,9 +533,11 @@ export async function duyetYeuCau(id: string) {
   if (e0) return { ok: false as const, error: e0.message }
   const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: LoaiTD; payload: Record<string, unknown> | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'cho_duyet') return { ok: false as const, error: 'Yêu cầu không tồn tại hoặc đã xử lý.' }
-  // Duyệt yêu cầu XOÁ thông tin khách chỉ dành cho admin (memory: xoá khách cần admin).
-  if (y.doi_tuong === 'cs_customers' && y.loai === 'xoa' && !(await laAdmin())) {
-    return { ok: false as const, error: 'Duyệt xoá thông tin khách cần quyền quản trị (admin).' }
+  // Duyệt XOÁ hoặc GỘP hồ sơ khách chỉ dành cho admin (memory: xoá/gộp khách cần admin).
+  // Không kiểm lại ở đây thì NV cấp quản lý (đã qua laQuanLy() phía trên) có thể
+  // tự duyệt yêu cầu gộp do chính mình gửi -> leo quyền ngay trên hàng chờ.
+  if (y.doi_tuong === 'cs_customers' && (y.loai === 'xoa' || y.loai === 'gop') && !(await laAdmin())) {
+    return { ok: false as const, error: 'Duyệt xoá/gộp thông tin khách cần quyền quản trị (admin).' }
   }
   const { error } = await apDungThayDoi(db, y.doi_tuong, y.ban_ghi_id, y.loai, y.payload)
   if (error) return { ok: false as const, error: error.message }
@@ -497,6 +547,26 @@ export async function duyetYeuCau(id: string) {
   revalidateThayDoi(y.doi_tuong, y.ban_ghi_id)
   revalidatePath('/duyet')
   return { ok: true as const }
+}
+
+/**
+ * Duyệt NHIỀU yêu cầu một lượt. Chạy TUẦN TỰ chứ không Promise.all: các yêu cầu
+ * có thể đụng cùng một hồ sơ khách (gộp A→B rồi gộp B→C), chạy song song sẽ
+ * giẫm chân nhau. Một yêu cầu hỏng không được chặn các yêu cầu còn lại.
+ * Quyền hạn (quản lý / admin theo loại) do duyetYeuCau tự kiểm cho từng mục,
+ * hàm này không nới quyền gì thêm.
+ */
+export async function duyetNhieuYeuCau(ids: string[]): Promise<{ ok: true; da_duyet: number; loi: string[] }> {
+  await requireStaff()
+  let daDuyet = 0
+  const loi: string[] = []
+  for (const id of ids) {
+    const r = await duyetYeuCau(id)
+    if (r.ok) daDuyet++
+    else loi.push(r.error)
+  }
+  revalidatePath('/duyet')
+  return { ok: true, da_duyet: daDuyet, loi }
 }
 
 /** Từ chối 1 yêu cầu (CHỈ ADMIN). */
