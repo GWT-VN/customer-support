@@ -32,11 +32,11 @@ describe('kiemTraGop', () => {
 
 describe('moTaGop', () => {
   it('nêu rõ cái gì chuyển đi và cái gì được lấp thêm', () => {
-    const giu = k({ id: 'a', full_name: 'Anh Ánh', primary_phone: '0326463653', so_may: 2 }) // pii-ok: invented test phone
-    const gop = k({ id: 'b', full_name: 'Anh Ánh/ Anh Ng', address: 'Số 55 Hải Thượng Lãn Ông' })
+    const giu = k({ id: 'a', full_name: 'Anh Long', primary_phone: '0900000001', so_may: 2 })
+    const gop = k({ id: 'b', full_name: 'Anh Long/ Anh Lâm', address: 'Số 12 Đường Lê Lợi' })
     const s = moTaGop(giu, gop)
-    expect(s).toContain('Anh Ánh/ Anh Ng')
-    expect(s).toContain('Anh Ánh')
+    expect(s).toContain('Anh Long/ Anh Lâm')
+    expect(s).toContain('Anh Long')
     expect(s).toContain('địa chỉ')
   })
 })

@@ -45,22 +45,22 @@ describe('docTenPlan', () => {
 })
 
 const KHACH: KhachUngVien[] = [
-  { id: 'k1', ten: 'Anh Ánh',  sdt: '0326463653', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2025-08-28' }, // pii-ok: test data
-  { id: 'k2', ten: 'Chị Bình', sdt: '0900000002', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2024-01-05' }, // pii-ok: test data
-  { id: 'k3', ten: 'Anh Cường', sdt: '0900000003', tinh: 'Hà Nội',  ngayLapSomNhat: '2025-08-25' }, // pii-ok: test data
+  { id: 'k1', ten: 'Anh Long',  sdt: '0900000001', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2025-08-28' },
+  { id: 'k2', ten: 'Chị Bình', sdt: '0900000002', tinh: 'Hà Tĩnh', ngayLapSomNhat: '2024-01-05' },
+  { id: 'k3', ten: 'Anh Cường', sdt: '0900000003', tinh: 'Hà Nội',  ngayLapSomNhat: '2025-08-25' },
 ]
 
 describe('sdtChuan', () => {
   it('lấy 9 số cuối, bỏ ký tự thừa và mã vùng', () => {
-    expect(sdtChuan('0326463653')).toBe('326463653') // pii-ok: test data
-    expect(sdtChuan('+84 326 463 653')).toBe('326463653') // pii-ok: test data
+    expect(sdtChuan('0900000001')).toBe('900000001')
+    expect(sdtChuan('+84 900 000 001')).toBe('900000001')
     expect(sdtChuan('')).toBe('')
   })
 })
 
 describe('xepGoiY', () => {
   it('SĐT trùng thì đứng đầu và luôn được gợi ý', () => {
-    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0326463653', bo_may: null }, KHACH) // pii-ok: test data
+    const r = xepGoiY({ source_customer_name: 'Chị Bình_Hà Tĩnh', source_phone: '0900000001', bo_may: null }, KHACH)
     expect(r[0].id).toBe('k1')
     expect(r[0].lyDo).toContain('trùng SĐT')
   })
