@@ -1,10 +1,10 @@
-import { laAdmin } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/supabase'
 import { listKhachChoDuyet } from '@/app/actions'
 import { ChonKieuLap } from '@/components/ChonKieuLap'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 
 export default async function DangKyBHPage() {
-  const [admin, choDuyet] = await Promise.all([laAdmin(), listKhachChoDuyet()])
+  const [quanLy, choDuyet] = await Promise.all([laQuanLy(), listKhachChoDuyet()])
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
@@ -16,9 +16,9 @@ export default async function DangKyBHPage() {
           <strong> 1 bộ combo</strong> (WH15A/WH30A…). Thông tin máy tự lấy từ kho serial;
           khách mới tạo được ngay nhưng <strong>chờ admin duyệt</strong>.
         </p>
-        <ChonKieuLap admin={admin} />
+        <ChonKieuLap />
 
-        {admin && (
+        {quanLy && (
           <section className="bg-white rounded-xl border p-5 max-w-2xl">
             <h2 className="font-medium text-slate-900 mb-3">Khách chờ duyệt ({choDuyet.length})</h2>
             <KhachChoDuyetList items={choDuyet} />

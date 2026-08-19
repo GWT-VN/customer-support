@@ -2286,8 +2286,10 @@ export async function linhKienCombo(combo: string): Promise<LinhKienCombo[]> {
 }
 
 /**
- * Lắp bộ combo cho 1 khách (CHỈ ADMIN). Gọi RPC nguyên tử lap_bo_combo:
- * sinh mã bộ mới + tạo mẹ (nhóm) và con (thiết bị) + kích hoạt BH TỪNG con.
+ * Lắp bộ combo cho 1 khách. Quyền NGANG với lắp máy lẻ (dangKyBaoHanh): mọi
+ * nhân viên CS làm được — lắp bộ chỉ là lắp nhiều máy một lượt, không phải
+ * thao tác nhạy cảm. Gọi RPC nguyên tử lap_bo_combo: sinh mã bộ mới + tạo mẹ
+ * (nhóm) và con (thiết bị) + kích hoạt BH TỪNG con.
  */
 export async function lapBoCombo(input: {
   combo: string
@@ -2297,7 +2299,6 @@ export async function lapBoCombo(input: {
   serials: { internal_code: string; serial: string }[]
 }): Promise<{ ok: true; ma_bo: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
   if (!(MA_COMBO as readonly string[]).includes(input.combo))
     return { ok: false, error: 'Combo không hợp lệ.' }
   if (!input.customer_id) return { ok: false, error: 'Chọn khách.' }
