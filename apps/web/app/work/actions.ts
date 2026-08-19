@@ -1,67 +1,178 @@
 'use server'
 
 /**
- * Server actions cho khu Work — gọi RPC public bọc schema `work`
- * (work_viec_cua_toi / work_tao_viec / work_doi_trang_thai).
+ * Server actions khu Work — gọi RPC public bọc schema `work` (work_*).
  *
- * Mọi action gọi requireNhanSu() trước (cổng nền tảng: mọi nhân sự hoạt động),
- * rồi dùng dataClient() (service_role, chỉ server). Email lấy từ session đã xác minh.
+ * Vì sao qua RPC: PostgREST chỉ phục vụ schema được expose (mặc định `public`),
+ * còn bảng `work.*` cố tình KHÔNG expose. RPC `security definer` là cửa duy nhất.
+ *
+ * Mọi action gọi requireNhanSu() trước (cổng nền tảng: mọi nhân sự đang hoạt động),
+ * rồi dùng dataClient() (service_role, chỉ chạy trên server). Email lấy từ session
+ * đã xác minh — KHÔNG bao giờ nhận email từ tham số client.
  */
 import { requireNhanSu, dataClient } from '@/lib/supabase'
 import { chuanHoaEmail } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
+export type NguoiLam = { staff_id: string; ten: string; email: string; role: string }
+
 export type ViecRow = {
   id: number
   ref: string
   title: string
+  description: string | null
   status: string
   priority: number
+  start_at: string | null
   due_at: string | null
   team_id: number | null
   team_name: string | null
   team_color: string | null
   my_role: string | null
   sub_n: number
+  assignees: NguoiLam[]
 }
 
+export type ViecTeamRow = Omit<ViecRow, 'description' | 'start_at' | 'my_role'> & {
+  creator_ten: string | null
+}
+
+export type NenTang = {
+  me: { id: string; ten: string; email: string; vai_tro: string[] } | null
+  teams: { id: number; key: string; name: string; color: string | null }[]
+  nhan_su: { id: string; ten: string; email: string }[]
+  projects: { id: number; name: string; team_id: number | null }[]
+}
+
+export type ChiTietViec = {
+  task: {
+    id: number; ref: string; title: string; description: string | null
+    status: string; priority: number; visibility: string
+    start_at: string | null; due_at: string | null; completed_at: string | null
+    team_id: number | null; parent_id: number | null; origin: string
+    team_name: string | null; team_color: string | null
+    creator_ten: string | null; created_at: string
+  }
+  assignees: NguoiLam[]
+  co_the_sua: boolean
+  comments: { id: number; body: string; ten: string | null; created_at: string }[]
+  activity: { id: number; verb: string; payload: Record<string, unknown> | null; ten: string | null; created_at: string }[]
+  subtasks: { id: number; ref: string; title: string; status: string }[]
+}
+
+/** Email của người đang đăng nhập — nguồn danh tính DUY NHẤT cho mọi RPC dưới đây. */
 async function emailHienTai(): Promise<string> {
   const u = await requireNhanSu()
   return chuanHoaEmail(u.email)
 }
 
-export async function vieCcuaToi(): Promise<ViecRow[]> {
+/** Gọi RPC + ném lỗi kèm thông điệp gốc từ Postgres (đã là tiếng Việt). */
+async function goi<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const email = await emailHienTai()
-  const { data, error } = await dataClient().rpc('work_viec_cua_toi', { p_email: email })
-  if (error) throw error
-  return (data ?? []) as ViecRow[]
+  const { data, error } = await dataClient().rpc(fn, { p_email: email, ...args })
+  if (error) throw new Error(error.message)
+  return data as T
+}
+
+// ── Đọc ─────────────────────────────────────────────────────────────────────
+export async function nenTang(): Promise<NenTang> {
+  return goi<NenTang>('work_nen_tang', {})
+}
+
+export async function vieCcuaToi(): Promise<ViecRow[]> {
+  return (await goi<ViecRow[]>('work_viec_cua_toi', {})) ?? []
+}
+
+export async function bangTeam(loc: {
+  team_id?: number | null
+  assignee?: string | null
+  status?: string | null
+  q?: string | null
+} = {}): Promise<ViecTeamRow[]> {
+  return (await goi<ViecTeamRow[]>('work_bang_team', {
+    p_team_id: loc.team_id ?? null,
+    p_assignee: loc.assignee ?? null,
+    p_status: loc.status ?? null,
+    p_q: loc.q ?? null,
+  })) ?? []
+}
+
+export async function chiTietViec(id: number): Promise<ChiTietViec> {
+  return goi<ChiTietViec>('work_chi_tiet_viec', { p_task_id: id })
+}
+
+// ── Ghi ─────────────────────────────────────────────────────────────────────
+function lamMoi() {
+  revalidatePath('/work')
+  revalidatePath('/work/team')
 }
 
 export async function taoViec(input: {
   title: string
+  description?: string | null
   priority?: number
   due?: string | null
+  start?: string | null
   team_id?: number | null
-}): Promise<void> {
-  const email = await emailHienTai()
-  const { error } = await dataClient().rpc('work_tao_viec', {
-    p_email: email,
+  parent_id?: number | null
+  assignees?: { staff_id: string; role: string }[]
+  visibility?: string
+}): Promise<{ id: number; ref: string }> {
+  const kq = await goi<{ id: number; ref: string }>('work_tao_viec', {
     p_title: input.title,
     p_priority: input.priority ?? 3,
     p_due: input.due ?? null,
     p_team_id: input.team_id ?? null,
+    p_description: input.description ?? null,
+    p_start: input.start ?? null,
+    p_parent_id: input.parent_id ?? null,
+    p_assignees: input.assignees?.length ? input.assignees : null,
+    p_visibility: input.visibility ?? 'team',
   })
-  if (error) throw error
-  revalidatePath('/work')
+  lamMoi()
+  return kq
 }
 
 export async function doiTrangThai(id: number, status: string): Promise<void> {
-  const email = await emailHienTai()
-  const { error } = await dataClient().rpc('work_doi_trang_thai', {
-    p_email: email,
+  await goi<void>('work_doi_trang_thai', { p_task_id: id, p_status: status })
+  lamMoi()
+}
+
+export async function suaViec(id: number, input: {
+  title?: string | null
+  description?: string | null
+  priority?: number | null
+  due?: string | null
+  team_id?: number | null
+  visibility?: string | null
+  xoa_due?: boolean
+  xoa_team?: boolean
+}): Promise<void> {
+  await goi<void>('work_sua_viec', {
     p_task_id: id,
-    p_status: status,
+    p_title: input.title ?? null,
+    p_description: input.description ?? null,
+    p_priority: input.priority ?? null,
+    p_due: input.due ?? null,
+    p_team_id: input.team_id ?? null,
+    p_visibility: input.visibility ?? null,
+    p_xoa_due: input.xoa_due ?? false,
+    p_xoa_team: input.xoa_team ?? false,
   })
-  if (error) throw error
-  revalidatePath('/work')
+  lamMoi()
+}
+
+export async function ganNguoi(taskId: number, staffId: string, role = 'doer'): Promise<void> {
+  await goi<void>('work_gan_nguoi', { p_task_id: taskId, p_staff_id: staffId, p_role: role })
+  lamMoi()
+}
+
+export async function boNguoi(taskId: number, staffId: string): Promise<void> {
+  await goi<void>('work_bo_nguoi', { p_task_id: taskId, p_staff_id: staffId })
+  lamMoi()
+}
+
+export async function themBinhLuan(taskId: number, body: string): Promise<void> {
+  await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
+  lamMoi()
 }

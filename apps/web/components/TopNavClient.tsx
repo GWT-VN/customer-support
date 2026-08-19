@@ -55,7 +55,7 @@ export function TopNavClient({
     key: 'viec', nhan: 'Việc', mau: '#0e8c9a', href: '/work', icon: 'check',
     trang: [
       { nhan: 'Việc của tôi', href: '/work' },
-      { nhan: 'Bảng team', href: '/work', soon: true },
+      { nhan: 'Bảng team', href: '/work/team' },
       { nhan: 'Lịch', href: '/work', soon: true },
       { nhan: 'Dự án', href: '/work', soon: true },
     ],
