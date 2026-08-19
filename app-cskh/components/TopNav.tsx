@@ -1,4 +1,4 @@
-import { coTheVaoCS, coTheVaoSales, laAdmin, laChiKyThuatVien, laQuanLy, layNguoiDung } from '@/lib/supabase'
+import { layNguoiDung, quyenNenTang } from '@/lib/supabase'
 import { TopNavClient } from './TopNavClient'
 
 /**
@@ -11,9 +11,8 @@ import { TopNavClient } from './TopNavClient'
 export async function TopNav() {
   const user = await layNguoiDung()
   if (!user) return null
-  const [admin, quanLy, chiKyThuat, vaoCS, vaoSales] = await Promise.all([
-    laAdmin(), laQuanLy(), laChiKyThuatVien(), coTheVaoCS(), coTheVaoSales(),
-  ])
+  // Cổng NỀN TẢNG: KHÔNG được đá Sales/Marketing (ngoài CS) ra login khi render nav.
+  const { admin, quanLy, chiKyThuat, vaoCS, vaoSales } = await quyenNenTang()
   return (
     <TopNavClient
       laAdmin={admin}
