@@ -48,6 +48,7 @@ export function TopNavClient({
 }: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat: boolean; coTheVaoCS: boolean; coTheVaoSales: boolean; email: string | null }) {
   const pathname = usePathname()
   const [moOpen, setMoOpen] = useState<string | null>(null) // 'launch' | 'gear' | 'g<idx>' | null
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
 
   // ---- registry: module theo quyền ----
   const viec: Module = {
@@ -121,6 +122,13 @@ export function TopNavClient({
 
   const toggle = (k: string) => setMoOpen((v) => (v === k ? null : k))
   const dong = () => setMoOpen(null)
+  // Mở dropdown nhóm trang ở toạ độ nút (render FIXED để không bị thanh cuộn overflow cắt mất).
+  function moNhom(i: number, el: HTMLElement) {
+    if (moOpen === `g${i}`) { dong(); return }
+    const r = el.getBoundingClientRect()
+    setMenuPos({ left: r.left, top: r.bottom + 6 })
+    setMoOpen(`g${i}`)
+  }
 
   return (
     <>
@@ -196,24 +204,13 @@ export function TopNavClient({
           {mod.trang.map((t, i) => {
             if (laNhom(t)) {
               const active = t.trang.some((x) => khopHref(pathname, x.href))
-              const open = moOpen === `g${i}`
               return (
-                <div key={i} className="relative">
-                  <button onClick={() => toggle(`g${i}`)}
-                    className={'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap text-[13.5px] font-medium ' +
-                      (active ? 'text-teal-800 bg-teal-50 font-semibold' : 'text-slate-600 hover:bg-slate-100')}>
-                    {t.nhan}
-                    <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}><path d="m6 9 6 6 6-6" /></svg>
-                  </button>
-                  {open && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] min-w-[190px] bg-white border rounded-xl shadow-xl p-1.5 z-50">
-                      {t.trang.map((x) => (
-                        <Link key={x.href} href={x.href} onClick={dong}
-                          className={'block px-2.5 py-2 rounded-lg text-[13px] ' + (khopHref(pathname, x.href) ? 'bg-teal-50 text-teal-800 font-medium' : 'text-slate-600 hover:bg-slate-100')}>{x.nhan}</Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button key={i} onClick={(e) => moNhom(i, e.currentTarget)}
+                  className={'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap text-[13.5px] font-medium ' +
+                    (active || moOpen === `g${i}` ? 'text-teal-800 bg-teal-50 font-semibold' : 'text-slate-600 hover:bg-slate-100')}>
+                  {t.nhan}
+                  <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}><path d="m6 9 6 6 6-6" /></svg>
+                </button>
               )
             }
             if (t.soon) {
@@ -230,6 +227,22 @@ export function TopNavClient({
 
       {/* ---- backdrop đóng menu ---- */}
       {moOpen && <button aria-hidden tabIndex={-1} onClick={dong} className="fixed inset-0 z-20 cursor-default" />}
+
+      {/* ---- dropdown nhóm trang (FIXED — thoát khỏi thanh cuộn overflow) ---- */}
+      {(() => {
+        if (!moOpen || !moOpen.startsWith('g') || !menuPos) return null
+        const grp = mod.trang[Number(moOpen.slice(1))]
+        if (!grp || !laNhom(grp)) return null
+        return (
+          <div className="fixed z-50 min-w-[190px] bg-white border rounded-xl shadow-xl p-1.5"
+            style={{ left: menuPos.left, top: menuPos.top }}>
+            {grp.trang.map((x) => (
+              <Link key={x.href} href={x.href} onClick={dong}
+                className={'block px-2.5 py-2 rounded-lg text-[13px] ' + (khopHref(pathname, x.href) ? 'bg-teal-50 text-teal-800 font-medium' : 'text-slate-600 hover:bg-slate-100')}>{x.nhan}</Link>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* ---- app launcher ---- */}
       {moOpen === 'launch' && (
