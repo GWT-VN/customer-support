@@ -8,6 +8,7 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
+import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -911,39 +912,48 @@ export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ 
 
 // ── Đợt 1: nền lịch bảo trì tự động + map khách bảo trì với khách kích hoạt máy ──
 
-/** 9 số cuối để so SĐT (bỏ mã vùng/0 đầu, mọi ký tự không phải số). */
-function soDienThoaiChuan(s: string | null | undefined): string {
-  const d = (s ?? '').replace(/\D/g, '')
-  return d.length >= 9 ? d.slice(-9) : d
-}
-
 export type PlanChuaMap = {
   id: string; bo_may: string | null; loai_goi: string | null
   tong_lan: number | null; chu_ky_thang: number | null
   source_customer_name: string | null; source_phone: string | null
-  goi_y_id: string | null; goi_y_ten: string | null; goi_y_sdt: string | null
+  /** Tối đa 3 khách khớp nhất, kèm lý do để CS tự kiểm chứng trước khi bấm gán. */
+  goi_y: GoiYKhach[]
 }
 
-/** Plan bảo trì CHƯA map khách + gợi ý khách khớp SĐT (9 số cuối). */
+/**
+ * Plan bảo trì CHƯA map khách + gợi ý khách khớp.
+ *
+ * Trước đây chỉ dò SĐT nên 23/48 plan không có gợi ý nào (plan Asana phần lớn
+ * thiếu SĐT). Nay dò thêm tỉnh + ngày lắp đọc từ tên thư mục — xem lib/khopPlanKhach.
+ */
 export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
   await requireStaff()
   const db = dataClient()
-  const [{ data: plans }, { data: khach }] = await Promise.all([
+  const [{ data: plans }, { data: khach }, { data: may }] = await Promise.all([
     db.from('maintenance_plan')
       .select('id, bo_may, loai_goi, tong_lan, chu_ky_thang, source_customer_name, source_phone')
       .is('customer_id', null).order('source_customer_name'),
-    db.from('cs_customers').select('id, full_name, primary_phone'),
+    db.from('cs_customers').select('id, full_name, primary_phone, province').neq('trang_thai', 'da_xoa'),
+    db.from('installed_base').select('customer_id, install_date').eq('status', 'active'),
   ])
-  const theoSdt = new Map<string, { id: string; ten: string; sdt: string }>()
-  for (const k of (khach ?? []) as { id: string; full_name: string; primary_phone: string | null }[]) {
-    const key = soDienThoaiChuan(k.primary_phone)
-    if (key && !theoSdt.has(key)) theoSdt.set(key, { id: k.id, ten: k.full_name, sdt: k.primary_phone ?? '' })
+
+  // Ngày lắp SỚM NHẤT của mỗi khách — mốc để so với ngày trong tên plan.
+  const somNhat = new Map<string, string>()
+  for (const m of (may ?? []) as { customer_id: string | null; install_date: string | null }[]) {
+    if (!m.customer_id || !m.install_date) continue
+    const cu = somNhat.get(m.customer_id)
+    if (!cu || m.install_date < cu) somNhat.set(m.customer_id, m.install_date)
   }
-  type PlanRow = Omit<PlanChuaMap, 'goi_y_id' | 'goi_y_ten' | 'goi_y_sdt'>
-  return ((plans ?? []) as PlanRow[]).map((p) => {
-    const g = theoSdt.get(soDienThoaiChuan(p.source_phone))
-    return { ...p, goi_y_id: g?.id ?? null, goi_y_ten: g?.ten ?? null, goi_y_sdt: g?.sdt ?? null }
-  })
+
+  const ungVien: KhachUngVien[] = ((khach ?? []) as {
+    id: string; full_name: string; primary_phone: string | null; province: string | null
+  }[]).map((k) => ({
+    id: k.id, ten: k.full_name, sdt: k.primary_phone, tinh: k.province,
+    ngayLapSomNhat: somNhat.get(k.id) ?? null,
+  }))
+
+  type PlanRow = Omit<PlanChuaMap, 'goi_y'>
+  return ((plans ?? []) as PlanRow[]).map((p) => ({ ...p, goi_y: xepGoiY(p, ungVien) }))
 }
 
 /** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */

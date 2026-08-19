@@ -147,11 +147,18 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                     <div className="text-xs text-slate-500">{p.bo_may ?? '—'} · {p.tong_lan ?? '?'} lần · {p.loai_goi}</div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {p.goi_y_id && (
-                      <button disabled={busy === p.id} onClick={() => gan(p.id, p.goi_y_id!)}
-                        className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm disabled:opacity-50">
-                        Gán: {p.goi_y_ten} ({p.goi_y_sdt})
-                      </button>
+                    {p.goi_y.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.goi_y.map((g) => (
+                          <button key={g.id} disabled={busy === p.id} onClick={() => gan(p.id, g.id)}
+                            className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm disabled:opacity-50 text-left">
+                            Gán: {g.ten}{g.sdt ? ` (${g.sdt})` : ''}
+                            <span className="block text-[10px] font-normal opacity-80">{g.lyDo.join(' · ')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-amber-700">chưa đoán được khách — bấm &quot;Chọn khách khác&quot;</span>
                     )}
                     <button onClick={() => setChonTay(chonTay === p.id ? null : p.id)}
                       className="rounded-lg border px-3 py-1.5 text-sm text-slate-700">Chọn khách khác</button>
