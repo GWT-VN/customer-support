@@ -4,6 +4,7 @@ import { ExportKhachButton } from '@/components/ExportKhachButton'
 import { ThaoTacHangLoat } from '@/components/ThaoTacHangLoat'
 import { BangKhach } from '@/components/BangKhach'
 import { DauTrang } from '@/components/DauTrang'
+import { TaoKhachButton } from '@/components/TaoKhachButton'
 import { SUA_HL_KHACH } from '@/lib/danhSach'
 import { OTimKiem, ThanhDangLoc, PhanTrang } from '@/bang'
 import { KhungChon, ThanhDaChon } from '@/bang'
@@ -28,7 +29,9 @@ export default async function KhachHangPage({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
-        <DauTrang tieuDe="Khách hàng" phuDe={`${tong.toLocaleString('vi-VN')} khách`} />
+        <DauTrang tieuDe="Khách hàng" phuDe={`${tong.toLocaleString('vi-VN')} khách`}>
+          <TaoKhachButton />
+        </DauTrang>
 
         <Suspense>
           <OTimKiem placeholder="Gõ tên khách, SĐT…" />
