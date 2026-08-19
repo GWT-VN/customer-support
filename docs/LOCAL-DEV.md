@@ -42,7 +42,7 @@ supabase db reset              # áp migration + seed.sql (data giả) — chạ
 - **Studio local:** http://localhost:54323 (xem/sửa data, tạo user test)
 - **API local:** http://localhost:54321
 
-Trỏ app vào local — sửa `app-cskh/.env.local`:
+Trỏ app vào local — sửa `apps/web/.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key in `supabase start` output>

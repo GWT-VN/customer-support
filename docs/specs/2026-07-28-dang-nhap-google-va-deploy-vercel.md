@@ -5,7 +5,7 @@
 
 ## 1. Bối cảnh & vấn đề
 
-App `app-cskh` hiện chỉ đăng nhập bằng email + mật khẩu, tài khoản do quản trị tạo tay trên
+App `apps/web` hiện chỉ đăng nhập bằng email + mật khẩu, tài khoản do quản trị tạo tay trên
 Supabase Dashboard. Thực tế có **2 tài khoản, đều `@gwt.vn`**: `bella@gwt.vn` (đang dùng) và
 `ai@gwt.vn` (đã tạo, chưa đăng nhập lần nào — người mới nhận việc chỉ cần đặt lại mật khẩu).
 App cũng chưa deploy ở đâu — chỉ chạy `localhost`.
@@ -106,7 +106,7 @@ vai trò, không phải nhập tay lại.
 
 | File | Việc |
 |---|---|
-| `supabase-cskh/migrations/02_cs_staff.sql` (mới) | Tạo `cs_staff` + RLS + trigger `updated_at` |
+| `db/cs/migrations/02_cs_staff.sql` (mới) | Tạo `cs_staff` + RLS + trigger `updated_at` |
 | `lib/auth.ts` (mới) | `duocPhepVao(email)` — luật 4 dòng ở mục 4, một chỗ duy nhất |
 | `lib/supabase.ts` | `requireStaff()` gọi `duocPhepVao()`, trượt thì ném `FORBIDDEN` |
 | `app/auth/callback/route.ts` (mới) | Đổi code lấy session, kiểm tra luật, upsert `cs_staff`, xử lý lỗi |
@@ -123,7 +123,7 @@ Plan sẽ kèm hướng dẫn từng bước với đúng giá trị cần đi�
 
 1. **Google Cloud Console** — tạo OAuth client (Web application), lấy Client ID + Client Secret
 2. **Supabase → Authentication → Providers → Google** — dán Client ID/Secret, bật provider
-3. **Vercel** — nối repo GitHub, **Root Directory = `app-cskh`** (repo nhiều thư mục, không đặt là build hỏng), nhập 3 biến môi trường cho cả Production lẫn Preview:
+3. **Vercel** — nối repo GitHub, **Root Directory = `apps/web`** (repo nhiều thư mục, không đặt là build hỏng), nhập 3 biến môi trường cho cả Production lẫn Preview:
    `NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY`
 
 ### Redirect URL — phải phủ đủ 3 môi trường

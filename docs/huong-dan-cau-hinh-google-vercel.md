@@ -11,7 +11,7 @@
 | Project Supabase | `GWT-SalesTracking` — `bwzmqfbcgouhvhoslmmm` |
 | URL project | `https://bwzmqfbcgouhvhoslmmm.supabase.co` |
 | Repo GitHub | `AIGWTVN/customer-support` (private) |
-| Thư mục app trong repo | `app-cskh` |
+| Thư mục app trong repo | `apps/web` |
 
 ---
 
@@ -23,7 +23,7 @@
    - Điền tên ứng dụng, email hỗ trợ, email liên hệ → Save
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
    - Application type: **Web application**
-   - Name: `app-cskh`
+   - Name: `apps/web`
    - **Authorized redirect URIs** — điền đúng URL của **Supabase**, không phải của app:
 
      ```
@@ -68,9 +68,9 @@ nhưng đóng luôn cửa này thì tốt hơn — bớt một bề mặt phải
 ## Bước 3 — Vercel
 
 1. https://vercel.com/new → **Import** repo `AIGWTVN/customer-support`
-2. **Root Directory: `app-cskh`**
+2. **Root Directory: `apps/web`**
 
-   > ⚠️ Bắt buộc. Repo có nhiều thư mục (`app-cskh`, `docs`, `migrate`, `supabase-cskh`);
+   > ⚠️ Bắt buộc. Repo có nhiều thư mục (`apps/web`, `docs`, `migrate`, `db/cs`);
    > để mặc định gốc repo là build hỏng ngay.
 
 3. **Environment Variables** — thêm cả ba, tick cho **cả Production lẫn Preview**:
@@ -78,7 +78,7 @@ nhưng đóng luôn cửa này thì tốt hơn — bớt một bề mặt phải
    | Tên | Giá trị |
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://bwzmqfbcgouhvhoslmmm.supabase.co` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | lấy ở `app-cskh/.env.example` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | lấy ở `apps/web/.env.example` |
    | `SUPABASE_SERVICE_ROLE_KEY` | Dashboard → Project Settings → API → `service_role` |
 
 4. Deploy → lấy domain production → **quay lại bước 2.2** điền nốt Redirect URLs

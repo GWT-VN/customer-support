@@ -18,7 +18,7 @@ Nếu phát hiện secret/PII → commit bị chặn, in rõ file:dòng.
 `.github/workflows/ci.yml` chạy 2 job:
 - **secret-pii-scan** — quét các file **thay đổi** (diff PR `base...head`, hoặc commit hiện tại khi push).
   Chỉ soi thay đổi mới → không fail vì PII cũ đã tồn tại trong repo (xem "Nợ cũ" bên dưới).
-- **quality** — `tsc --noEmit` + `npm run lint` + `npm run test` trong `app-cskh/`.
+- **quality** — `tsc --noEmit` + `npm run lint` + `npm run test` trong `apps/web/`.
 
 ## Script bắt gì
 

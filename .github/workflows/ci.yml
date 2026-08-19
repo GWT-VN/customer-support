@@ -30,26 +30,26 @@ jobs:
           BASE="${{ steps.base.outputs.base }}"
           if [ -n "$BASE" ] && git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
             echo "Quét diff ${BASE}...${{ github.sha }}"
-            python3 scripts/scan_pii_secrets.py --range "$BASE" "${{ github.sha }}"
+            python3 tools/scripts/scan_pii_secrets.py --range "$BASE" "${{ github.sha }}"
           else
             echo "Không có base hợp lệ — quét file của commit hiện tại"
             FILES=$(git diff-tree --no-commit-id --name-only -r "${{ github.sha }}")
-            [ -z "$FILES" ] || python3 scripts/scan_pii_secrets.py $FILES
+            [ -z "$FILES" ] || python3 tools/scripts/scan_pii_secrets.py $FILES
           fi
 
   quality:
-    name: Typecheck · Lint · Test (app-cskh)
+    name: Typecheck · Lint · Test (apps/web)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: app-cskh
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: app-cskh/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint

@@ -8,11 +8,11 @@
 App nội bộ chăm sóc khách hàng cho máy lọc nước GWT (thương hiệu GE): quản lý khách, máy đã lắp,
 bảo hành, lịch thay lõi, ticket lỗi, gói bảo trì. Dùng cho nhân viên CS + kỹ thuật.
 
-- **Frontend/Backend**: `app-cskh/` — Next.js 16 (App Router, Server Actions), Tailwind.
-- **DB**: Supabase (PostgreSQL). App dùng 2 client (`app-cskh/lib/supabase.ts`):
+- **Frontend/Backend**: `apps/web/` — Next.js 16 (App Router, Server Actions), Tailwind.
+- **DB**: Supabase (PostgreSQL). App dùng 2 client (`apps/web/lib/supabase.ts`):
   - `authClient()` — anon key + cookie, CHỈ để biết ai đăng nhập (Supabase Auth).
   - `dataClient()` — service_role, bỏ qua RLS, gọi sau `requireStaff()`. **Không xuống browser.**
-- **Scripts di trú/ETL**: `migrate/*.py` (Python, đọc `app-cskh/.env.local`).
+- **Scripts di trú/ETL**: `migrate/*.py` (Python, đọc `apps/web/.env.local`).
 
 ## 2. Hai project Supabase (QUAN TRỌNG)
 
@@ -29,14 +29,14 @@ bảo hành, lịch thay lõi, ticket lỗi, gói bảo trì. Dùng cho nhân vi
 
 **Local dev:**
 ```bash
-cd app-cskh && npm install && npm run dev   # http://localhost:3000
+cd apps/web && npm install && npm run dev   # http://localhost:3000
 ```
 ⚠️ Repo nằm trong **iCloud Drive** → dev server có thể lỗi `npm EPERM: uv_cwd`. Khắc phục bền:
 copy repo ra ngoài iCloud (vd `~/code/customer-support`). Vì lý do này, verify trong phiên Claude
 làm bằng `npx tsc --noEmit` + truy vấn SQL, **không chạy được preview UI**.
 
 **Vercel (production):**
-1. **Root Directory** = `app-cskh`.
+1. **Root Directory** = `apps/web`.
 2. **Environment Variables** (lấy từ Supabase project MỚI):
    - `NEXT_PUBLIC_SUPABASE_URL` = `https://bwzmqfbcgouhvhoslmmm.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon key (public, xem Dashboard > API)
@@ -46,7 +46,7 @@ làm bằng `npx tsc --noEmit` + truy vấn SQL, **không chạy được previe
    thì đăng nhập fail dù deploy OK.
 
 **Secrets (đều gitignored, KHÔNG commit):**
-- `app-cskh/.env.local` — cấu hình app (đang trỏ project mới). Backup project cũ: `.env.local.bak-masterdata`.
+- `apps/web/.env.local` — cấu hình app (đang trỏ project mới). Backup project cũ: `.env.local.bak-masterdata`.
 - `migrate/.env.migrate` — `DEST_URL` + `DEST_SERVICE_KEY` cho script di trú.
 
 ## 4. Cấu trúc DB (project mới)
@@ -72,7 +72,7 @@ làm bằng `npx tsc --noEmit` + truy vấn SQL, **không chạy được previe
 `v_core_forecast` (lịch thay lõi) · `v_maintenance_due` · `v_issue_report` · `v_ticket_issue` ·
 `v_ticket_chua_phan_nhom`. **RPC**: `activate_warranty(p_serial, p_start)`.
 
-**Migrations** (nguồn tái lập ở `supabase-cskh/migrations/`, đã apply qua Supabase MCP):
+**Migrations** (nguồn tái lập ở `db/cs/migrations/`, đã apply qua Supabase MCP):
 - `00_init_cskh_project_moi.sql` — schema gốc.
 - `01_add_missing_issue_views.sql` — 3 view nhóm lỗi (thiếu lúc di trú).
 - `02_ticket_khan_note.sql` — cờ Khẩn + ticket_note.
@@ -110,7 +110,7 @@ làm bằng `npx tsc --noEmit` + truy vấn SQL, **không chạy được previe
   `.env*`, `Phiếu theo dõi/...`.
 - **`docs/CHECKLIST.md` CHỨA tên khách → cố ý KHÔNG commit** (chỉ giữ local).
 - Trước mỗi commit: `git status` + `git diff --cached --name-only`, **soi** `git diff --cached | grep -E "0[35789][0-9]{8}"`,
-  **không bao giờ** `git add -A` / `git add .` mù. Chỉ add đúng thư mục code (`app-cskh`, `supabase-cskh`).
+  **không bao giờ** `git add -A` / `git add .` mù. Chỉ add đúng thư mục code (`apps/web`, `db/cs`).
 - Commit chỉ khi user yêu cầu.
 
 ## 8. Việc còn treo (ưu tiên từ trên xuống)
@@ -143,8 +143,8 @@ maintenance_visit 467 · issue_group 13 · serial_registry 1.891 (1.870 có mã 
 
 ## 10. Điểm vào nhanh cho dev mới
 
-- Kết nối DB: `app-cskh/lib/supabase.ts`. Mọi query qua Server Actions ở `app-cskh/app/actions.ts`.
-- Trang: `app-cskh/app/**/page.tsx`. Component: `app-cskh/components/`.
-- `app-cskh/AGENTS.md`: Next.js bản này khác — bám pattern code sẵn có (async `params`/`searchParams` là Promise).
-- Thay đổi schema: viết migration mới ở `supabase-cskh/migrations/NN_*.sql` + apply (Supabase MCP hoặc dashboard).
+- Kết nối DB: `apps/web/lib/supabase.ts`. Mọi query qua Server Actions ở `apps/web/app/actions.ts`.
+- Trang: `apps/web/app/**/page.tsx`. Component: `apps/web/components/`.
+- `apps/web/AGENTS.md`: Next.js bản này khác — bám pattern code sẵn có (async `params`/`searchParams` là Promise).
+- Thay đổi schema: viết migration mới ở `db/cs/migrations/NN_*.sql` + apply (Supabase MCP hoặc dashboard).
 - Toàn bộ tiến trình & quyết định: `docs/CHECKLIST.md` (local, có PII).

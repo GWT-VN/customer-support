@@ -6,7 +6,7 @@
 #
 # CHỈ chạy trên máy dev, chỉ vào LOCAL. Không đụng production (chỉ ĐỌC để dump).
 #
-# Dùng:  npm run seed:prod        (từ app-cskh/)
+# Dùng:  npm run seed:prod        (từ apps/web/)
 #   hoặc: bash supabase/seed-prod-masked.sh   (từ repo root)
 #
 # Yêu cầu: đã `supabase start` + `supabase link --project-ref bwzmqfbcgouhvhoslmmm`.

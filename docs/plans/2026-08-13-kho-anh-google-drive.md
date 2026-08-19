@@ -18,13 +18,13 @@ Cả **ticket** lẫn module **bảo trì** cần đính kèm ảnh/video (kỹ 
 ## Thiết lập phía Google (USER làm — kèm hướng dẫn)
 1. Google Cloud: bật **Drive API**, tạo **service account**, tải JSON key.
 2. Workspace: tạo **Shared Drive** "GWT CSKH Media", thêm email service account làm **Content manager**. (SA không có quota cá nhân → file BẮT BUỘC nằm trong Shared Drive, dùng dung lượng pool Workspace.)
-3. Env (Vercel + `.env.local`): `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON), `GDRIVE_SHARED_DRIVE_ID`, `GDRIVE_ROOT_FOLDER_ID`, `MEDIA_CLEANUP_SECRET`. Thêm (để trống) vào `app-cskh/.env.example`.
+3. Env (Vercel + `.env.local`): `GOOGLE_SERVICE_ACCOUNT_KEY` (JSON), `GDRIVE_SHARED_DRIVE_ID`, `GDRIVE_ROOT_FOLDER_ID`, `MEDIA_CLEANUP_SECRET`. Thêm (để trống) vào `apps/web/.env.example`.
 - Doc mới `docs/huong-dan-kho-anh-google-drive.md` (theo mẫu `docs/huong-dan-cau-hinh-google-vercel.md`).
 
-## DB — `supabase-cskh/migrations/45_media.sql`
+## DB — `db/cs/migrations/45_media.sql`
 Bảng `public.media`: `id uuid pk default gen_random_uuid()`, `entity_type text check in ('ticket','bao_tri')`, `entity_id text not null` (=`ticket_code` hoặc `maintenance_visit.id`), `drive_file_id text not null`, `filename text`, `mime text`, `size_bytes bigint`, `uploaded_by text`, `created_at timestamptz default now()`, `deleted_at timestamptz`. Index `(entity_type, entity_id) where deleted_at is null`. RLS bật (app đọc bằng service_role như các bảng khác).
 
-## Thư viện Drive — `app-cskh/lib/drive.ts` (server-only)
+## Thư viện Drive — `apps/web/lib/drive.ts` (server-only)
 - Dùng `@googleapis/drive` (scoped, gọn hơn `googleapis`) + JWT từ SA key. Đọc env **lazily + throw rõ ràng** (theo mẫu `dataClient()` trong `lib/supabase.ts`). Route dùng `export const runtime = 'nodejs'`.
 - Hàm: `taiLenDrive({buffer, mime, filename, entityType, entityId})` → tạo folder theo scope nếu chưa có (`/tickets/<code>/`, `/bao-tri/<visit>/`), `files.create` với `supportsAllDrives:true` trong Shared Drive → trả `fileId`; `taiVeDrive(fileId)` → stream; `xoaDrive(fileId)`.
 
@@ -32,13 +32,13 @@ Bảng `public.media`: `id uuid pk default gen_random_uuid()`, `entity_type text
 - `app/api/media/upload/route.ts` (POST, `requireStaff()`): nhận multipart (entity_type, entity_id, file) → validate mime + size (≤ ~4MB/file — hợp giới hạn body Vercel ~4.5MB; ảnh nén client thường <1MB) → `taiLenDrive` → insert `media` → trả metadata + ghi audit. Video >4MB: v1 chặn (nén/transcode video để sau).
 - `app/api/media/[id]/route.ts` (GET, `requireStaff()`): **proxy** stream file từ Drive → ảnh riêng tư, chỉ NV đăng nhập xem. Hỗ trợ `?thumb` (Drive `?sz=` cho ảnh nhỏ).
 - `app/api/media/cleanup/route.ts` (POST, xác thực bằng header `MEDIA_CLEANUP_SECRET`, KHÔNG dùng session).
-- **`app-cskh/proxy.ts`**: loại `/api/media/cleanup` khỏi matcher (tự xác thực bằng secret); giữ upload/download qua proxy (bắt buộc đăng nhập — đúng ý bảo vệ PII).
+- **`apps/web/proxy.ts`**: loại `/api/media/cleanup` khỏi matcher (tự xác thực bằng secret); giữ upload/download qua proxy (bắt buộc đăng nhập — đúng ý bảo vệ PII).
 
 ## Server actions (`app/actions.ts`)
 - `listMedia(entityType, entityId)` (requireStaff) → media chưa xoá.
 - `xoaMedia(id)` (requireStaff) → set `deleted_at` + `xoaDrive(fileId)` + audit. UI hỏi confirm (quy ước: xoá cần confirm).
 
-## UI — `app-cskh/components/DinhKemMedia.tsx` (client, dùng lại)
+## UI — `apps/web/components/DinhKemMedia.tsx` (client, dùng lại)
 - Props: `entityType`, `entityId`, `items` (khởi tạo), `choSua`.
 - Chọn ảnh/video → **nén ảnh tại trình duyệt** (canvas resize ~1600px, JPEG ~0.8) trước khi up → POST `/api/media/upload` (có progress) → lưới thumbnail (`<img src="/api/media/{id}?thumb">`, click mở full) → nút **Xoá** (confirm). Chỉ hiện thao tác khi `choSua`.
 - Nhúng:

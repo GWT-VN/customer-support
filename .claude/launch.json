@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "cskh",
+      "name": "gwt-app",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "app-cskh", "run", "dev"],
+      "runtimeArgs": ["--prefix", "apps/web", "run", "dev"],
       "port": 3000,
       "autoPort": true
     }

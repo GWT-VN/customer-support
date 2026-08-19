@@ -26,16 +26,16 @@
 
 | File | Trách nhiệm |
 |---|---|
-| `supabase-cskh/migrations/06_tim_kiem_khong_dau.sql` | *Tạo.* `unaccent` + `pg_trgm`, hàm `khong_dau()` IMMUTABLE, cột sinh sẵn + index trigram, tạo lại view để lộ cột |
-| `app-cskh/lib/timkiem.ts` | *Tạo.* **Hàm thuần**: `boDau()`, `chuanHoaTuKhoa()`, `sapXepHopLe()` (danh sách trắng cột) |
-| `app-cskh/lib/timkiem.test.ts` | *Tạo.* Unit test cho 3 hàm trên |
-| `app-cskh/app/actions.ts` | *Sửa.* Các hàm truy vấn nhận thêm `sapXep`, `trang`; trả kèm `tong` |
-| `app-cskh/components/OTimKiem.tsx` | *Tạo.* Ô tìm kiếm gõ-tới-đâu-lọc-tới-đó (debounce 300ms, `router.replace`) |
-| `app-cskh/components/ThanhDangLoc.tsx` | *Tạo.* "Đang lọc: … · 12/465 · Xoá lọc" |
-| `app-cskh/components/PhanTrang.tsx` | *Tạo.* Nút chuyển trang, giữ nguyên các tham số lọc khác |
-| `app-cskh/components/TieuDeCotSapXep.tsx` | *Tạo.* Tiêu đề cột bấm được + mũi tên chiều sắp xếp |
-| `app-cskh/app/{,ticket,loi,khach,nhom-loi}/page.tsx` | *Sửa.* Gắn 4 component trên; **không đụng phần `<table>`** |
-| `app-cskh/app/{may/[serial],khach/[id],ticket/[code],nhom-loi/[code]}/loading.tsx` | *Tạo.* Khung xương khi đang tải |
+| `db/cs/migrations/06_tim_kiem_khong_dau.sql` | *Tạo.* `unaccent` + `pg_trgm`, hàm `khong_dau()` IMMUTABLE, cột sinh sẵn + index trigram, tạo lại view để lộ cột |
+| `apps/web/lib/timkiem.ts` | *Tạo.* **Hàm thuần**: `boDau()`, `chuanHoaTuKhoa()`, `sapXepHopLe()` (danh sách trắng cột) |
+| `apps/web/lib/timkiem.test.ts` | *Tạo.* Unit test cho 3 hàm trên |
+| `apps/web/app/actions.ts` | *Sửa.* Các hàm truy vấn nhận thêm `sapXep`, `trang`; trả kèm `tong` |
+| `apps/web/components/OTimKiem.tsx` | *Tạo.* Ô tìm kiếm gõ-tới-đâu-lọc-tới-đó (debounce 300ms, `router.replace`) |
+| `apps/web/components/ThanhDangLoc.tsx` | *Tạo.* "Đang lọc: … · 12/465 · Xoá lọc" |
+| `apps/web/components/PhanTrang.tsx` | *Tạo.* Nút chuyển trang, giữ nguyên các tham số lọc khác |
+| `apps/web/components/TieuDeCotSapXep.tsx` | *Tạo.* Tiêu đề cột bấm được + mũi tên chiều sắp xếp |
+| `apps/web/app/{,ticket,loi,khach,nhom-loi}/page.tsx` | *Sửa.* Gắn 4 component trên; **không đụng phần `<table>`** |
+| `apps/web/app/{may/[serial],khach/[id],ticket/[code],nhom-loi/[code]}/loading.tsx` | *Tạo.* Khung xương khi đang tải |
 
 **Vì sao tách `lib/timkiem.ts` thuần:** giống `lib/auth.ts` và `lib/quyen.ts` đã làm — phần quyết định (bỏ dấu, danh sách trắng cột) tách khỏi phần đọc DB nên test được thật. Danh sách trắng cột là chốt chặn injection, bắt buộc phải có test.
 
@@ -44,7 +44,7 @@
 ## Task 1: Database — bỏ dấu + index trigram
 
 **Files:**
-- Create: `supabase-cskh/migrations/06_tim_kiem_khong_dau.sql`
+- Create: `db/cs/migrations/06_tim_kiem_khong_dau.sql`
 
 **Interfaces:**
 - Produces: hàm `public.khong_dau(text) -> text`; cột `ten_kd` trên `cs_customers`, `dia_chi_kd` trên `cs_customers`; view `v_installed_base` và `v_tickets` lộ thêm các cột `_kd`
@@ -134,7 +134,7 @@ So với số cột trước khi sửa (đếm trước ở Step 2). Phải **nh
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase-cskh/migrations/06_tim_kiem_khong_dau.sql
+git add db/cs/migrations/06_tim_kiem_khong_dau.sql
 git commit -m "feat(db): tìm kiếm không dấu — unaccent + pg_trgm + cột sinh sẵn"
 ```
 
@@ -143,14 +143,14 @@ git commit -m "feat(db): tìm kiếm không dấu — unaccent + pg_trgm + cột
 ## Task 2: Hàm thuần bỏ dấu + danh sách trắng cột sắp xếp
 
 **Files:**
-- Create: `app-cskh/lib/timkiem.ts`, `app-cskh/lib/timkiem.test.ts`
+- Create: `apps/web/lib/timkiem.ts`, `apps/web/lib/timkiem.test.ts`
 
 **Interfaces:**
 - Produces: `boDau(s: string): string` · `chuanHoaTuKhoa(q: string): string` · `sapXepHopLe(cot: string | undefined, chieu: string | undefined, choPhep: readonly string[], macDinh: SapXep): SapXep` · `type SapXep = { cot: string; tang: boolean }`
 
 - [ ] **Step 1: Viết test TRƯỚC (phải fail)**
 
-Tạo `app-cskh/lib/timkiem.test.ts`:
+Tạo `apps/web/lib/timkiem.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -219,7 +219,7 @@ describe('sapXepHopLe — chốt chặn injection', () => {
 - [ ] **Step 2: Chạy test, xác nhận FAIL**
 
 ```bash
-npm --prefix app-cskh test
+npm --prefix apps/web test
 ```
 
 Kỳ vọng: fail vì `./timkiem` chưa tồn tại.
@@ -231,7 +231,7 @@ Kỳ vọng: fail vì `./timkiem` chưa tồn tại.
  * Tìm kiếm và sắp xếp — HÀM THUẦN, không đụng DB, không import gì.
  *
  * boDau() phải khớp ĐÚNG với hàm khong_dau() dưới Postgres
- * (supabase-cskh/migrations/06_tim_kiem_khong_dau.sql). Lệch nhau là gõ ra
+ * (db/cs/migrations/06_tim_kiem_khong_dau.sql). Lệch nhau là gõ ra
  * kết quả rỗng mà không ai hiểu vì sao.
  */
 
@@ -269,7 +269,7 @@ export function sapXepHopLe(
 - [ ] **Step 4: Chạy test, xác nhận PASS**
 
 ```bash
-npm --prefix app-cskh test
+npm --prefix apps/web test
 ```
 
 Kỳ vọng: toàn bộ test mới pass, và 16 test sẵn có (`auth.test.ts`, `quyen.test.ts`) vẫn xanh.
@@ -287,7 +287,7 @@ Phải bằng đúng `'nguyen thi huong'` — trùng kết quả test JS ở Ste
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app-cskh/lib/timkiem.ts app-cskh/lib/timkiem.test.ts
+git add apps/web/lib/timkiem.ts apps/web/lib/timkiem.test.ts
 git commit -m "feat(tim-kiem): hàm thuần bỏ dấu + danh sách trắng cột sắp xếp"
 ```
 
@@ -296,7 +296,7 @@ git commit -m "feat(tim-kiem): hàm thuần bỏ dấu + danh sách trắng cộ
 ## Task 3: Truy vấn nhận tìm-kiếm-không-dấu, sắp xếp, phân trang
 
 **Files:**
-- Modify: `app-cskh/app/actions.ts` — `searchMachines`, `searchTickets`, `coreForecast`, `listToFix`
+- Modify: `apps/web/app/actions.ts` — `searchMachines`, `searchTickets`, `coreForecast`, `listToFix`
 
 **Interfaces:**
 - Consumes: `chuanHoaTuKhoa`, `sapXepHopLe`, `type SapXep` (Task 2); cột `ten_kd`, `dia_chi_kd` (Task 1)
@@ -417,7 +417,7 @@ rồi `.map` trên `rows`. **Không đổi gì bên trong `<table>`.**
 - [ ] **Step 6: Verify**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run lint && npm --prefix apps/web run build
 ```
 
 Cả ba phải sạch. Sau đó chạy dev server, mở `/` gõ `huong` (không dấu) — phải ra khách tên `Hương`. Đây là mục đích của cả Task 1–3.
@@ -425,7 +425,7 @@ Cả ba phải sạch. Sau đó chạy dev server, mở `/` gõ `huong` (không 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add app-cskh/app app-cskh/components app-cskh/lib
+git add apps/web/app apps/web/components apps/web/lib
 git commit -m "feat(tim-kiem): truy vấn nhận tìm không dấu, sắp xếp có whitelist, phân trang"
 ```
 
@@ -434,7 +434,7 @@ git commit -m "feat(tim-kiem): truy vấn nhận tìm không dấu, sắp xếp 
 ## Task 4: Ô tìm kiếm gõ-tới-đâu-lọc-tới-đó + thanh đang lọc + phân trang
 
 **Files:**
-- Create: `app-cskh/components/OTimKiem.tsx`, `app-cskh/components/ThanhDangLoc.tsx`, `app-cskh/components/PhanTrang.tsx`
+- Create: `apps/web/components/OTimKiem.tsx`, `apps/web/components/ThanhDangLoc.tsx`, `apps/web/components/PhanTrang.tsx`
 - Modify: 5 trang danh sách — thay `<form>` tìm kiếm hiện tại
 
 **Interfaces:**
@@ -520,7 +520,7 @@ Nhớ bọc `<Suspense>` quanh phần dùng `useSearchParams` — Next 16 lỗi 
 - [ ] **Step 5: Verify**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run lint && npm --prefix apps/web run build
 ```
 
 Rồi mở dev server: gõ vào ô tìm kiếm thấy danh sách tự lọc sau ~300ms không cần bấm Enter; thanh trạng thái hiện đúng `x/tổng`; bấm Xoá lọc về danh sách đầy đủ; chuyển trang giữ nguyên từ khoá.
@@ -528,7 +528,7 @@ Rồi mở dev server: gõ vào ô tìm kiếm thấy danh sách tự lọc sau 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app-cskh/components app-cskh/app
+git add apps/web/components apps/web/app
 git commit -m "feat(ui): ô tìm gõ-tới-đâu-lọc-tới-đó + thanh đang lọc + phân trang"
 ```
 
@@ -541,8 +541,8 @@ git commit -m "feat(ui): ô tìm gõ-tới-đâu-lọc-tới-đó + thanh đang 
 > không có phải bổ sung chứ."* Đúng — thiếu thì bổ sung, không phải đóng lại.
 
 **Files:**
-- Modify: `app-cskh/app/actions.ts` — `listToFix`, `issueReport`, `ticketsChuaPhanNhom`
-- Modify: `app-cskh/app/khach/page.tsx`, `app-cskh/app/nhom-loi/page.tsx`
+- Modify: `apps/web/app/actions.ts` — `listToFix`, `issueReport`, `ticketsChuaPhanNhom`
+- Modify: `apps/web/app/khach/page.tsx`, `apps/web/app/nhom-loi/page.tsx`
 
 - [ ] **Step 1: `listToFix` nhận `q`**
 
@@ -563,7 +563,7 @@ Placeholder ghi đúng thứ tìm được. Gỡ comment "không gắn OTimKiem"
 - [ ] **Step 4: Verify + commit**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run lint && npm --prefix apps/web run build
 ```
 
 ```bash
@@ -581,10 +581,10 @@ git commit -m "feat(tim-kiem): bổ sung tìm kiếm cho trang khách cần dọ
 đoán trước là vào trang Máy hay trang Ticket, đoán sai thì tưởng không có dữ liệu.
 
 **Files:**
-- Create: `app-cskh/app/tim/page.tsx` — trang kết quả gộp
-- Create: `app-cskh/components/OTimKiemGop.tsx` — ô tìm đặt ở thanh trên cùng
-- Modify: `app-cskh/components/ThanhTaiKhoan.tsx` — nhúng ô tìm gộp
-- Modify: `app-cskh/app/actions.ts` — thêm `timGop(q)`
+- Create: `apps/web/app/tim/page.tsx` — trang kết quả gộp
+- Create: `apps/web/components/OTimKiemGop.tsx` — ô tìm đặt ở thanh trên cùng
+- Modify: `apps/web/components/ThanhTaiKhoan.tsx` — nhúng ô tìm gộp
+- Modify: `apps/web/app/actions.ts` — thêm `timGop(q)`
 
 **Interfaces:**
 - Produces: `timGop(q: string): Promise<{ may: Machine[]; ticket: Ticket[]; khach: Customer[]; tongMay: number; tongTicket: number; tongKhach: number }>`
@@ -629,7 +629,7 @@ git commit -m "feat(tim-kiem): trang tìm gộp tách kết quả theo máy / ti
 ## Task 5: Sắp xếp bằng cách bấm tiêu đề cột + bộ lọc bổ sung
 
 **Files:**
-- Create: `app-cskh/components/TieuDeCotSapXep.tsx`
+- Create: `apps/web/components/TieuDeCotSapXep.tsx`
 - Modify: 5 trang danh sách — bọc tiêu đề cột; thêm bộ lọc
 
 **Interfaces:**
@@ -655,7 +655,7 @@ Mỗi bộ lọc là một tham số URL, đọc trong `searchParams`, đẩy xu
 - [ ] **Step 4: Verify**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run lint && npm --prefix apps/web run build
 ```
 
 Trên dev server: bấm tiêu đề cột đổi thứ tự và mũi tên đúng chiều; bấm lại đảo chiều; đổi trang giữ nguyên sắp xếp; **gõ tay `?cot=mat_khau` lên URL không làm vỡ trang** mà rơi về sắp xếp mặc định — đây là ca chứng minh danh sách trắng hoạt động.
@@ -663,7 +663,7 @@ Trên dev server: bấm tiêu đề cột đổi thứ tự và mũi tên đúng
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app-cskh/components app-cskh/app
+git add apps/web/components apps/web/app
 git commit -m "feat(ui): sắp xếp bằng tiêu đề cột + bộ lọc theo trạng thái/tỉnh/nhóm lỗi"
 ```
 
@@ -672,8 +672,8 @@ git commit -m "feat(ui): sắp xếp bằng tiêu đề cột + bộ lọc theo 
 ## Task 6: `loading.tsx` + prefetch khi rê chuột
 
 **Files:**
-- Create: `app-cskh/app/may/[serial]/loading.tsx`, `app-cskh/app/khach/[id]/loading.tsx`, `app-cskh/app/ticket/[code]/loading.tsx`, `app-cskh/app/nhom-loi/[code]/loading.tsx`
-- Create: `app-cskh/components/LinkRePrefetch.tsx`
+- Create: `apps/web/app/may/[serial]/loading.tsx`, `apps/web/app/khach/[id]/loading.tsx`, `apps/web/app/ticket/[code]/loading.tsx`, `apps/web/app/nhom-loi/[code]/loading.tsx`
+- Create: `apps/web/components/LinkRePrefetch.tsx`
 - Modify: 17 link chi tiết trong các bảng danh sách
 
 **Interfaces:**
@@ -728,7 +728,7 @@ Tìm bằng codegraph, không grep. Chỉ thay link **trong bảng danh sách** 
 - [ ] **Step 5: Verify**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run lint && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run lint && npm --prefix apps/web run build
 ```
 
 Trên dev server, mở tab Network: **tải trang danh sách không thấy loạt request `/may/...`**; rê chuột lên một dòng mới thấy một request; bấm vào thấy khung xương hiện ngay.
@@ -738,7 +738,7 @@ Trên dev server, mở tab Network: **tải trang danh sách không thấy loạ
 Tick 5 mục giai đoạn 2 trong `docs/CHECKLIST.md` (search, filter, sort, phân trang, loading+prefetch).
 
 ```bash
-git add app-cskh docs/CHECKLIST.md
+git add apps/web docs/CHECKLIST.md
 git commit -m "feat(ui): loading.tsx cho 4 trang chi tiết + prefetch khi rê chuột"
 ```
 

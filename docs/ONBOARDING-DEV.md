@@ -35,7 +35,7 @@ cd customer-support
 ## Bước 3 — Tạo database local (một lần, cần mật khẩu DB — xin CTO)
 Lấy cấu trúc database thật về máy (chỉ **cấu trúc bảng**, KHÔNG lấy data khách):
 ```bash
-cd "Customer Support"                       # thư mục chứa app-cskh + supabase/
+cd "Customer Support"                       # thư mục chứa apps/web + supabase/
 supabase link --project-ref bwzmqfbcgouhvhoslmmm   # dán DB password khi được hỏi
 supabase db pull                            # tạo file schema trong supabase/migrations/
 ```
@@ -48,7 +48,7 @@ supabase db reset     # áp cấu trúc + data giả (supabase/seed.sql)
 Mở **Studio** để xem database bằng mắt: http://localhost:54323
 
 ## Bước 5 — Trỏ web app vào database local
-Vào `app-cskh/`, tạo file `.env.local` (copy từ `.env.example`) và điền **KEY local** từ output Bước 4:
+Vào `apps/web/`, tạo file `.env.local` (copy từ `.env.example`) và điền **KEY local** từ output Bước 4:
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
@@ -59,7 +59,7 @@ ALLOWED_EMAIL_DOMAIN=gwt.vn
 
 ## Bước 6 — Chạy app
 ```bash
-cd app-cskh
+cd apps/web
 npm install     # một lần
 npm run dev     # mở http://localhost:3000
 ```
@@ -70,7 +70,7 @@ Tạo tài khoản test để đăng nhập: Studio local (54323) → **Authenti
 ## Dùng hằng ngày (sau khi đã cài xong)
 ```bash
 supabase start          # bật database local (nếu chưa chạy)
-cd app-cskh && npm run dev
+cd apps/web && npm run dev
 # ... code ...
 supabase db reset       # muốn database sạch lại + data giả mới
 ```

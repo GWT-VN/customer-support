@@ -29,14 +29,14 @@ venv/
 ~$*.xlsx
 
 # Dữ liệu di trú sinh ra (CHỨA TÊN/SĐT KHÁCH — không bao giờ commit)
-migrate/out/
+tools/migrate/out/
 *.tsv
 load.sql
 catalog.json
 
 # Mọi file xuất ra từ DB (CHỨA TÊN/SĐT/ĐỊA CHỈ KHÁCH hoặc số liệu kinh doanh) — không bao giờ commit
-Phiếu theo dõi/GWT_*.xlsx
-/GWT_*.xlsx
+Phiếu theo dõi/data/GWT_*.xlsx
+/data/GWT_*.xlsx
 /GWT_*.md
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -68,11 +68,11 @@ Phiếu theo dõi/GWT_*.xlsx
 
 # User gom TOÀN BỘ data thô vào 1 thư mục "File gốc/" (2026-07-24) — chứa mọi thứ
 # nhạy cảm ở trên: Excel khách, CRM, hợp đồng, báo cáo CEO. Không bao giờ commit.
-/File gốc/
+/data/File gốc/
 
 # "File md/" (2026-07-24) — bản .md của CRM Pancake (tên/SĐT khách), Báo cáo CEO,
 # ticket lỗi, chi phí dịch vụ. PII nặng. Không bao giờ commit.
-/File md/
+/data/File md/
 
 # CodeGraph — index cục bộ, sinh lại bằng `codegraph init`. Không commit.
 .codegraph/
@@ -81,7 +81,7 @@ Phiếu theo dõi/GWT_*.xlsx
 docs/CHECKLIST.md
 
 # Output đối chiếu khách (có PII) — không commit
-migrate/_out/
+tools/migrate/_out/
 
 # Obsidian editor config
 .obsidian/
@@ -95,3 +95,9 @@ supabase/.temp/
 supabase/.branches/
 # File dump data prod tạm (CÓ PII) — script tự xoá, chặn commit cho chắc
 supabase/.tmp-*
+
+# ── Sau tái cấu trúc 19/08/2026 ──────────────────────────────────────────
+# Mọi data thô / kết quả rà soát (CÓ PII khách) gom vào data/ — KHÔNG commit.
+# Chỉ giữ data/README.md để giải thích thư mục này là gì.
+/data/*
+!/data/README.md

@@ -26,16 +26,16 @@
 
 | File | Trách nhiệm |
 |---|---|
-| `supabase-cskh/migrations/02_cs_staff.sql` | *Tạo mới.* Bảng `cs_staff` + RLS + trigger + nạp 2 email đang dùng |
-| `app-cskh/lib/auth.ts` | *Tạo mới.* **Hàm thuần, không import gì** — luật vào cửa 4 dòng. Đây là chỗ duy nhất chứa luật |
-| `app-cskh/lib/auth.test.ts` | *Tạo mới.* Unit test cho luật, gồm ca `hoat_dong=false` thắng luật domain |
-| `app-cskh/lib/supabase.ts` | *Sửa.* Thêm lớp đọc `cs_staff`, nối vào `requireStaff()` |
-| `app-cskh/app/auth/callback/route.ts` | *Tạo mới.* Đổi code OAuth lấy session, xét luật, xử lý lỗi |
-| `app-cskh/app/auth/actions.ts` | *Tạo mới.* Server Action xác nhận quyền cho đường đăng nhập mật khẩu |
-| `app-cskh/app/login/page.tsx` | *Sửa.* Thêm nút Google, hiện thông báo lỗi từ `?loi=` |
-| `app-cskh/proxy.ts` | *Sửa.* Mở ngoại lệ `/auth` |
-| `app-cskh/.env.example` | *Sửa.* Đang trỏ nhầm project cũ |
-| `app-cskh/README.md` · `docs/CHECKLIST.md` | *Sửa.* Cập nhật hướng dẫn + tiến độ |
+| `db/cs/migrations/02_cs_staff.sql` | *Tạo mới.* Bảng `cs_staff` + RLS + trigger + nạp 2 email đang dùng |
+| `apps/web/lib/auth.ts` | *Tạo mới.* **Hàm thuần, không import gì** — luật vào cửa 4 dòng. Đây là chỗ duy nhất chứa luật |
+| `apps/web/lib/auth.test.ts` | *Tạo mới.* Unit test cho luật, gồm ca `hoat_dong=false` thắng luật domain |
+| `apps/web/lib/supabase.ts` | *Sửa.* Thêm lớp đọc `cs_staff`, nối vào `requireStaff()` |
+| `apps/web/app/auth/callback/route.ts` | *Tạo mới.* Đổi code OAuth lấy session, xét luật, xử lý lỗi |
+| `apps/web/app/auth/actions.ts` | *Tạo mới.* Server Action xác nhận quyền cho đường đăng nhập mật khẩu |
+| `apps/web/app/login/page.tsx` | *Sửa.* Thêm nút Google, hiện thông báo lỗi từ `?loi=` |
+| `apps/web/proxy.ts` | *Sửa.* Mở ngoại lệ `/auth` |
+| `apps/web/.env.example` | *Sửa.* Đang trỏ nhầm project cũ |
+| `apps/web/README.md` · `docs/CHECKLIST.md` | *Sửa.* Cập nhật hướng dẫn + tiến độ |
 | `docs/huong-dan-cau-hinh-google-vercel.md` | *Tạo mới.* Hướng dẫn 3 việc user tự làm |
 
 **Vì sao tách `lib/auth.ts` thuần:** nếu để luật gọi thẳng DB thì không test được nếu không dựng mock. Tách phần quyết định (thuần) khỏi phần đọc dữ liệu (IO) khiến luật — thứ đang bảo vệ PII của 293 khách — có test tự động thật. Cũng tránh vòng import: `supabase.ts` → `auth.ts` một chiều.
@@ -45,7 +45,7 @@
 ## Task 1: Bảng `cs_staff`
 
 **Files:**
-- Create: `supabase-cskh/migrations/02_cs_staff.sql`
+- Create: `db/cs/migrations/02_cs_staff.sql`
 
 **Interfaces:**
 - Produces: bảng `public.cs_staff` với cột `email` (unique, chữ thường), `hoat_dong` (bool), `vai_tro` (text)
@@ -113,7 +113,7 @@ Sai bất kỳ ô nào thì dừng, sửa migration, chạy lại — không đi
 - [ ] **Step 4: Commit**
 
 ```bash
-git add supabase-cskh/migrations/02_cs_staff.sql
+git add db/cs/migrations/02_cs_staff.sql
 git commit -m "feat(auth): bảng cs_staff — allowlist kiêm blocklist cho app CSKH"
 ```
 
@@ -122,9 +122,9 @@ git commit -m "feat(auth): bảng cs_staff — allowlist kiêm blocklist cho app
 ## Task 2: Luật vào cửa (hàm thuần + test)
 
 **Files:**
-- Create: `app-cskh/lib/auth.ts`
-- Test: `app-cskh/lib/auth.test.ts`
-- Modify: `app-cskh/package.json`
+- Create: `apps/web/lib/auth.ts`
+- Test: `apps/web/lib/auth.test.ts`
+- Modify: `apps/web/package.json`
 
 **Interfaces:**
 - Produces: `DOMAIN_CONG_TY`, `chuanHoaEmail(email)`, `xetLuatVaoCua(email, dong)`, kiểu `KetQuaVaoCua`, `DongStaff`
@@ -132,10 +132,10 @@ git commit -m "feat(auth): bảng cs_staff — allowlist kiêm blocklist cho app
 - [ ] **Step 1: Cài vitest**
 
 ```bash
-npm --prefix app-cskh install -D vitest
+npm --prefix apps/web install -D vitest
 ```
 
-Thêm vào `app-cskh/package.json` phần `scripts`:
+Thêm vào `apps/web/package.json` phần `scripts`:
 
 ```json
 "test": "vitest run"
@@ -143,7 +143,7 @@ Thêm vào `app-cskh/package.json` phần `scripts`:
 
 - [ ] **Step 2: Viết test TRƯỚC (phải fail)**
 
-Tạo `app-cskh/lib/auth.test.ts`:
+Tạo `apps/web/lib/auth.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -187,7 +187,7 @@ describe('xetLuatVaoCua', () => {
 - [ ] **Step 3: Chạy test, xác nhận FAIL**
 
 ```bash
-npm --prefix app-cskh test
+npm --prefix apps/web test
 ```
 
 Kỳ vọng: fail vì `./auth` chưa tồn tại.
@@ -240,7 +240,7 @@ export function xetLuatVaoCua(email: string, dong: DongStaff): KetQuaVaoCua {
 - [ ] **Step 5: Chạy test, xác nhận PASS**
 
 ```bash
-npm --prefix app-cskh test
+npm --prefix apps/web test
 ```
 
 Kỳ vọng: 7 test pass.
@@ -248,7 +248,7 @@ Kỳ vọng: 7 test pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app-cskh/lib/auth.ts app-cskh/lib/auth.test.ts app-cskh/package.json app-cskh/package-lock.json
+git add apps/web/lib/auth.ts apps/web/lib/auth.test.ts apps/web/package.json apps/web/package-lock.json
 git commit -m "feat(auth): luật vào cửa dạng hàm thuần + 7 unit test"
 ```
 
@@ -257,7 +257,7 @@ git commit -m "feat(auth): luật vào cửa dạng hàm thuần + 7 unit test"
 ## Task 3: Nối luật vào `requireStaff()`
 
 **Files:**
-- Modify: `app-cskh/lib/supabase.ts:46-51`
+- Modify: `apps/web/lib/supabase.ts:46-51`
 
 **Interfaces:**
 - Consumes: `xetLuatVaoCua`, `chuanHoaEmail`, `KetQuaVaoCua` từ Task 2
@@ -317,7 +317,7 @@ export async function requireStaff() {
 - [ ] **Step 3: Verify biên dịch và lint sạch**
 
 ```bash
-npm --prefix app-cskh run lint
+npm --prefix apps/web run lint
 ```
 
 Kỳ vọng: không lỗi. `actions.ts` gọi `requireStaff()` ở 13 chỗ, không chỗ nào cần sửa vì chữ ký hàm giữ nguyên.
@@ -325,7 +325,7 @@ Kỳ vọng: không lỗi. `actions.ts` gọi `requireStaff()` ở 13 chỗ, kh�
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app-cskh/lib/supabase.ts
+git add apps/web/lib/supabase.ts
 git commit -m "feat(auth): requireStaff xét luật vào cửa qua cs_staff"
 ```
 
@@ -334,8 +334,8 @@ git commit -m "feat(auth): requireStaff xét luật vào cửa qua cs_staff"
 ## Task 4: Route callback + mở ngoại lệ proxy
 
 **Files:**
-- Create: `app-cskh/app/auth/callback/route.ts`
-- Modify: `app-cskh/proxy.ts:29-34`
+- Create: `apps/web/app/auth/callback/route.ts`
+- Modify: `apps/web/proxy.ts:29-34`
 
 **Interfaces:**
 - Consumes: `authClient`, `kiemTraVaoCua`, `ghiNhanNhanVienMoi` (Task 3); `chuanHoaEmail` (Task 2)
@@ -412,7 +412,7 @@ Nếu ra `/login` trơn (không có `?loi=`) thì proxy vẫn đang chặn, ngo�
 - [ ] **Step 4: Commit**
 
 ```bash
-git add app-cskh/app/auth/callback/route.ts app-cskh/proxy.ts
+git add apps/web/app/auth/callback/route.ts apps/web/proxy.ts
 git commit -m "feat(auth): route /auth/callback + mở ngoại lệ /auth trong proxy"
 ```
 
@@ -421,8 +421,8 @@ git commit -m "feat(auth): route /auth/callback + mở ngoại lệ /auth trong 
 ## Task 5: Nút Google trên trang login
 
 **Files:**
-- Create: `app-cskh/app/auth/actions.ts`
-- Modify: `app-cskh/app/login/page.tsx`
+- Create: `apps/web/app/auth/actions.ts`
+- Modify: `apps/web/app/login/page.tsx`
 
 **Interfaces:**
 - Consumes: `authClient`, `kiemTraVaoCua`, `ghiNhanNhanVienMoi` (Task 3)
@@ -559,7 +559,7 @@ Nhớ `import { Suspense } from 'react'`.
 - [ ] **Step 4: Verify build thật, không chỉ dev**
 
 ```bash
-npm --prefix app-cskh run build
+npm --prefix apps/web run build
 ```
 
 Kỳ vọng: build thành công. Đây là bước bắt buộc vì lỗi `useSearchParams` thiếu Suspense **chỉ lộ ra lúc build**, chạy `npm run dev` vẫn bình thường.
@@ -567,7 +567,7 @@ Kỳ vọng: build thành công. Đây là bước bắt buộc vì lỗi `useSe
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app-cskh/app/login/page.tsx app-cskh/app/auth/actions.ts
+git add apps/web/app/login/page.tsx apps/web/app/auth/actions.ts
 git commit -m "feat(auth): nút đăng nhập Google + áp luật cho cả đường mật khẩu"
 ```
 
@@ -576,7 +576,7 @@ git commit -m "feat(auth): nút đăng nhập Google + áp luật cho cả đư�
 ## Task 6: Sửa tài liệu và cấu hình lệch
 
 **Files:**
-- Modify: `app-cskh/.env.example`, `app-cskh/README.md`, `docs/CHECKLIST.md`
+- Modify: `apps/web/.env.example`, `apps/web/README.md`, `docs/CHECKLIST.md`
 - Create: `docs/huong-dan-cau-hinh-google-vercel.md`
 
 - [ ] **Step 1: Sửa `.env.example`** — đang trỏ project cũ `qynpywysgltspmgnhhga` (GWT-Masterdata) trong khi code đã cutover sang `cs_customers`. Đổi `NEXT_PUBLIC_SUPABASE_URL` thành `https://bwzmqfbcgouhvhoslmmm.supabase.co`, anon key tương ứng, và sửa dòng comment "project GWT-Masterdata" → "project GWT-SalesTracking".
@@ -604,12 +604,12 @@ Thêm mục mới:
 Hướng dẫn 3 việc user tự làm, mỗi bước ghi đúng giá trị cần điền:
 1. Google Cloud Console → OAuth client (Web application) → Authorized redirect URI là URL callback **của Supabase** (`https://bwzmqfbcgouhvhoslmmm.supabase.co/auth/v1/callback`), lấy Client ID + Secret
 2. Supabase → Authentication → Providers → Google → dán Client ID/Secret; Authentication → URL Configuration → thêm Redirect URLs: `http://localhost:3000/auth/callback`, `https://<domain-production>/auth/callback`, `https://*-<team>.vercel.app/auth/callback`
-3. Vercel → Import repo `AIGWTVN/customer-support` → **Root Directory = `app-cskh`** → nhập 3 biến môi trường cho cả Production và Preview → Settings → Deployment Protection bật cho Preview
+3. Vercel → Import repo `AIGWTVN/customer-support` → **Root Directory = `apps/web`** → nhập 3 biến môi trường cho cả Production và Preview → Settings → Deployment Protection bật cho Preview
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app-cskh/.env.example app-cskh/README.md docs/CHECKLIST.md docs/huong-dan-cau-hinh-google-vercel.md
+git add apps/web/.env.example apps/web/README.md docs/CHECKLIST.md docs/huong-dan-cau-hinh-google-vercel.md
 git commit -m "docs(auth): sửa .env.example trỏ nhầm project + hướng dẫn cấu hình Google/Vercel"
 ```
 
@@ -624,7 +624,7 @@ Ba việc cấu hình ở Task 6 Step 4 phải **user tự làm xong** trước 
 - [ ] **Step 1: Chạy toàn bộ test và build**
 
 ```bash
-npm --prefix app-cskh test && npm --prefix app-cskh run build
+npm --prefix apps/web test && npm --prefix apps/web run build
 ```
 
 Kỳ vọng: 7 test pass, build thành công.

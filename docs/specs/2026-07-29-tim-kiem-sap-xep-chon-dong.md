@@ -22,9 +22,9 @@
 | `82811c6` | Chọn **tất cả khớp bộ lọc**, không chỉ 50 dòng đang xem |
 | `c097034` | Sửa lỗi Supabase cắt còn 1000 dòng mà không báo |
 | `145b1f9` | `/serial` + `/bao-tri` thêm phân trang — mọi dòng chọn được đều xem tới được |
-| `0230b46` | Tách thành gói dùng lại được ở [`app-cskh/bang/`](../../app-cskh/bang/README.md) |
+| `0230b46` | Tách thành gói dùng lại được ở [`apps/web/bang/`](../../apps/web/bang/README.md) |
 
-Toàn bộ phần chung đã tách vào **[`app-cskh/bang/`](../../app-cskh/bang/README.md)** — chép
+Toàn bộ phần chung đã tách vào **[`apps/web/bang/`](../../apps/web/bang/README.md)** — chép
 nguyên thư mục sang project khác là dùng được, chỉ cần sửa `giaoDien.ts` để đổi giao diện.
 App này trỏ thẳng vào đó, **không có bản sao** nên không bao giờ lệch.
 
@@ -41,7 +41,7 @@ Cột trong DB có bản **bỏ dấu sinh sẵn** (`ten_kd`, `dia_chi_kd`, `sec
 từ khoá người dùng gõ cũng được bỏ dấu bằng `boDau()` trước khi truy vấn. Nhờ vậy gõ `Hương`
 hay `huong` đều ra kết quả y hệt.
 
-⚠️ `boDau()` trong [`lib/timkiem.ts`](../../app-cskh/lib/timkiem.ts) phải khớp **đúng** với hàm
+⚠️ `boDau()` trong [`lib/timkiem.ts`](../../apps/web/lib/timkiem.ts) phải khớp **đúng** với hàm
 `public.khong_dau()` dưới Postgres. Lệch nhau là gõ ra kết quả rỗng mà không ai hiểu vì sao.
 
 ### 2.2 Tên người khớp theo ĐẦU TỪ, không phải chuỗi con
@@ -162,7 +162,7 @@ Chip đặt ngay trên bảng, viết thẳng:
 ```
 
 Nhãn cột và nghĩa từng chiều khai báo ở `TEN_COT` / `NGHIA_SAP_XEP` trong
-[`lib/danhSach.ts`](../../app-cskh/lib/danhSach.ts). Thêm cột sắp mới thì **nhớ khai báo cả hai**,
+[`lib/danhSach.ts`](../../apps/web/lib/danhSach.ts). Thêm cột sắp mới thì **nhớ khai báo cả hai**,
 thiếu thì chip rơi về câu chung chung "tăng dần/giảm dần".
 
 ⚠️ Chip đọc `KetQuaTrang.sapXep` — **cột máy chủ đã chốt**, KHÔNG đọc lại URL. Gõ tay
@@ -185,7 +185,7 @@ hiện ra nhưng bấm vào không đổi gì, người dùng tưởng nút hỏ
 
 ### 4.1 Hiện có gì
 
-[`components/ChonDong.tsx`](../../app-cskh/components/ChonDong.tsx):
+[`components/ChonDong.tsx`](../../apps/web/components/ChonDong.tsx):
 
 - Cột checkbox + ô "chọn tất cả trang này" (có trạng thái chọn-một-phần).
 - Thanh đen "Đã chọn N … · Bỏ chọn" hiện khi có ít nhất một dòng.
@@ -364,7 +364,7 @@ vẫn chỉ có `requireStaff()`.
 
 ## 6. Migration DB
 
-`supabase-cskh/migrations/07_bao_tri_tim_khong_dau.sql` — đã apply lên
+`db/cs/migrations/07_bao_tri_tim_khong_dau.sql` — đã apply lên
 `bwzmqfbcgouhvhoslmmm`.
 
 - Thêm cột **sinh sẵn** (`generated always as … stored`): `maintenance_plan.ten_kd`,
