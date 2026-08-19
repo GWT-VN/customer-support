@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { deXuatGopKhach } from '@/app/actions'
 import { KhachPicker } from '@/components/KhachPicker'
@@ -18,11 +18,18 @@ export function GopKhachButton({ giuId, tenGiu }: { giuId: string; tenGiu: strin
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const router = useRouter()
+  // Chốt chặn "sự thật" cho việc đang gộp — không phụ thuộc riêng vào state busy
+  // (state cập nhật bất đồng bộ, có thể chưa kịp re-render kịp click thứ hai).
+  // Thao tác này ẩn cả một hồ sơ khách nên tuyệt đối không được chạy 2 lần cùng lúc.
+  const dangGop = useRef(false)
 
   async function gop(gopId: string, nhan: string) {
+    if (dangGop.current) return
     if (!window.confirm(`Gộp "${nhan}" vào "${tenGiu}"?\n\nMáy, ticket, lịch bảo trì của hồ sơ kia sẽ chuyển sang đây. Hồ sơ kia bị ẩn đi (không xoá hẳn).`)) return
+    dangGop.current = true
     setBusy(true); setErr(null); setMsg(null)
     const r = await deXuatGopKhach(giuId, gopId)
+    dangGop.current = false
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
     // Đóng picker ngay trong cả 2 nhánh — nếu đã gộp xong thì hồ sơ kia đã ẩn
@@ -35,8 +42,8 @@ export function GopKhachButton({ giuId, tenGiu }: { giuId: string; tenGiu: strin
 
   return (
     <div className="space-y-1.5">
-      <button onClick={() => { setMo(!mo); setErr(null) }}
-        className="rounded-lg border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+      <button onClick={() => { setMo(!mo); setErr(null) }} disabled={busy}
+        className="rounded-lg border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
         Gộp hồ sơ trùng vào đây
       </button>
       {mo && (
@@ -44,8 +51,13 @@ export function GopKhachButton({ giuId, tenGiu }: { giuId: string; tenGiu: strin
           <p className="text-xs text-slate-600">
             Chọn hồ sơ <strong>bị trùng</strong> — dữ liệu của nó sẽ chuyển sang <strong>{tenGiu}</strong>.
           </p>
-          <KhachPicker onPick={(id, nhan) => gop(id, nhan)} />
-          {busy && <p className="text-xs text-slate-500">Đang xử lý…</p>}
+          {busy ? (
+            // Ẩn hẳn picker trong lúc đang gộp — kể cả link "đổi" của nó cũng
+            // active mọi lúc, nếu để lộ ra thì bấm được là bắn request thứ 2.
+            <p className="text-xs text-slate-500">Đang xử lý…</p>
+          ) : (
+            <KhachPicker onPick={(id, nhan) => gop(id, nhan)} />
+          )}
         </div>
       )}
       {err && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1.5">{err}</p>}
