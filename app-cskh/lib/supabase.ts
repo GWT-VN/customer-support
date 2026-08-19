@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
-import { chuanHoaEmail, xetLuatVaoCua, type KetQuaVaoCua } from './auth'
+import { chuanHoaEmail, xetLuatVaoCua, xetLuatVaoNenTang, VAI_TRO_VAO_APP, type KetQuaVaoCua } from './auth'
 import { chuanHoaVaiTro, coQuyenQuanLy, laChiKyThuat, laQuyenAdmin, type VaiTro } from './quyen'
 
 /**
@@ -138,6 +138,37 @@ export const requireStaff = cache(async () => {
 
   return user
 })
+
+/** Xét luật vào NỀN TẢNG (rộng — mọi nhân sự hoạt động). Dùng cho khu /work. */
+export async function kiemTraVaoNenTang(email: string): Promise<KetQuaVaoCua> {
+  const e = chuanHoaEmail(email)
+  const dong = await layDongStaff(e)
+  return xetLuatVaoNenTang(e, dong ? { hoat_dong: dong.hoat_dong, vai_tro: dong.vai_tro } : null)
+}
+
+/**
+ * Chặn cổng NỀN TẢNG — cho MỌI nhân sự đang hoạt động (không cần vai trò CS).
+ * Dùng cho khu /work và module không phải CS. Khu CS vẫn dùng requireStaff().
+ */
+export const requireNhanSu = cache(async () => {
+  const user = await layNguoiDung()
+  if (!user) redirect('/login')
+
+  const email = chuanHoaEmail(user.email)
+  const kq = await kiemTraVaoNenTang(email)
+  if (!kq.duocVao) {
+    if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
+    redirect(`/login?loi=${kq.lyDo}`)
+  }
+  return user
+})
+
+/** Người đang đăng nhập có vào được KHU CS không (admin|cs|cs_manager|ky_thuat). */
+export async function coTheVaoCS(): Promise<boolean> {
+  const nv = await layNhanVien()
+  if (!nv) return false
+  return nv.vai_tro.some((r) => (VAI_TRO_VAO_APP as readonly string[]).includes(r))
+}
 
 /**
  * Hồ sơ nhân viên của người đang đăng nhập.

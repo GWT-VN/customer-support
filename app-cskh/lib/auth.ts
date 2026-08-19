@@ -52,3 +52,22 @@ export function xetLuatVaoCua(email: string, dong: DongStaff): KetQuaVaoCua {
   // Luật 4
   return { duocVao: false, lyDo: 'ngoai_danh_sach' }
 }
+
+/**
+ * Luật vào cửa NỀN TẢNG — dùng cho khu /work (và các module không phải CS sau này).
+ *
+ * RỘNG hơn xetLuatVaoCua: BẤT KỲ nhân sự đang hoạt động nào cũng vào được nền tảng
+ * để dùng Việc/Work — KHÔNG cần vai trò CS. Khu CS vẫn gác riêng bằng xetLuatVaoCua
+ * (Sales thuần thấy /work nhưng vẫn bị chặn khỏi trang khách/ticket).
+ *
+ * Người nghỉ việc (hoat_dong=false) vẫn bị chặn ở mọi khu — luật khoá giữ nguyên.
+ */
+export function xetLuatVaoNenTang(email: string, dong: DongStaff): KetQuaVaoCua {
+  const e = chuanHoaEmail(email)
+  if (dong) {
+    if (!dong.hoat_dong) return { duocVao: false, lyDo: 'bi_khoa' }
+    return { duocVao: true, nguon: 'staff' }
+  }
+  if (e.endsWith(DOMAIN_CONG_TY)) return { duocVao: false, lyDo: 'cho_duyet' }
+  return { duocVao: false, lyDo: 'ngoai_danh_sach' }
+}
