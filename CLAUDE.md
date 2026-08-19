@@ -3,6 +3,30 @@
 **Một** Next.js app phục vụ nhiều module nghiệp vụ, chung đăng nhập / UI / deploy,
 chung 1 Postgres. Trước 19/08/2026 repo này tên `customer-support` và chỉ có CSKH.
 
+## ⚠️ ĐỌC ĐẦU TIÊN — mỗi phiên Claude một worktree riêng
+
+Repo này thường có **nhiều phiên Claude chạy song song**. Hai phiên cùng mở một thư
+mục là giẫm chân nhau: phiên A `git checkout` sang nhánh khác trong lúc phiên B đang
+sửa dở, commit của B rơi vào nhánh của A, `git add -A` quét luôn file dang dở của
+nhau. **19/08/2026 đã suýt commit SĐT khách thật vì đúng chuyện này** (git hook chặn kịp).
+
+**Luật:** thư mục gốc `GWT-App/` chỉ đứng ở `main` để đọc. Muốn sửa code → worktree riêng.
+
+```bash
+bash tools/wt.sh ds                  # xem phiên khác đang giữ worktree nào — CHẠY TRƯỚC KHI LÀM GÌ
+bash tools/wt.sh moi feat/<viec>     # tạo chỗ làm riêng, in đường dẫn
+cd <đường dẫn nó in> && npm --prefix apps/web install
+bash tools/wt.sh xong feat/<viec>    # gỡ khi đã merge
+```
+
+Vẫn chung một kho git: nhánh, commit, remote dùng chung, chỉ tách thư mục làm việc.
+Worktree đặt ở `~/gwt-worktrees/` — **ngoài iCloud**, vì iCloud sync sinh file trùng
+kiểu `TopNav 2.tsx` và làm chậm build.
+
+Nếu buộc phải làm ngay trong thư mục gốc: chạy `bash tools/wt.sh ds` trước, thấy có
+worktree của người khác thì `git status` + `git branch --show-current` để biết mình
+đang đứng ở đâu, và **chỉ `git add` đúng file của mình** — đừng `git add -A`.
+
 ## Cấu trúc
 
 ```
