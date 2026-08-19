@@ -93,3 +93,5 @@ migrate/_out/
 # Supabase CLI — state cục bộ (link/branch tạm), KHÔNG commit. Migrations + config THÌ commit.
 supabase/.temp/
 supabase/.branches/
+# File dump data prod tạm (CÓ PII) — script tự xoá, chặn commit cho chắc
+supabase/.tmp-*

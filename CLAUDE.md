@@ -17,3 +17,11 @@ Quy tắc từ file đó:
 - **Schema/dữ liệu = query DB Supabase `bwzmqfbcgouhvhoslmmm`** (Supabase MCP) — ĐỪNG tin mô tả cột cũ trong doc, code repo có thể đã đi xa hơn context của bạn.
 - **Đổi bảng DÙNG CHUNG** → ghi 1 dòng vào Changelog trong `SYSTEM.md` + báo Sales TRƯỚC khi chạy migration.
 - Không commit PII khách; git author = `ai@gwt.vn`.
+
+## Toolchain Claude (bắt buộc)
+
+Chuẩn chung mọi module: **Superpowers** (skill) + **CodeGraph** (index code) —
+luật đầy đủ: `../GWT-SHARED/TOOLCHAIN-CLAUDE.md`.
+- Repo này CÓ `.codegraph/` → hỏi code bằng `codegraph explore "<câu hỏi>"` (hoặc MCP `codegraph_explore`) **TRƯỚC** khi grep/đọc file.
+- Việc nhiều bước → skill `writing-plans` → `executing-plans`; tính năng mới → `test-driven-development`;
+  bug → `systematic-debugging`; trước khi báo xong → `verification-before-completion`.
