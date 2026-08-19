@@ -16,8 +16,16 @@ insert into public.staff (email, ten, vai_tro, hoat_dong) values
   ('dev.locked@gwt.vn',   'Dev Nghỉ việc',    array['cs'],                    false)
 on conflict (email) do nothing;
 
--- --- Team Work đã được seed trong migration work_00_init (marketing/sales/cskh/ky_thuat).
---     Cho vài người vào team để test bảng team sau này. ---
+-- --- Team Work: db dump chỉ lấy SCHEMA, không lấy data seed trong migration work_00_init,
+--     nên phải seed lại 4 team ở đây. ---
+insert into work.team(key,name,color,sort_order) values
+  ('marketing','Marketing','#b0518f',1),
+  ('sales','Sales','#2f7d8a',2),
+  ('cskh','CSKH','#b5642a',3),
+  ('ky_thuat','Kỹ thuật','#5560c9',4)
+on conflict (key) do nothing;
+
+-- Cho vài người vào team để test bảng team sau này.
 insert into work.team_member (team_id, staff_id, role_in_team)
 select t.id, s.id, 'member'
 from work.team t

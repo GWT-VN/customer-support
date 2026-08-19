@@ -86,3 +86,10 @@ migrate/_out/
 # Obsidian editor config
 .obsidian/
 /BACKLOG.md
+
+# Claude worktrees (không commit)
+.claude/worktrees/
+
+# Supabase CLI — state cục bộ (link/branch tạm), KHÔNG commit. Migrations + config THÌ commit.
+supabase/.temp/
+supabase/.branches/
