@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { danhSachDon } from './actions'
@@ -60,7 +61,10 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
                   rows.map((o) => (
                     <tr key={o.order_code} className="hover:bg-slate-50">
                       <td className="whitespace-nowrap px-3 py-2.5">
-                        <span className="inline-flex items-center gap-2 font-medium text-teal-700">
+                        <Link
+                          href={`/sales/don/${encodeURIComponent(o.order_code)}`}
+                          className="inline-flex items-center gap-2 font-medium text-teal-700 hover:underline"
+                        >
                           {o.source_tab && (
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
                               {TAB_LABEL[o.source_tab] ?? o.source_tab}
@@ -70,7 +74,7 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
                           {o.is_app && (
                             <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">App</span>
                           )}
-                        </span>
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{fmtDate(o.order_date)}</td>
                       <td className="px-3 py-2.5 text-slate-700">
