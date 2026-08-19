@@ -66,13 +66,30 @@ function laNgayNghi(day: number, vung: Vung): boolean {
   return false
 }
 
-/** Dời tới ngày làm kế tiếp nếu rơi vào ngày nghỉ của vùng. */
-function dichQuaNgayNghi(y: number, m: number, d: number, vung: Vung): string {
-  let dt = new Date(Date.UTC(y, m, d))
-  while (laNgayNghi(dt.getUTCDay(), vung)) {
-    dt = new Date(dt.getTime() + 86400000)
-  }
-  return dt.toISOString().slice(0, 10)
+const iso = (dt: Date) => dt.toISOString().slice(0, 10)
+
+/**
+ * Dời tới ngày làm gần nhất nếu rơi vào ngày nghỉ của vùng.
+ *
+ * `giuThang` = mốc phải Ở LẠI ĐÚNG THÁNG của nó. Dùng cho các lượt SUY RA (lượt 2,
+ * 3, 4…), không dùng cho ngày bắt đầu do người nhập chọn.
+ *
+ * Vì sao cần: cộng 3 tháng vào 30/11 ra 30/02 -> kẹp về 28/02 -> nếu 28/02 là Chủ
+ * nhật, dời TỚI sẽ nhảy sang 01/03. Nhìn bảng thấy 30/11 · 01/03 · 31/05 · 30/08:
+ * lượt 2 rơi sang THÁNG 3 nên trông như lệch chu kỳ. Khi giữ tháng thì lùi về ngày
+ * làm cuối cùng của tháng 2 (26/02) -> các mốc thành T11 · T2 · T5 · T8, đều theo
+ * tháng đúng như người dùng mong đợi.
+ */
+function dichQuaNgayNghi(y: number, m: number, d: number, vung: Vung, giuThang = false): string {
+  const goc = new Date(Date.UTC(y, m, d))
+  let toi = goc
+  while (laNgayNghi(toi.getUTCDay(), vung)) toi = new Date(toi.getTime() + 86400000)
+  if (!giuThang || toi.getUTCMonth() === goc.getUTCMonth()) return iso(toi)
+
+  // Dời tới đã nhảy sang tháng khác -> lùi về ngày làm gần nhất TRONG tháng.
+  let lui = goc
+  while (laNgayNghi(lui.getUTCDay(), vung)) lui = new Date(lui.getTime() - 86400000)
+  return iso(lui.getUTCMonth() === goc.getUTCMonth() ? lui : toi)
 }
 
 /**
@@ -91,7 +108,8 @@ export function sinhLichBaoTri(
   for (let i = 0; i < soLan; i++) {
     if (buoc === 0 && i > 0) break  // "chỉ 1 lần"
     const [ay, am, ad] = themThang(y, mo, d, i * buoc)
-    out.push(dichQuaNgayNghi(ay, am, ad, vung))
+    // i === 0 là ngày người nhập chọn -> chỉ dời TỚI, không được lùi về quá khứ.
+    out.push(dichQuaNgayNghi(ay, am, ad, vung, i > 0))
   }
   return out
 }

@@ -224,6 +224,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
             {preview.length > 0 ? (
               <div className="text-xs space-y-1">
                 <p className="text-slate-500">Xem trước {preview.length} mốc (né cuối tuần vùng {vungHl}) — <strong>sửa từng mốc được</strong>{tDates.length > 0 && <> · <button onClick={() => setTDates([])} className="text-sky-600 underline">tạo lại theo tham số</button></>}:</p>
+                <p className="text-[10px] text-slate-400">Mốc luôn nằm đúng tháng của chu kỳ; ngày có thể lệch vài hôm vì tháng ngắn/dài khác nhau và phải né T7/CN.</p>
                 <div className="flex flex-wrap gap-1.5">
                   {preview.map((d, i) => (
                     <span key={i} className="inline-flex items-center gap-1 bg-white border rounded px-1 py-0.5">
@@ -315,6 +316,7 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                     {preview.length > 0 ? (
                       <div className="text-xs">
                         <p className="text-slate-500 mb-1">Xem trước {preview.length} mốc (đã né cuối tuần) — sửa xong bấm Sinh lịch để lưu:</p>
+                        <p className="text-[10px] text-slate-400 mb-1">Mốc luôn nằm đúng tháng của chu kỳ; ngày có thể lệch vài hôm vì tháng ngắn/dài khác nhau và phải né T7/CN.</p>
                         <div className="flex flex-wrap gap-1">
                           {preview.map((d, i) => (
                             <span key={d + i} className="px-1.5 py-0.5 rounded bg-white border text-slate-700">L{i + 1}: {vnDate(d)}</span>

@@ -32,7 +32,22 @@ function chiTieuTheoLoai(mmloai: LoaiMay): ChiTieu[] {
   return [TDS, PH, DO_CUNG, CLO]
 }
 
-type SoMap = Partial<Record<SoField, number>>
+/**
+ * Giữ NGUYÊN CHUỖI người gõ, không parse ngay từng phím.
+ *
+ * Trước đây map này là `number`: gõ "7." -> Number("7.") = 7 -> ô render lại
+ * thành "7", dấu chấm bay mất nên KHÔNG TÀI NÀO gõ được pH 7.5. Chỉ đổi sang
+ * số ở bước lưu.
+ */
+type SoMap = Partial<Record<SoField, string>>
+
+/** Chuỗi ô nhập -> số gửi lên server. Rỗng/dở dang ("7.", "-", ".") -> bỏ qua. */
+const soHoacBo = (s: string | undefined): number | undefined => {
+  const t = s?.trim()
+  if (!t) return undefined
+  const n = Number(t)
+  return Number.isFinite(n) ? n : undefined
+}
 
 /** Đo nước cho 1 việc bảo trì. "Trước lọc" dùng chung `truoc` cả chuyến; "sau lọc" riêng máy này. */
 function DoNuocViec({
@@ -50,12 +65,11 @@ function DoNuocViec({
   const [msg, setMsg] = useState<string | null>(null)
 
   const ct = chiTieuTheoLoai(mmloai)
-  const soHoacBo = (s: string): number | undefined => (s === '' ? undefined : Number(s))
 
   async function luu() {
     setBusy(true); setErr(null); setMsg(null)
     const kq: KetQuaDo = { ngay, ghi_chu: ghiChu || undefined }
-    for (const c of ct) { kq[c.t] = truoc[c.t]; kq[c.s] = sau[c.s] }
+    for (const c of ct) { kq[c.t] = soHoacBo(truoc[c.t]); kq[c.s] = soHoacBo(sau[c.s]) }
     const r = await ghiKetQuaBaoTri(visitId, kq)
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
@@ -84,10 +98,10 @@ function DoNuocViec({
         {ct.map((c) => (
           <div key={c.key} className="contents">
             <span className="text-slate-600">{c.nhan}</span>
-            <input inputMode="decimal" value={(truoc[c.t] as number | undefined) ?? ''} placeholder="chung điểm"
-              onChange={(e) => setTruoc((cur) => ({ ...cur, [c.t]: soHoacBo(e.target.value) }))} className={oNum} />
-            <input inputMode="decimal" value={(sau[c.s] as number | undefined) ?? ''} placeholder="sau"
-              onChange={(e) => setSau((cur) => ({ ...cur, [c.s]: soHoacBo(e.target.value) }))} className={oNum} />
+            <input inputMode="decimal" value={truoc[c.t] ?? ''} placeholder="chung điểm"
+              onChange={(e) => setTruoc((cur) => ({ ...cur, [c.t]: e.target.value }))} className={oNum} />
+            <input inputMode="decimal" value={sau[c.s] ?? ''} placeholder="sau"
+              onChange={(e) => setSau((cur) => ({ ...cur, [c.s]: e.target.value }))} className={oNum} />
           </div>
         ))}
       </div>

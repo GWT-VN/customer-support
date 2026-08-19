@@ -60,6 +60,29 @@ describe('sinhLichBaoTri', () => {
     expect([1, 2, 3, 4, 5]).toContain(weekday(sinhLichBaoTri(t7, null, 1, 'bac')[0]))
   })
 
+  it('mốc suy ra KHÔNG nhảy sang tháng khác (ca 30/11/2026, lỗi CEO báo)', () => {
+    // 30/11 + 3 tháng -> 30/02 -> kẹp 28/02/2027 (Chủ nhật). Trước đây dời TỚI
+    // thành 01/03 nên bảng đọc ra T11 · T3 · T5 · T8, trông như lệch chu kỳ.
+    const ds = sinhLichBaoTri('2026-11-30', 3, 4, 'bac')
+    expect(ds).toEqual(['2026-11-30', '2027-02-26', '2027-05-31', '2027-08-30'])
+    for (const iso of ds) expect([1, 2, 3, 4, 5]).toContain(weekday(iso))
+  })
+
+  it('mốc suy ra luôn đúng tháng kỳ vọng (12 lượt × 1 tháng)', () => {
+    const ds = sinhLichBaoTri('2026-01-30', 1, 12, 'bac')   // 30/01/2026 là Thứ 6
+    ds.forEach((iso, i) => {
+      const thangKyVong = (0 + i) % 12                       // T1 + i
+      expect(new Date(iso + 'T00:00:00Z').getUTCMonth()).toBe(thangKyVong)
+    })
+  })
+
+  it('ngày BẮT ĐẦU vẫn chỉ dời TỚI (không lùi về quá khứ)', () => {
+    // 31/01/2026 là Thứ 7: giữ-tháng sẽ muốn lùi, nhưng lượt đầu là ngày người
+    // nhập chọn nên phải dời TỚI (02/02) chứ không được lùi về 30/01.
+    expect(weekday('2026-01-31')).toBe(6)
+    expect(sinhLichBaoTri('2026-01-31', null, 1, 'bac')[0]).toBe('2026-02-02')
+  })
+
   it('cách nhau đúng số tháng (mốc chưa dời)', () => {
     const ds = sinhLichBaoTri('2026-03-16', 3, 3, 'bac') // 16/3 là Thứ 2
     // lượt kế ~ 16/6, ~16/9 (có thể lệch 1-2 ngày do dời cuối tuần)
