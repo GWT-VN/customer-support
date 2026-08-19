@@ -101,3 +101,7 @@ supabase/.tmp-*
 # Chỉ giữ data/README.md để giải thích thư mục này là gì.
 /data/*
 !/data/README.md
+
+# Ghi chú làm việc cá nhân qua Superpowers (plan nháp có thể dán nguyên văn
+# thông tin khách — tên, SĐT, MST, địa chỉ) — không commit, chỉ máy cục bộ.
+/docs/superpowers/
