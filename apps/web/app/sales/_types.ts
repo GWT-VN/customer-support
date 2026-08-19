@@ -5,6 +5,8 @@ export type CatalogPick = {
   name: string
   category_l1: string | null
   category_l2: string | null
+  ma_cu: string | null // mã cũ (search)
+  ma_doitac: string | null // mã đối tác/kho (search)
 }
 
 export type ChannelOpt = {

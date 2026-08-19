@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { TINH_VN } from '@/lib/tinh'
 import { taoDon, suaDon, timKhachChoDon } from './actions'
 import { fmtVnd } from './_ui'
 import {
@@ -42,6 +43,74 @@ const inp =
 const lbl = 'block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1'
 const card = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
+/** Ô tìm sản phẩm: gõ theo tên / mã nội bộ / mã cũ / mã đối tác, hoặc bấm chọn. */
+function ProductPicker({
+  catalog,
+  code,
+  name,
+  onPick,
+}: {
+  catalog: CatalogPick[]
+  code: string
+  name: string
+  onPick: (c: CatalogPick) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const boxRef = useRef<HTMLDivElement>(null)
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    const arr = !s
+      ? catalog
+      : catalog.filter(
+          (c) =>
+            c.name.toLowerCase().includes(s) ||
+            c.internal_code.toLowerCase().includes(s) ||
+            (c.ma_cu ?? '').toLowerCase().includes(s) ||
+            (c.ma_doitac ?? '').toLowerCase().includes(s)
+        )
+    return arr.slice(0, 40)
+  }, [q, catalog])
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+  return (
+    <div className="relative" ref={boxRef}>
+      <input
+        className={inp}
+        placeholder="Gõ tên / mã nội bộ / mã cũ… hoặc bấm chọn"
+        value={open ? q : code ? `${name} (${code})` : ''}
+        onFocus={() => { setOpen(true); setQ('') }}
+        onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white text-sm shadow-lg">
+          {filtered.length === 0 && <div className="px-3 py-2 text-slate-400">Không thấy sản phẩm khớp.</div>}
+          {filtered.map((c) => (
+            <button
+              key={c.internal_code}
+              type="button"
+              onClick={() => { onPick(c); setOpen(false); setQ('') }}
+              className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+            >
+              <span className="text-slate-800">{c.name}</span>
+              <span className="ml-1 font-mono text-xs text-slate-400">
+                {c.internal_code}
+                {c.ma_cu ? ` · cũ ${c.ma_cu}` : ''}
+              </span>
+            </button>
+          ))}
+          {filtered.length === 40 && <div className="px-3 py-1.5 text-[11px] text-slate-400">Gõ thêm để lọc hẹp hơn…</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function OrderForm({
   catalog,
   channels,
@@ -57,17 +126,6 @@ export function OrderForm({
 }) {
   const router = useRouter()
   const isEdit = mode === 'edit'
-
-  const catalogByCode = useMemo(() => new Map(catalog.map((c) => [c.internal_code, c])), [catalog])
-  const catalogGroups = useMemo(() => {
-    const g = new Map<string, CatalogPick[]>()
-    for (const c of catalog) {
-      const k = c.category_l1 || 'Khác'
-      if (!g.has(k)) g.set(k, [])
-      g.get(k)!.push(c)
-    }
-    return [...g.entries()]
-  }, [catalog])
 
   const initHasNewCust = !!initial && !initial.customer_code && !!(initial.customer_name || initial.phone)
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>(initHasNewCust ? 'new' : 'existing')
@@ -106,10 +164,6 @@ export function OrderForm({
     startSearch(async () => setCustHits((await timKhachChoDon(q)) as CustomerHit[]))
   }
   const setLine = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
-  function pickProduct(key: number, code: string) {
-    const c = catalogByCode.get(code)
-    setLine(key, { internal_code: code, product_name: c?.name ?? '', category_l1: c?.category_l1 ?? null, category_l2: c?.category_l2 ?? null })
-  }
   const addLine = () => setLines((ls) => [...ls, emptyLine(Math.max(0, ...ls.map((l) => l.key)) + 1)])
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls))
 
@@ -225,14 +279,12 @@ export function OrderForm({
             <div key={l.key} className="rounded-lg border border-slate-100 bg-slate-50/50 p-2">
               <div className="grid grid-cols-12 items-center gap-2">
                 <div className="col-span-12 sm:col-span-5">
-                  <select className={inp} value={l.internal_code} onChange={(e) => pickProduct(l.key, e.target.value)}>
-                    <option value="">— chọn sản phẩm —</option>
-                    {catalogGroups.map(([grp, items]) => (
-                      <optgroup key={grp} label={grp}>
-                        {items.map((c) => <option key={c.internal_code} value={c.internal_code}>{c.name} ({c.internal_code})</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <ProductPicker
+                    catalog={catalog}
+                    code={l.internal_code}
+                    name={l.product_name}
+                    onPick={(c) => setLine(l.key, { internal_code: c.internal_code, product_name: c.name, category_l1: c.category_l1, category_l2: c.category_l2 })}
+                  />
                 </div>
                 <input type="number" min={0} className={inp + ' col-span-3 sm:col-span-2 text-right'} value={l.quantity} onChange={(e) => setLine(l.key, { quantity: Number(e.target.value) })} title="Số lượng (DVBT = số lần)" />
                 <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá" disabled={l.is_gift} title="Đơn giá (sau VAT)" />
@@ -263,12 +315,18 @@ export function OrderForm({
             </select>
           </div>
           <div><label className={lbl}>Mã đơn đối tác</label><input className={inp} value={partnerCode} onChange={(e) => setPartnerCode(e.target.value)} placeholder="Shopee / HĐ…" /></div>
-          <div><label className={lbl}>Ngày lắp đặt</label><input type="date" className={inp} value={installDate} onChange={(e) => setInstallDate(e.target.value)} /></div>
+          <div><label className={lbl}>Ngày lắp đặt <span className="font-normal text-slate-400">(không bắt buộc)</span></label><input type="date" className={inp} value={installDate} onChange={(e) => setInstallDate(e.target.value)} /></div>
           <div><label className={lbl}>Tình trạng hàng</label><select className={inp} value={status} onChange={(e) => setStatus(e.target.value)}>{FULFILL_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div><label className={lbl}>Thanh toán</label><select className={inp} value={payment} onChange={(e) => setPayment(e.target.value)}>{PAYMENT_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div><label className={lbl}>Hình thức TT</label><select className={inp} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>{PAYMETHOD_OPTS.map((o) => <option key={o} value={o}>{o || '— chọn —'}</option>)}</select></div>
           <div><label className={lbl}>Mã vận đơn</label><input className={inp} value={shippingCode} onChange={(e) => setShippingCode(e.target.value)} /></div>
-          <div className="sm:col-span-1"><label className={lbl}>Tỉnh / TP</label><input className={inp} value={province} onChange={(e) => setProvince(e.target.value)} /></div>
+          <div className="sm:col-span-1"><label className={lbl}>Tỉnh / TP</label>
+            <select className={inp} value={province} onChange={(e) => setProvince(e.target.value)}>
+              <option value="">— chọn —</option>
+              {province && !TINH_VN.includes(province) && <option value={province}>{province} (cũ)</option>}
+              {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
           <div className="sm:col-span-3"><label className={lbl}>Địa chỉ giao</label><input className={inp} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
         </div>
         <div className="mt-3"><label className={lbl}>Ghi chú đơn</label><textarea className={inp} rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>

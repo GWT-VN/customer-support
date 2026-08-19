@@ -8,7 +8,7 @@ export async function listCatalogForPicker(): Promise<CatalogPick[]> {
   const db = dataClient()
   const { data, error } = await db
     .from('catalog_item')
-    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1","Danh mục cấp 2"')
+    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1","Danh mục cấp 2","Mã cũ","Mã đối tác/Kho"')
   if (error) throw error
   return ((data ?? []) as Array<Record<string, string | null>>)
     .map((r) => ({
@@ -16,6 +16,8 @@ export async function listCatalogForPicker(): Promise<CatalogPick[]> {
       name: (r['Tên ngắn gọn (đề xuất)'] || r['Mã nội bộ'] || '').trim(),
       category_l1: r['Danh mục cấp 1'],
       category_l2: r['Danh mục cấp 2'],
+      ma_cu: r['Mã cũ'],
+      ma_doitac: r['Mã đối tác/Kho'],
     }))
     .filter((r) => r.internal_code)
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
