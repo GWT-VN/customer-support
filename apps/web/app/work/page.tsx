@@ -1,4 +1,4 @@
-import { requireNhanSu } from '@/lib/supabase'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { vieCcuaToi } from './actions'
 import { ViecCuaToi } from '@/components/ViecCuaToi'
 

@@ -7,8 +7,9 @@
  * Mọi action gọi requireNhanSu() trước (cổng nền tảng: mọi nhân sự hoạt động),
  * rồi dùng dataClient() (service_role, chỉ server). Email lấy từ session đã xác minh.
  */
-import { requireNhanSu, dataClient } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { dataClient } from '@/lib/nen-tang/db'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 import { revalidatePath } from 'next/cache'
 
 export type ViecRow = {

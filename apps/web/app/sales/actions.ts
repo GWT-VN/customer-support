@@ -1,7 +1,9 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { coTheVaoSales, dataClient, requireNhanSu } from '@/lib/supabase'
+import { dataClient } from '@/lib/nen-tang/db'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 
 /** Gác khu Sales: nền tảng (mọi nhân sự) + phải có vai trò Sales. */
 async function chanSales() {
