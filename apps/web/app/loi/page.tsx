@@ -9,6 +9,7 @@ import { laQuanLy } from '@/lib/supabase'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportLoiButton } from '@/components/ExportLoiButton'
 import { BangLoi } from '@/components/BangLoi'
+import { DauTrang } from '@/components/DauTrang'
 
 const SAP = 'sắp đến hạn (≤30 ngày)'
 
@@ -37,9 +38,7 @@ export default async function LoiPage({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-900">Lịch thay lõi</h1>
-        </header>
+        <DauTrang tieuDe="Lịch thay lõi" phuDe="Lõi tới hạn thay theo từng máy" />
 
         <Suspense>
           <OTimKiem placeholder="Gõ serial, tên khách, SĐT, mã lõi…" />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sapXepHopLe } from '../bang'
-import { tenModel, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from './danhSach'
+import { tenModel, doChacHopLe, DO_CHAC_NGAY_LAP, NHAN_DO_CHAC, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH } from './danhSach'
 
 describe('tenModel — rút tên sản phẩm về mã máy cho ô lọc', () => {
   // 18 tên dưới đây lấy NGUYÊN VĂN từ v_installed_base trên DB thật (2026-07-29),
@@ -89,5 +89,32 @@ describe('sapXepHopLe — ?cot=mat_khau trên URL thật (Task 5, bấm tiêu đ
   it('cột lạ bị loại thì KHÔNG hiện nút bỏ sắp xếp — URL bẩn không được tính là "đã sắp"', () => {
     expect(sapXepHopLe('mat_khau', 'asc', COT_MAY, { cot: 'install_date', tang: false }).macDinh)
       .toBe(true)
+  })
+})
+
+describe('doChacHopLe — độ chắc của ngày lắp (migration 47)', () => {
+  it('nhận đúng 3 giá trị hợp lệ', () => {
+    expect(doChacHopLe('chinh_xac')).toBe('chinh_xac')
+    expect(doChacHopLe('uoc_luong')).toBe('uoc_luong')
+    expect(doChacHopLe('khong_ro')).toBe('khong_ro')
+  })
+
+  // Ràng buộc CHECK ở DB chỉ nhận 3 giá trị. Để lọt giá trị lạ là cả lần kích hoạt
+  // bảo hành đổ, nên rơi về mặc định chứ không ném lỗi.
+  it('giá trị lạ rơi về chinh_xac, không ném lỗi', () => {
+    expect(doChacHopLe('linh tinh')).toBe('chinh_xac')
+    expect(doChacHopLe('CHINH_XAC')).toBe('chinh_xac')
+    expect(doChacHopLe('')).toBe('chinh_xac')
+  })
+
+  it('null/undefined rơi về chinh_xac — máy cũ không có cột này', () => {
+    expect(doChacHopLe(null)).toBe('chinh_xac')
+    expect(doChacHopLe(undefined)).toBe('chinh_xac')
+  })
+
+  it('mọi giá trị đều có nhãn tiếng Việt để hiển thị', () => {
+    for (const k of DO_CHAC_NGAY_LAP) {
+      expect(NHAN_DO_CHAC[k]).toBeTruthy()
+    }
   })
 })

@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { PhanTrang } from '@/bang'
+import { DauTrang } from '@/components/DauTrang'
 import { SerialTao } from '@/components/SerialTao'
 import { SerialPendingList } from '@/components/SerialPendingList'
 import { NhapKhoSerial } from '@/components/NhapKhoSerial'
@@ -38,9 +39,7 @@ export default async function SerialPage({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-900">Kho serial</h1>
-        </header>
+        <DauTrang tieuDe="Kho serial" phuDe="Serial trong kho, đã xuất và chờ nhập" />
 
         <div className="flex gap-2 flex-wrap">
           <Link href="/serial"

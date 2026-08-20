@@ -4,6 +4,7 @@ import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, listBangView
 import type { KetQuaTrang } from '@/bang'
 import { ExportTicketButton } from '@/components/ExportTicketButton'
 import { BangTicket } from '@/components/BangTicket'
+import { DauTrang } from '@/components/DauTrang'
 import { laQuanLy } from '@/lib/supabase'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
@@ -76,13 +77,14 @@ export default async function TicketsPage({
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-slate-900">Ticket CSKH</h1>
-            <Link href="/tao-ticket"
-              className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm font-medium">+ Tạo ticket</Link>
-          </div>
-        </header>
+        <DauTrang tieuDe="Ticket CSKH" phuDe={`${tong.toLocaleString('vi-VN')} ticket`}>
+          <Link
+            href="/tao-ticket"
+            className="rounded-[9px] bg-[#b5642a] text-white px-4 py-2 text-sm font-medium hover:bg-[#8a4a1c]"
+          >
+            ＋ Tạo ticket
+          </Link>
+        </DauTrang>
 
         <Suspense>
           <OTimKiem placeholder="Gõ mã ticket, serial, tên khách, SĐT hoặc nội dung lỗi…" />

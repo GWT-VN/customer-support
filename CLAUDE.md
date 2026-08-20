@@ -76,3 +76,51 @@ npx --prefix apps/web tsc --noEmit
 
 Dựng máy từ 0: `docs/ONBOARDING-DEV.md` · DB local: `docs/LOCAL-DEV.md`.
 Backlog: `BACKLOG.md` (xem `../GWT-SHARED/HUONG-DAN-BACKLOG.md`).
+
+## ⚠️ Quy trình giao việc: LOCAL trước, KHÔNG đẩy CEO sang preview
+
+**CEO duyệt trên máy mình, không duyệt trên preview.** Chốt 20/08/2026.
+Preview Vercel build chậm, và nó cắm vào **DB production** — CEO bấm thử là sửa data thật.
+
+Xong một việc thì làm ĐÚNG thứ tự này:
+
+1. **Tự kiểm trước khi gọi.** `npx tsc --noEmit` + `npm run test` + `npm run build` phải sạch.
+   Chưa xanh thì chưa được gọi CEO.
+2. **Trỏ DB local** — `npm run env:local` (Supabase local 127.0.0.1, có ~425 khách data
+   thật đã che PII từ `supabase/seed-prod-masked.sh`). **Tuyệt đối không** đưa CEO xem bản
+   đang cắm `.env.local.prod`.
+3. **Bật server local từ worktree, cổng riêng** — mỗi phiên một cổng để không đụng nhau:
+   ```bash
+   cd <worktree>/apps/web && npx next dev -p 3100    # 3200, 3300… cho phiên sau
+   ```
+   Chạy nền, chờ dòng `Ready in`, rồi **đưa CEO đúng đường dẫn `http://localhost:31xx/...`**
+   của màn cần xem — đừng bắt CEO tự mò.
+   > Khung xem trước tích hợp (`preview_start`) **không mở được worktree ở `~/gwt-worktrees`**
+   > (sandbox chặn, `EPERM: uv_cwd`). Dùng lệnh trên. Gặp lỗi này thì đừng bỏ bước local.
+
+   🚫 **TUYỆT ĐỐI KHÔNG `pkill -f "next dev"`** (hay `killall node`). Lệnh đó giết dev server
+   của **mọi phiên Claude đang chạy** — kể cả server mà phiên khác vừa đưa CEO vào xem: CEO
+   đang bấm thì trang chết, không ai biết vì sao. **Đã xảy ra thật 20/08/2026.**
+   Tắt server của mình thì tắt **đúng tiến trình mình tạo** (dừng task nền đã khởi chạy nó),
+   hoặc giết **đúng cổng của mình**: `lsof -ti :3200 | xargs kill`.
+4. **CEO xem, báo lỗi → sửa → CEO F5.** Không rebuild, không chờ deploy.
+5. **CEO OK → đối chiếu migration local vs prod** (xem dưới) → merge `main` → production.
+
+### Trước khi merge: đối chiếu migration local vs production
+
+Bẫy đã dính 20/08/2026: migration 46 (`gop_khach`) chạy ngon ở local, prod **chưa có hàm**
+— suýt đẩy một nút hỏng lên cho nhân viên. Local xanh **không** có nghĩa prod chạy được.
+
+Việc có đụng `db/*/migrations/` thì trước khi merge phải kiểm hàm/bảng mới đã có trên
+prod chưa (Supabase MCP, project `bwzmqfbcgouhvhoslmmm`), thiếu thì áp trước rồi mới merge.
+
+### Khi nào mới dùng preview Vercel
+
+Mặc định **KHÔNG**. Chỉ đề nghị khi có một trong bốn lý do, và **phải nói rõ lý do**:
+
+1. Cần người khác xem (nhân viên, kỹ thuật) — họ không mở được localhost của CEO.
+2. Cần xem trên điện thoại.
+3. Việc đụng đăng nhập Google / cron / webhook — local không tái hiện được.
+4. Cần đúng data production mà bản che PII không tái hiện được.
+
+Dùng preview thì **nói trước cho CEO là nó cắm DB thật**, và nhắc chỗ nào không nên bấm.

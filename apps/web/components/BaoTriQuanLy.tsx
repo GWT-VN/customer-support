@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ganKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
+import { ganKhachBaoTri, goGanKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, khachDayDu, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
+import { TimKhachChiTiet } from '@/components/TimKhachChiTiet'
+import { SoSanhHoSo } from '@/components/SoSanhHoSo'
+import { dangCo, type KhachDayDu } from '@/lib/gopKhach'
 import { sinhLichBaoTri, vungTheoTinh, macDinhTheoBoMay, type Vung } from '@/lib/lichBaoTri'
+import { tinCayThap } from '@/lib/khopPlanKhach'
 import { KhachPicker } from '@/components/KhachPicker'
 import { vnDate } from '@/components/Badge'
 
@@ -57,6 +61,8 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
     setMoTao(false); setTKhach(''); setTBoMay(''); setTCtx(null); setTDates([]); setMsg(`Đã tạo lịch mới ${r.so_lan} lượt.`); router.refresh()
   }
   const [chonTay, setChonTay] = useState<string | null>(null)     // plan id đang chọn khách tay
+  // Ứng viên đang xem so sánh trước khi gán (null = chưa mở cái nào).
+  const [xem, setXem] = useState<{ planId: string; dangTai: boolean; khach: KhachDayDu | null } | null>(null)
   const [moLich, setMoLich] = useState<string | null>(null)       // plan id đang mở form lịch
   const [suaLan, setSuaLan] = useState<string | null>(null)       // plan id đang sửa số lần
   const [lanVal, setLanVal] = useState('')
@@ -84,12 +90,38 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
     setSuaLan(null); setMsg(r.them > 0 ? `Đã đặt số lần + nối thêm ${r.them} lượt.` : 'Đã cập nhật số lần.'); router.refresh()
   }
 
-  async function gan(planId: string, customerId: string) {
+  /**
+   * Gán khách cho plan — chỉ gọi được SAU khi CS đã mở khối so sánh và nhìn đủ
+   * thông tin hai bên. Trước đây bấm gợi ý phát là gán luôn: các gợi ý xếp sát
+   * nhau, bấm trượt một ô là plan dính vào khách sai mà không có gì báo, lại
+   * không hoàn tác được.
+   */
+  async function gan(planId: string, customerId: string, tenKhach: string) {
     setBusy(planId); setErr(null); setMsg(null)
     const r = await ganKhachBaoTri(planId, customerId)
     setBusy(null)
     if (!r.ok) { setErr(r.error); return }
-    setChonTay(null); setMsg('Đã map khách.'); router.refresh()
+    setChonTay(null); setXem(null)
+    setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
+    router.refresh()
+  }
+
+  /** Mở khối so sánh cho một ứng viên: nạp hồ sơ khách đủ trường rồi mới vẽ. */
+  async function moSoSanh(planId: string, customerId: string) {
+    setErr(null); setMsg(null)
+    setXem({ planId, dangTai: true, khach: null })
+    const k = await khachDayDu(customerId)
+    if (!k) { setXem(null); setErr('Không đọc được hồ sơ khách này.'); return }
+    setXem({ planId, dangTai: false, khach: k })
+  }
+
+  async function goGan(planId: string, tenKhach: string | null) {
+    if (!window.confirm(`Gỡ lịch bảo trì này khỏi khách "${tenKhach ?? '—'}"?\n\nLịch quay về nhóm "chưa khớp khách". Các lượt bảo trì đã có KHÔNG bị xoá.`)) return
+    setBusy(planId); setErr(null); setMsg(null)
+    const r = await goGanKhachBaoTri(planId)
+    setBusy(null)
+    if (!r.ok) { setErr(r.error); return }
+    setMsg('Đã gỡ gán — lịch quay về nhóm chưa khớp khách.'); router.refresh()
   }
   async function lenLich(planId: string, macDinhLan: number | null) {
     setBusy(planId); setErr(null); setMsg(null)
@@ -147,18 +179,94 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                     <div className="text-xs text-slate-500">{p.bo_may ?? '—'} · {p.tong_lan ?? '?'} lần · {p.loai_goi}</div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {p.goi_y_id && (
-                      <button disabled={busy === p.id} onClick={() => gan(p.id, p.goi_y_id!)}
-                        className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm disabled:opacity-50">
-                        Gán: {p.goi_y_ten} ({p.goi_y_sdt})
-                      </button>
+                    {p.goi_y.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.goi_y.map((g) => {
+                          // Gợi ý chỉ dựa trên 1 tín hiệu mềm duy nhất (cùng tỉnh, hoặc ngày lắp
+                          // lệch xa) trông giống hệt gợi ý trùng SĐT nếu vẽ cùng màu emerald đặc —
+                          // CS dễ tưởng "chắc chắn" rồi gán nhầm khách. Đổi màu + chữ để phân biệt
+                          // rõ, thay vì ẩn hẳn (vẫn còn giá trị hơn phải mò tay trong 400 khách).
+                          const yeu = tinCayThap(g.diem)
+                          return (
+                            <button key={g.id} disabled={busy === p.id}
+                              onClick={() => moSoSanh(p.id, g.id)}
+                              className={
+                                'rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 text-left ' +
+                                (yeu ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-emerald-600 text-white')
+                              }>
+                              {yeu ? 'Có thể là: ' : 'Xem & gán: '}{g.ten}{g.sdt ? ` (${g.sdt})` : ''}
+                              <span className={'block text-[10px] font-normal ' + (yeu ? 'text-amber-800' : 'opacity-80')}>
+                                {yeu ? 'gợi ý yếu, kiểm tra kỹ trước khi gán — ' : ''}{g.lyDo.join(' · ')}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-amber-700">chưa đoán được khách — bấm &quot;Chọn khách khác&quot;</span>
                     )}
                     <button onClick={() => setChonTay(chonTay === p.id ? null : p.id)}
                       className="rounded-lg border px-3 py-1.5 text-sm text-slate-700">Chọn khách khác</button>
                   </div>
                 </div>
                 {chonTay === p.id && (
-                  <div className="pt-1"><KhachPicker onPick={(id) => gan(p.id, id)} /></div>
+                  <div className="pt-1">
+                    {/* Ô tìm hiện đủ tỉnh + địa chỉ; chọn xong vẫn đi qua khối so
+                        sánh chứ không gán thẳng — cùng một đường với nút gợi ý. */}
+                    <TimKhachChiTiet onChon={(k) => moSoSanh(p.id, k.id)} />
+                  </div>
+                )}
+
+                {/* Khối so sánh: plan bên trái, khách ứng viên bên phải. Nút gán
+                    nằm TRONG đây nên không thể gán mà chưa nhìn. */}
+                {xem?.planId === p.id && (
+                  <div className="pt-2">
+                    {xem.dangTai || !xem.khach ? (
+                      <p className="text-xs text-slate-400">Đang tải hồ sơ khách…</p>
+                    ) : (
+                      <SoSanhHoSo
+                        trai={{
+                          tieuDe: 'Lịch bảo trì (từ Asana)',
+                          dong: [
+                            { nhan: 'Tên', giaTri: p.source_customer_name ?? '' },
+                            { nhan: 'SĐT', giaTri: p.source_phone ?? '' },
+                            { nhan: 'Tỉnh/TP', giaTri: '' },
+                            { nhan: 'Địa chỉ', giaTri: '' },
+                            { nhan: 'Bộ máy', giaTri: p.bo_may ?? '' },
+                            { nhan: 'Số lần', giaTri: p.tong_lan ? String(p.tong_lan) : '' },
+                          ],
+                        }}
+                        phai={{
+                          tieuDe: 'Khách trong hệ thống',
+                          nhan: dangCo(xem.khach),
+                          href: `/khach/${xem.khach.id}`,
+                          dong: [
+                            { nhan: 'Tên', giaTri: xem.khach.full_name },
+                            { nhan: 'SĐT', giaTri: xem.khach.primary_phone ?? '' },
+                            { nhan: 'Tỉnh/TP', giaTri: xem.khach.province ?? '' },
+                            { nhan: 'Địa chỉ', giaTri: xem.khach.address ?? '' },
+                            { nhan: 'Bộ máy', giaTri: `${xem.khach.so_may} máy đã lắp` },
+                            { nhan: 'Số lần', giaTri: `${xem.khach.so_plan} lịch bảo trì đang có` },
+                          ],
+                        }}
+                        hanhDong={
+                          <>
+                            <button disabled={busy === p.id}
+                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name)}
+                              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                              {busy === p.id ? 'Đang gán…' : 'Đúng người, gán'}
+                            </button>
+                            <button onClick={() => setXem(null)} className="text-sm text-slate-500 underline">
+                              Không phải, đóng
+                            </button>
+                            <span className="text-xs text-slate-400">
+                              Gán nhầm vẫn gỡ được ở danh sách &ldquo;đã map&rdquo; bên dưới.
+                            </span>
+                          </>
+                        }
+                      />
+                    )}
+                  </div>
                 )}
               </li>
             ))}
@@ -277,10 +385,18 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
-                    <button onClick={() => moFormLich(p)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800">
-                      {p.so_visit > 0 ? 'Sinh lại lịch' : 'Lên lịch'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Đường HOÀN TÁC cho lỡ gán nhầm khách — trước đây gán là một
+                          chiều, sai thì phải nhờ kỹ thuật chạy SQL mới gỡ được. */}
+                      <button disabled={busy === p.id} onClick={() => goGan(p.id, p.ten_khach)}
+                        className="text-xs text-slate-500 underline hover:text-red-600 disabled:opacity-50">
+                        gỡ gán
+                      </button>
+                      <button onClick={() => moFormLich(p)}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800">
+                        {p.so_visit > 0 ? 'Sinh lại lịch' : 'Lên lịch'}
+                      </button>
+                    </div>
                     {p.so_may === 0 && <span className="text-[10px] text-amber-500">khách chưa có máy kích hoạt BH</span>}
                   </div>
                 </div>

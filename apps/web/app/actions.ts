@@ -8,11 +8,14 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
+import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
+import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
+import type { PChon } from '@/lib/gopKhachChon'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay,
-  type TinhTrangBH, type DongNhapSerial,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, doChacHopLe, NHAN_LOAI_DIA_CHI,
+  type TinhTrangBH, type DongNhapSerial, type DoChacNgayLap,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -65,6 +68,8 @@ export type Machine = {
   con_han_may: boolean | null
   con_han_loi: boolean | null
   co_chinh_sach_bh: boolean
+  ngay_lap_do_chac: DoChacNgayLap | null
+  ghi_chu: string | null
 }
 
 /** Tra máy theo serial / tên khách / SĐT / địa chỉ (không dấu). Rỗng -> máy lắp gần nhất. */
@@ -214,6 +219,12 @@ export type Customer = {
   needs_phone: boolean
   notes: string | null
   channel_id: number | null
+  /** Thông tin công ty để xuất hoá đơn / làm hợp đồng (migration 50). */
+  ten_cty: string | null
+  mst: string | null
+  dia_chi_cty: string | null
+  sdt_cty: string | null
+  email_cty: string | null
 }
 
 export async function getCustomer(id: string) {
@@ -248,6 +259,11 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
     primary_phone: sdt,
     province: patch.province || null,
     address: patch.address || null,
+    ten_cty: patch.ten_cty || null,
+    mst: patch.mst || null,
+    dia_chi_cty: patch.dia_chi_cty || null,
+    sdt_cty: patch.sdt_cty || null,
+    email_cty: patch.email_cty || null,
   }
   // Sửa được SĐT hợp lệ -> hạ cờ needs_phone + xoá ghi chú lỗi
   if (sdt && /^0\d{9,10}$/.test(sdt)) { payload.needs_phone = false; payload.notes = null }
@@ -281,9 +297,14 @@ export async function deleteContact(id: string, customerId: string) {
 
 // ── Đề xuất SỬA/XOÁ cần admin duyệt (yeu_cau_thay_doi) ─────────────────────
 type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts' | 'installed_base'
-type LoaiTD = 'sua' | 'xoa' | 'doi_serial'
+type LoaiTD = 'sua' | 'xoa' | 'doi_serial' | 'gop'
 const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
-  cs_customers: ['full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone'],
+  cs_customers: [
+    'full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone',
+    // Thông tin công ty (mig 50) — thiếu ở đây thì CS sửa xong, admin duyệt, mà
+    // trường vẫn không đổi: vòng duyệt lọc payload đúng theo danh sách này.
+    'ten_cty', 'mst', 'dia_chi_cty', 'sdt_cty', 'email_cty',
+  ],
   filter_replacement: ['filter_code', 'replaced_at', 'note'],
   customer_contacts: ['phone', 'contact_name', 'role', 'zalo_ok'],
   installed_base: ['customer_id', 'install_date', 'install_address'],
@@ -369,6 +390,20 @@ async function apDungThayDoi(
   loai: LoaiTD, payload?: Record<string, unknown> | null
 ) {
   if (doiTuong === 'installed_base') return apDungMay(db, banGhiId, loai, payload)
+  // Gộp khách: ban_ghi_id = bản GIỮ LẠI, payload.gop_id = bản bị gộp.
+  // Gọi RPC để 5 bảng tham chiếu + trộn trường + ẩn mềm nằm trong 1 transaction.
+  if (loai === 'gop') {
+    if (doiTuong !== 'cs_customers') return { error: { message: 'Chỉ gộp được hồ sơ khách.' } }
+    const gopId = payload?.gop_id
+    if (typeof gopId !== 'string' || !gopId) return { error: { message: 'Thiếu khách bị gộp.' } }
+    // `chon` chỉ có ở yêu cầu tạo từ màn /khach/gop. Yêu cầu cũ (payload chỉ có
+    // gop_id) truyền p_chon = null -> RPC chạy đúng luật trước migration 49.
+    const chon = payload?.chon ?? null
+    const { error } = await db.rpc('gop_khach', {
+      p_giu: banGhiId, p_gop: gopId, p_chon: chon,
+    })
+    return { error: error ? { message: error.message } : null }
+  }
   if (loai === 'xoa') {
     // Khách: ẩn mềm (giữ máy/ticket). SĐT phụ + lịch thay lõi: xoá cứng (bảng lá).
     if (doiTuong === 'cs_customers') {
@@ -383,9 +418,15 @@ async function apDungThayDoi(
   return db.from(doiTuong).update(patch).eq('id', banGhiId)
 }
 
-function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string) {
+function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string, loai?: LoaiTD) {
   if (doiTuong === 'cs_customers') {
-    revalidatePath('/khach'); revalidatePath(`/khach/${banGhiId}`); revalidatePath('/')
+    revalidatePath('/khach'); revalidatePath(`/khach/${banGhiId}`)
+    // GỘP khách KHÔNG revalidate '/'. Trang "Máy đã lắp" là trang ĐỘNG (dựng lại
+    // mỗi lần truy cập) nên revalidate chẳng giúp gì, nhưng lại bắt server dựng
+    // lại cả bảng 2.400 máy NGAY TRONG lượt gọi server action — nút "Gộp" đứng
+    // mãi ở "Đang xử lý…" dù DB đã xong từ lâu. CEO gặp đúng ca này 20/08/2026:
+    // audit ghi ok lúc 15:19:07, giao diện không bao giờ báo xong.
+    if (loai !== 'gop') revalidatePath('/')
   } else if (doiTuong === 'customer_contacts') {
     revalidatePath('/khach')
   } else {
@@ -402,13 +443,15 @@ export async function guiYeuCauThayDoi(input: {
   const db = dataClient()
   // XOÁ thông tin khách phải qua ADMIN duyệt. Cấp quản lý (cs_manager) áp trực tiếp
   // các thay đổi KHÁC; riêng xoá khách của họ vẫn vào hàng chờ để admin duyệt.
-  const laXoaKhach = input.doi_tuong === 'cs_customers' && input.loai === 'xoa'
+  // XOÁ hoặc GỘP hồ sơ khách đều phải qua ADMIN duyệt: cả hai đều làm biến mất
+  // một hồ sơ khách khỏi danh sách, sai thì rất khó phát hiện.
+  const laXoaKhach = input.doi_tuong === 'cs_customers' && (input.loai === 'xoa' || input.loai === 'gop')
   const apTrucTiep = laXoaKhach ? await laAdmin() : await laQuanLy()
   if (apTrucTiep) {
     const { error } = await apDungThayDoi(db, input.doi_tuong, input.ban_ghi_id, input.loai, input.payload)
     if (error) return { ok: false, error: error.message }
     await ghiAudit(`${input.loai}_${input.doi_tuong}`, `${input.doi_tuong}:${input.ban_ghi_id}`, input.payload)
-    revalidateThayDoi(input.doi_tuong, input.ban_ghi_id)
+    revalidateThayDoi(input.doi_tuong, input.ban_ghi_id, input.loai)
     return { ok: true, applied: true }
   }
   const { error } = await db.from('yeu_cau_thay_doi').insert({
@@ -425,6 +468,151 @@ export async function guiYeuCauThayDoi(input: {
 export async function xoaKhach(id: string, lyDo?: string) {
   await requireStaff()
   return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'xoa', ly_do: lyDo })
+}
+
+/** Hồ sơ khách rút gọn + số lượng dữ liệu đính kèm — để cân nhắc chiều gộp. */
+export async function khachGon(id: string): Promise<KhachGon | null> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: k }, may, ticket, plan] = await Promise.all([
+    db.from('cs_customers').select('id, full_name, primary_phone, address').eq('id', id).maybeSingle(),
+    db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+  ])
+  if (!k) return null
+  const r = k as { id: string; full_name: string; primary_phone: string | null; address: string | null }
+  return {
+    ...r, so_may: may.count ?? 0, so_ticket: ticket.count ?? 0, so_plan: plan.count ?? 0,
+  }
+}
+
+/**
+ * Hồ sơ khách ĐỦ TRƯỜNG cho màn so sánh trước khi gộp (/khach/gop).
+ *
+ * Khác `khachGon` ở chỗ trả thêm tỉnh, mã KH, kênh, nguồn, ghi chú — bản cũ chỉ
+ * có tên + SĐT, mà rất nhiều khách không có SĐT nên CS không có gì để phân biệt
+ * hai hồ sơ trùng tên.
+ */
+export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: k }, may, ticket, plan, lienHe, diaChiPhu] = await Promise.all([
+    db.from('cs_customers')
+      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at, ten_cty, mst, dia_chi_cty, sdt_cty, email_cty, address_truoc_sap_nhap, province_truoc_sap_nhap')
+      .eq('id', id).maybeSingle(),
+    db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+    // Lấy CẢ NỘI DUNG chứ không chỉ đếm: gộp xong hai bộ SĐT phụ / địa chỉ phụ
+    // nhập vào nhau, CS phải nhìn được chúng TRƯỚC khi bấm.
+    db.from('customer_contacts').select('phone, contact_name, role').eq('customer_id', id),
+    db.from('customer_addresses').select('dia_chi, loai').eq('customer_id', id),
+  ])
+  if (!k) return null
+  const r = k as Record<string, unknown>
+
+  // Tên kênh nằm ở bảng của Sales — chỉ tra khi khách thật sự có kênh.
+  let tenKenh: string | null = null
+  if (r.channel_id != null) {
+    const { data: ch } = await db.from('dim_channel')
+      .select('channel_l1, channel_l2').eq('id', r.channel_id).maybeSingle()
+    const c = ch as { channel_l1: string | null; channel_l2: string | null } | null
+    if (c) tenKenh = [c.channel_l1, c.channel_l2].filter(Boolean).join(' · ') || null
+  }
+
+  return {
+    id: r.id as string,
+    full_name: r.full_name as string,
+    primary_phone: (r.primary_phone as string | null) ?? null,
+    address: (r.address as string | null) ?? null,
+    province: (r.province as string | null) ?? null,
+    customer_code: (r.customer_code as string | null) ?? null,
+    channel_id: (r.channel_id as number | null) ?? null,
+    ten_kenh: tenKenh,
+    source: (r.source as string | null) ?? null,
+    partner_ref: (r.partner_ref as string | null) ?? null,
+    notes: (r.notes as string | null) ?? null,
+    ten_cty: (r.ten_cty as string | null) ?? null,
+    mst: (r.mst as string | null) ?? null,
+    dia_chi_cty: (r.dia_chi_cty as string | null) ?? null,
+    sdt_cty: (r.sdt_cty as string | null) ?? null,
+    email_cty: (r.email_cty as string | null) ?? null,
+    address_truoc_sap_nhap: (r.address_truoc_sap_nhap as string | null) ?? null,
+    province_truoc_sap_nhap: (r.province_truoc_sap_nhap as string | null) ?? null,
+    created_at: (r.created_at as string | null) ?? null,
+    so_may: may.count ?? 0,
+    so_ticket: ticket.count ?? 0,
+    so_plan: plan.count ?? 0,
+    sdt_phu: ((lienHe.data ?? []) as { phone: string | null; contact_name: string | null; role: string | null }[])
+      .map((x) => [x.phone, x.contact_name].filter(Boolean).join(' · '))
+      .filter(Boolean),
+    dia_chi_phu: ((diaChiPhu.data ?? []) as { dia_chi: string; loai: string }[])
+      .map((x) => `${x.dia_chi} [${NHAN_LOAI_DIA_CHI[x.loai] ?? x.loai}]`),
+    so_lien_he: (lienHe.data ?? []).length,
+  }
+}
+
+export type DiaChiKhach = {
+  id: string; dia_chi: string; loai: string; ghi_chu: string | null; created_at: string
+}
+
+/** Địa chỉ phụ của khách (migration 48) — nhà / công ty / lắp đặt. */
+export async function diaChiCuaKhach(customerId: string): Promise<DiaChiKhach[]> {
+  await requireStaff()
+  const { data, error } = await dataClient().from('customer_addresses')
+    .select('id, dia_chi, loai, ghi_chu, created_at')
+    .eq('customer_id', customerId).order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DiaChiKhach[]
+}
+
+export async function themDiaChiKhach(
+  customerId: string, dia_chi: string, loai: string, ghi_chu?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  const dc = dia_chi.trim()
+  if (!dc) return { ok: false, error: 'Nhập địa chỉ đã.' }
+  const l = ['nha', 'cty', 'lap_dat', 'khac'].includes(loai) ? loai : 'khac'
+  const { error } = await dataClient().from('customer_addresses')
+    .insert({ customer_id: customerId, dia_chi: dc, loai: l, ghi_chu: ghi_chu?.trim() || null })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('them_dia_chi_khach', `khach:${customerId}`, { loai: l })
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+export async function xoaDiaChiKhach(
+  id: string, customerId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  const { error } = await dataClient().from('customer_addresses').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_dia_chi_khach', `khach:${customerId}`, { dia_chi_id: id })
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+/**
+ * Đề xuất GỘP 2 hồ sơ khách trùng. NV bấm -> vào hàng chờ; admin bấm -> áp ngay.
+ * `giuId` là bản giữ lại, `gopId` là bản bị gộp (sẽ bị ẩn mềm).
+ */
+export async function deXuatGopKhach(
+  giuId: string, gopId: string, chon?: PChon | null, lyDo?: string
+): Promise<{ ok: true; applied: boolean } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!giuId || !gopId) return { ok: false, error: 'Chọn đủ 2 khách.' }
+  const [giu, gop] = await Promise.all([khachGon(giuId), khachGon(gopId)])
+  if (!giu || !gop) return { ok: false, error: 'Không thấy một trong hai hồ sơ khách.' }
+  const kt = kiemTraGop(giu, gop)
+  if (!kt.ok) return { ok: false, error: kt.lyDo }
+  return guiYeuCauThayDoi({
+    doi_tuong: 'cs_customers', ban_ghi_id: giuId, loai: 'gop',
+    // `chon` đi kèm vào hàng chờ: nhân viên chọn trường nào thì lúc admin duyệt
+    // (có thể vài ngày sau) phải áp đúng lựa chọn đó, không phải luật mặc định.
+    payload: { gop_id: gopId, ...(chon ? { chon } : {}) },
+    ly_do: lyDo?.trim() || moTaGop(giu, gop),
+  })
 }
 
 /** Xoá máy đã lắp -> trả serial về tồn kho (gỡ BH + lịch thay lõi). Qua admin duyệt. */
@@ -484,9 +672,11 @@ export async function duyetYeuCau(id: string) {
   if (e0) return { ok: false as const, error: e0.message }
   const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: LoaiTD; payload: Record<string, unknown> | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'cho_duyet') return { ok: false as const, error: 'Yêu cầu không tồn tại hoặc đã xử lý.' }
-  // Duyệt yêu cầu XOÁ thông tin khách chỉ dành cho admin (memory: xoá khách cần admin).
-  if (y.doi_tuong === 'cs_customers' && y.loai === 'xoa' && !(await laAdmin())) {
-    return { ok: false as const, error: 'Duyệt xoá thông tin khách cần quyền quản trị (admin).' }
+  // Duyệt XOÁ hoặc GỘP hồ sơ khách chỉ dành cho admin (memory: xoá/gộp khách cần admin).
+  // Không kiểm lại ở đây thì NV cấp quản lý (đã qua laQuanLy() phía trên) có thể
+  // tự duyệt yêu cầu gộp do chính mình gửi -> leo quyền ngay trên hàng chờ.
+  if (y.doi_tuong === 'cs_customers' && (y.loai === 'xoa' || y.loai === 'gop') && !(await laAdmin())) {
+    return { ok: false as const, error: 'Duyệt xoá/gộp thông tin khách cần quyền quản trị (admin).' }
   }
   const { error } = await apDungThayDoi(db, y.doi_tuong, y.ban_ghi_id, y.loai, y.payload)
   if (error) return { ok: false as const, error: error.message }
@@ -496,6 +686,26 @@ export async function duyetYeuCau(id: string) {
   revalidateThayDoi(y.doi_tuong, y.ban_ghi_id)
   revalidatePath('/duyet')
   return { ok: true as const }
+}
+
+/**
+ * Duyệt NHIỀU yêu cầu một lượt. Chạy TUẦN TỰ chứ không Promise.all: các yêu cầu
+ * có thể đụng cùng một hồ sơ khách (gộp A→B rồi gộp B→C), chạy song song sẽ
+ * giẫm chân nhau. Một yêu cầu hỏng không được chặn các yêu cầu còn lại.
+ * Quyền hạn (quản lý / admin theo loại) do duyetYeuCau tự kiểm cho từng mục,
+ * hàm này không nới quyền gì thêm.
+ */
+export async function duyetNhieuYeuCau(ids: string[]): Promise<{ ok: true; da_duyet: number; loi: string[] }> {
+  await requireStaff()
+  let daDuyet = 0
+  const loi: string[] = []
+  for (const id of ids) {
+    const r = await duyetYeuCau(id)
+    if (r.ok) daDuyet++
+    else loi.push(r.error)
+  }
+  revalidatePath('/duyet')
+  return { ok: true, da_duyet: daDuyet, loi }
 }
 
 /** Từ chối 1 yêu cầu (CHỈ ADMIN). */
@@ -911,39 +1121,48 @@ export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ 
 
 // ── Đợt 1: nền lịch bảo trì tự động + map khách bảo trì với khách kích hoạt máy ──
 
-/** 9 số cuối để so SĐT (bỏ mã vùng/0 đầu, mọi ký tự không phải số). */
-function soDienThoaiChuan(s: string | null | undefined): string {
-  const d = (s ?? '').replace(/\D/g, '')
-  return d.length >= 9 ? d.slice(-9) : d
-}
-
 export type PlanChuaMap = {
   id: string; bo_may: string | null; loai_goi: string | null
   tong_lan: number | null; chu_ky_thang: number | null
   source_customer_name: string | null; source_phone: string | null
-  goi_y_id: string | null; goi_y_ten: string | null; goi_y_sdt: string | null
+  /** Tối đa 3 khách khớp nhất, kèm lý do để CS tự kiểm chứng trước khi bấm gán. */
+  goi_y: GoiYKhach[]
 }
 
-/** Plan bảo trì CHƯA map khách + gợi ý khách khớp SĐT (9 số cuối). */
+/**
+ * Plan bảo trì CHƯA map khách + gợi ý khách khớp.
+ *
+ * Trước đây chỉ dò SĐT nên 23/48 plan không có gợi ý nào (plan Asana phần lớn
+ * thiếu SĐT). Nay dò thêm tỉnh + ngày lắp đọc từ tên thư mục — xem lib/khopPlanKhach.
+ */
 export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
   await requireStaff()
   const db = dataClient()
-  const [{ data: plans }, { data: khach }] = await Promise.all([
+  const [{ data: plans }, { data: khach }, { data: may }] = await Promise.all([
     db.from('maintenance_plan')
       .select('id, bo_may, loai_goi, tong_lan, chu_ky_thang, source_customer_name, source_phone')
       .is('customer_id', null).order('source_customer_name'),
-    db.from('cs_customers').select('id, full_name, primary_phone'),
+    db.from('cs_customers').select('id, full_name, primary_phone, province').neq('trang_thai', 'da_xoa'),
+    db.from('installed_base').select('customer_id, install_date').eq('status', 'active'),
   ])
-  const theoSdt = new Map<string, { id: string; ten: string; sdt: string }>()
-  for (const k of (khach ?? []) as { id: string; full_name: string; primary_phone: string | null }[]) {
-    const key = soDienThoaiChuan(k.primary_phone)
-    if (key && !theoSdt.has(key)) theoSdt.set(key, { id: k.id, ten: k.full_name, sdt: k.primary_phone ?? '' })
+
+  // Ngày lắp SỚM NHẤT của mỗi khách — mốc để so với ngày trong tên plan.
+  const somNhat = new Map<string, string>()
+  for (const m of (may ?? []) as { customer_id: string | null; install_date: string | null }[]) {
+    if (!m.customer_id || !m.install_date) continue
+    const cu = somNhat.get(m.customer_id)
+    if (!cu || m.install_date < cu) somNhat.set(m.customer_id, m.install_date)
   }
-  type PlanRow = Omit<PlanChuaMap, 'goi_y_id' | 'goi_y_ten' | 'goi_y_sdt'>
-  return ((plans ?? []) as PlanRow[]).map((p) => {
-    const g = theoSdt.get(soDienThoaiChuan(p.source_phone))
-    return { ...p, goi_y_id: g?.id ?? null, goi_y_ten: g?.ten ?? null, goi_y_sdt: g?.sdt ?? null }
-  })
+
+  const ungVien: KhachUngVien[] = ((khach ?? []) as {
+    id: string; full_name: string; primary_phone: string | null; province: string | null
+  }[]).map((k) => ({
+    id: k.id, ten: k.full_name, sdt: k.primary_phone, tinh: k.province,
+    ngayLapSomNhat: somNhat.get(k.id) ?? null,
+  }))
+
+  type PlanRow = Omit<PlanChuaMap, 'goi_y'>
+  return ((plans ?? []) as PlanRow[]).map((p) => ({ ...p, goi_y: xepGoiY(p, ungVien) }))
 }
 
 /** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */
@@ -955,6 +1174,30 @@ export async function ganKhachBaoTri(planId: string, customerId: string): Promis
     .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
   if (error) return { ok: false, error: error.message }
   await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId })
+  revalidatePath('/bao-tri')
+  return { ok: true }
+}
+
+/**
+ * Gỡ khách khỏi plan — đường HOÀN TÁC cho lỡ gán nhầm.
+ *
+ * Trước đây gán là một chiều: bấm nhầm một cái là plan dính vào khách sai, muốn
+ * sửa phải nhờ kỹ thuật chạy SQL. Gán chỉ là đặt `customer_id`, gỡ ra rẻ như gán
+ * vào, nên không có lý do gì bắt người dùng sống chung với cái nhầm.
+ * Lượt bảo trì đã sinh KHÔNG bị đụng — chúng treo theo plan, không theo khách.
+ */
+export async function goGanKhachBaoTri(planId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: cu } = await db.from('maintenance_plan')
+    .select('customer_id').eq('id', planId).maybeSingle()
+  const { error } = await db.from('maintenance_plan')
+    .update({ customer_id: null, updated_at: new Date().toISOString() }).eq('id', planId)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('go_gan_khach_bao_tri', `plan:${planId}`, {
+    customer_id_cu: (cu as { customer_id: string | null } | null)?.customer_id ?? null,
+  })
   revalidatePath('/bao-tri')
   return { ok: true }
 }
@@ -2864,12 +3107,14 @@ export async function taoKhachChoDuyet(input: {
 /** Đăng ký bảo hành: gắn máy (serial) cho khách + kích hoạt BH. */
 export async function dangKyBaoHanh(input: {
   serial: string; customer_id: string; install_date: string; install_address?: string
+  ngay_lap_do_chac?: DoChacNgayLap; ghi_chu?: string
 }) {
   await requireStaff()
   const serial = input.serial?.trim()
   if (!serial) return { ok: false as const, error: 'Chọn serial.' }
   if (!input.customer_id) return { ok: false as const, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false as const, error: 'Ngày lắp không hợp lệ.' }
+  const doChac = doChacHopLe(input.ngay_lap_do_chac)
   const db = dataClient()
   // Chặn GHI ĐÈ CHỦ MÁY: serial đã lắp cho khách KHÁC thì từ chối, không upsert đè.
   // NV gõ nhầm 1 ký tự serial không được phép đổi chủ máy của người khác.
@@ -2901,6 +3146,8 @@ export async function dangKyBaoHanh(input: {
     customer_id: input.customer_id,
     install_date: input.install_date,
     install_address: input.install_address?.trim() || null,
+    ngay_lap_do_chac: doChac,
+    ghi_chu: input.ghi_chu?.trim() || null,
     channel_source: 'CSKH đăng ký', status: 'active',
   }, { onConflict: 'serial' })
   if (e1) return { ok: false as const, error: e1.message }
