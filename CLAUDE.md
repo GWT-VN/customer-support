@@ -97,6 +97,12 @@ Xong một việc thì làm ĐÚNG thứ tự này:
    của màn cần xem — đừng bắt CEO tự mò.
    > Khung xem trước tích hợp (`preview_start`) **không mở được worktree ở `~/gwt-worktrees`**
    > (sandbox chặn, `EPERM: uv_cwd`). Dùng lệnh trên. Gặp lỗi này thì đừng bỏ bước local.
+
+   🚫 **TUYỆT ĐỐI KHÔNG `pkill -f "next dev"`** (hay `killall node`). Lệnh đó giết dev server
+   của **mọi phiên Claude đang chạy** — kể cả server mà phiên khác vừa đưa CEO vào xem: CEO
+   đang bấm thì trang chết, không ai biết vì sao. **Đã xảy ra thật 20/08/2026.**
+   Tắt server của mình thì tắt **đúng tiến trình mình tạo** (dừng task nền đã khởi chạy nó),
+   hoặc giết **đúng cổng của mình**: `lsof -ti :3200 | xargs kill`.
 4. **CEO xem, báo lỗi → sửa → CEO F5.** Không rebuild, không chờ deploy.
 5. **CEO OK → đối chiếu migration local vs prod** (xem dưới) → merge `main` → production.
 
