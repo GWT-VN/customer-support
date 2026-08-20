@@ -145,6 +145,87 @@ không khoá nhầm người đang làm việc thật.
 Không cho admin tự thêm mã quyền trong DB: một mã quyền chỉ có nghĩa khi **có chỗ trong code
 kiểm tra nó**. Cho gõ tự do là đẻ ra quyền ma — tick vào thấy yên tâm nhưng không gác gì cả.
 
+### 6.1 Kho quyền — 42 quyền, chốt với CEO 20/08
+
+Gom từ **149 hàm** thật trong `app/actions.ts`, `app/sales/actions.ts`, `app/work/actions.ts`,
+`lib/nen-tang/nhan-su.ts` theo *đối tượng + hành động*. Cột "Mặc định" = **hành vi HÔM NAY**,
+dùng làm giá trị khởi tạo ⇒ ngày đầu ma trận khớp 100%, số lệch = 0.
+
+Viết tắt: **A** = Quản trị · **TCS** = Trưởng CSKH trở lên · **CS** = mọi nhân viên vào được khu CS ·
+**NS** = mọi nhân sự đang hoạt động.
+
+| Mã quyền | Việc nó mở | Mặc định |
+|---|---|---|
+| `cs.khach.xem` | Tìm / xem hồ sơ khách, danh sách khách | CS |
+| `cs.khach.sua` | Sửa thông tin khách, thêm-xoá liên hệ | CS |
+| `cs.khach.xin_xoa` | Gửi yêu cầu xoá khách / máy (chờ duyệt) | CS |
+| `cs.khach.gop` | Gộp 2 hồ sơ trùng NGAY, không qua duyệt | TCS |
+| `cs.khach.duyet_cho` | Duyệt khách chờ | TCS |
+| `cs.khach.xin_xuat` | Xin xuất danh sách khách ra Excel | CS |
+| `cs.khach.duyet_xuat` | Duyệt yêu cầu xuất | TCS |
+| `cs.khach.xoa_hang_loat` | Xoá nhiều khách một lúc | A |
+| `cs.may.xem` | Xem máy, tra serial, lịch sử | CS |
+| `cs.may.kich_hoat_bh` | Kích hoạt bảo hành, lắp bộ combo | CS |
+| `cs.may.lap_thu_doi` | Lắp / thu hồi / đổi máy cho khách | TCS |
+| `cs.serial.kho` | Kho serial: nhập, nhập bảng, đổi trạng thái | TCS |
+| `cs.serial.duyet` | Duyệt / từ chối serial chờ | TCS |
+| `cs.may.thay_loi` | Ghi / sửa / xoá lần thay lõi | CS |
+| `cs.may.trang_thai` | Tạo-sửa-xoá trạng thái máy tuỳ chỉnh | TCS |
+| `cs.ticket.xem` | Xem ticket, danh sách, chi tiết | CS |
+| `cs.ticket.tao_sua` | Tạo, sửa, nhận ticket, ghi chú | CS |
+| `cs.ticket.chi_phi` | Ghi mục / chi phí ticket, thu phí | **CS** ⚠️ |
+| `cs.ticket.nhom_loi` | Tạo-sửa-xoá nhóm lỗi, gán ticket vào nhóm | TCS |
+| `cs.bao_tri.xem` | Xem lịch bảo trì, lượt tới hạn | CS |
+| `cs.bao_tri.ghi_ket_qua` | Đánh dấu đã bảo trì, ghi kết quả đo | CS |
+| `cs.bao_tri.tao_plan` | Tạo plan / gán khách / lên lịch → vào hàng **chờ duyệt** | **CS** ⚠️ |
+| `cs.bao_tri.duyet_plan` | **Duyệt** plan bảo trì đang chờ | **TCS** ⚠️ mới |
+| `cs.ky_thuat.lich_cua_toi` | Xem lịch chuyến của chính mình | NS |
+| `cs.ky_thuat.ho_so` | Tạo-sửa-xoá hồ sơ kỹ thuật viên | TCS |
+| `cs.ky_thuat.xep_lich` | Xếp lịch chuyến, đặt ngày nghỉ | TCS |
+| `cs.ky_thuat.tai_khoan` | Cấp / thu tài khoản đăng nhập cho KTV | A |
+| `cs.bao_cao.xuat` | Xuất Excel ticket / máy / bảo trì / lỗi | TCS |
+| `cs.bao_cao.doanh_so` | Xem doanh số CSKH | CS |
+| `cs.yeu_cau.gui` | Gửi yêu cầu sửa dữ liệu | CS |
+| `cs.yeu_cau.duyet` | **Duyệt** yêu cầu sửa dữ liệu | A |
+| `cs.yeu_cau.tu_choi` | Xem + **từ chối** yêu cầu sửa dữ liệu | TCS |
+| `cs.hang_loat.cap_nhat` | Cập nhật hàng loạt nhiều bản ghi | TCS |
+| `work.viec.xem_tao` | Xem + tạo việc, bình luận | NS |
+| `work.viec.giao` | Giao việc cho người khác, đổi hàng loạt | NS |
+| `work.luat_tu_sinh` | Bật / tắt / chạy tay luật tự sinh việc | TCS |
+| `sales.don.xem` | Xem đơn hàng Sales | khu Sales |
+| `sales.don.ghi` | Tạo / sửa / xoá đơn Sales | khu Sales |
+| `he_thong.nhan_su.xem` | Xem danh sách nhân sự đầy đủ | A |
+| `he_thong.nhan_su.sua` | Đổi vai trò, khoá-mở, mời người ngoài | A |
+| `he_thong.phan_quyen` | Sửa CHÍNH ma trận này | A |
+| `he_thong.nhat_ky` | Xem nhật ký thao tác | A |
+| `he_thong.catalog` | Đồng bộ danh mục sản phẩm | A |
+| `he_thong.kenh` | Quản lý kênh bán, gán kênh | CS |
+| `he_thong.view_chung` | Lưu / xoá view bảng dùng chung | TCS |
+
+**Ba ô ⚠️ là CEO CHỦ ĐỘNG ĐỔI so với hiện trạng** (20/08), không phải sao chép hành vi cũ:
+
+1. `cs.ticket.chi_phi` hạ từ TCS xuống **CS** — nhân viên CSKH ghi chi phí / thu phí được.
+2. `cs.bao_tri.tao_plan` hạ từ TCS xuống **CS**, NHƯNG kết quả vào hàng **chờ duyệt**.
+3. `cs.bao_tri.duyet_plan` là quyền **MỚI** cho TCS.
+
+⚠️ Điểm 2-3 **KHÔNG phải chỉ là ô tick**: ma trận trả lời *ai được làm gì*, còn *làm xong nằm
+chờ duyệt* là cơ chế khác. App đã có mẫu ở 3 chỗ (serial chờ · khách chờ · yêu cầu sửa) nhưng
+plan bảo trì thì CHƯA có hàng chờ. Phải dựng thêm luồng đó — **làm SAU khi ma trận xong**, xem §6.3.
+
+Vì ba ô này khác hiện trạng, tab "Lệch" ở GĐ2 sẽ hiện chúng ngay — đó là **kết quả đúng**, và cũng
+là phép thử thật cho cơ chế dò lệch. Chúng chỉ có hiệu lực THẬT từ GĐ3.
+
+### 6.2 Một điểm lệch sẵn có trong code, CEO cần biết
+
+Trưởng CSKH **xem và TỪ CHỐI** được yêu cầu sửa dữ liệu (`listYeuCauThayDoi`, `tuChoiYeuCau` gác
+`laQuanLy`) nhưng **KHÔNG duyệt** được (`duyetYeuCau` gác `laAdmin`). Có thể cố ý (duyệt mới là
+thao tác nguy hiểm), có thể là sót. GĐ2 giữ NGUYÊN, tách thành 2 quyền để CEO tự quyết sau.
+
+### 6.3 Luồng "chờ duyệt" cho plan bảo trì — làm sau ma trận
+
+Theo đúng mẫu sẵn có của serial chờ / khách chờ: bản ghi tạo ra ở trạng thái chờ, TCS duyệt thì
+mới có hiệu lực. Chưa thiết kế chi tiết — sẽ brainstorm riêng khi tới lượt.
+
 **DB (chỉ local):**
 ```sql
 create table quyen_vai_tro (
