@@ -63,6 +63,8 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
   const [chonTay, setChonTay] = useState<string | null>(null)     // plan id đang chọn khách tay
   // Ứng viên đang xem so sánh trước khi gán (null = chưa mở cái nào).
   const [xem, setXem] = useState<{ planId: string; dangTai: boolean; khach: KhachDayDu | null } | null>(null)
+  // Mặc định BẬT: mất một SĐT thật tệ hơn là thừa một số phụ.
+  const [giuSdt, setGiuSdt] = useState(true)
   const [moLich, setMoLich] = useState<string | null>(null)       // plan id đang mở form lịch
   const [suaLan, setSuaLan] = useState<string | null>(null)       // plan id đang sửa số lần
   const [lanVal, setLanVal] = useState('')
@@ -96,14 +98,24 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
    * nhau, bấm trượt một ô là plan dính vào khách sai mà không có gì báo, lại
    * không hoàn tác được.
    */
-  async function gan(planId: string, customerId: string, tenKhach: string) {
+  async function gan(planId: string, customerId: string, tenKhach: string, giuSdt: boolean) {
     setBusy(planId); setErr(null); setMsg(null)
-    const r = await ganKhachBaoTri(planId, customerId)
-    setBusy(null)
-    if (!r.ok) { setErr(r.error); return }
-    setChonTay(null); setXem(null)
-    setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
-    router.refresh()
+    try {
+      const r = await ganKhachBaoTri(planId, customerId, giuSdt)
+      if (!r.ok) { setErr(r.error); return }
+      setChonTay(null); setXem(null)
+      setMsg(
+        `Đã gán cho "${tenKhach}".` +
+        (r.themSdtPhu ? ' SĐT trên lịch đã lưu thành SĐT phụ của khách.' : '') +
+        ' Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.',
+      )
+      router.refresh()
+    } catch (e) {
+      setErr('Không rõ kết quả — mở lại danh sách kiểm tra trước khi bấm lần nữa. ' +
+        (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(null)
+    }
   }
 
   /** Mở khối so sánh cho một ứng viên: nạp hồ sơ khách đủ trường rồi mới vẽ. */
@@ -251,8 +263,25 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                         }}
                         hanhDong={
                           <>
+                            {/* Hai SĐT khác nhau = cùng người, hai số — không phải
+                                mâu thuẫn. Gán xong mà không giữ thì số trên lịch
+                                mất hẳn (ca Đoàn Văn Hậu: lịch 032…, hồ sơ 093…). */}
+                            {(() => {
+                              const soPlan = (p.source_phone ?? '').replace(/\D/g, '')
+                              const soKhach = (xem.khach?.primary_phone ?? '').replace(/\D/g, '')
+                              if (!soPlan || soPlan.slice(-9) === soKhach.slice(-9)) return null
+                              return (
+                                <label className="flex w-full items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                                  <input type="checkbox" checked={giuSdt}
+                                    onChange={(e) => setGiuSdt(e.target.checked)} />
+                                  Lưu SĐT trên lịch <b className="font-mono">{p.source_phone}</b> thành{' '}
+                                  <b>SĐT phụ</b> của khách (hồ sơ đang là{' '}
+                                  <span className="font-mono">{xem.khach?.primary_phone || '—'}</span>)
+                                </label>
+                              )
+                            })()}
                             <button disabled={busy === p.id}
-                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name)}
+                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name, giuSdt)}
                               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
                               {busy === p.id ? 'Đang gán…' : 'Đúng người, gán'}
                             </button>

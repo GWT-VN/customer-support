@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { coTheVaoCS, requireStaff } from '@/lib/supabase'
+import { kenhChon } from '@/app/actions'
 import { DauTrang } from '@/components/DauTrang'
 import { TaoKhachForm } from '@/components/TaoKhachForm'
 
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function TaoKhachPage() {
   await requireStaff()
   if (!(await coTheVaoCS())) redirect('/work')
+  const kenh = await kenhChon()
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -17,7 +19,7 @@ export default async function TaoKhachPage() {
           tieuDe="Tạo khách mới"
           phuDe="Nhập SĐT trước — hệ thống tra xem đã có khách này chưa"
         />
-        <TaoKhachForm />
+        <TaoKhachForm kenh={kenh} />
       </div>
     </main>
   )

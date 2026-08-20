@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { taoKhachChoDuyet, timKhachTheoSdt, type KhachKhopSdt } from '@/app/actions'
+import { taoKhachChoDuyet, timKhachTheoSdt, type KhachKhopSdt, type Kenh } from '@/app/actions'
 import { ChonTinh } from '@/components/ChonTinh'
 import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
 
@@ -17,11 +17,15 @@ import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
  * SĐT tra TRƯỚC (lỗi #3): gõ xong là dò ngay, trùng thì mời dùng lại hồ sơ cũ
  * thay vì đẻ bản trùng — chống rác ngay tại cửa vào.
  */
-export function TaoKhachForm() {
+export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
   const [f, setF] = useState({
     full_name: '', primary_phone: '', address: '', province: '',
-    notes: '', ten_cty: '', mst: '', dia_chi_cty: '', sdt_cty: '', email_cty: '',
+    notes: '', source: '', ten_cty: '', mst: '', dia_chi_cty: '', sdt_cty: '', email_cty: '',
+    nguoi_dai_dien: '', chuc_vu_dai_dien: '',
   })
+  const [kenhId, setKenhId] = useState('')
+  const [sdtPhu, setSdtPhu] = useState<{ phone: string; contact_name: string; role: string }[]>([])
+  const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string }[]>([])
   const [khop, setKhop] = useState<KhachKhopSdt | null>(null)
   const [dangTra, setDangTra] = useState(false)
   const [nangCao, setNangCao] = useState(false)
@@ -57,7 +61,12 @@ export function TaoKhachForm() {
   async function luu() {
     setBusy(true); setErr(null); setTrungId(null)
     try {
-      const r = await taoKhachChoDuyet(f)
+      const r = await taoKhachChoDuyet({
+        ...f,
+        channel_id: kenhId ? Number(kenhId) : null,
+        sdt_phu: sdtPhu.filter((x) => x.phone.trim()),
+        dia_chi_phu: dcPhu.filter((x) => x.dia_chi.trim()),
+      })
       if (!r.ok) {
         setErr(r.error)
         if (r.existingId) setTrungId(r.existingId)
@@ -140,17 +149,107 @@ export function TaoKhachForm() {
 
         {nangCao && (
           <div className="space-y-3 border-t border-slate-200 px-5 py-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-sm text-slate-700">Nguồn khách</span>
+                <input value={f.source} onChange={(e) => dat('source', e.target.value)}
+                  placeholder="Trực tiếp · Shopee · giới thiệu…" className={oChu} />
+                <span className="mt-1 block text-xs text-slate-400">
+                  Bỏ trống thì tự ghi &ldquo;CSKH đăng ký&rdquo;, hoặc &ldquo;Sales (khớp SĐT)&rdquo; nếu trùng khách Sales.
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-sm text-slate-700">Kênh / đối tác</span>
+                <select value={kenhId} onChange={(e) => setKenhId(e.target.value)} className={`${oChu} bg-white`}>
+                  <option value="">— Không qua kênh nào —</option>
+                  {kenh.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {[k.channel_l1, k.channel_l2].filter(Boolean).join(' · ')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <label className="block">
               <span className="text-sm text-slate-700">Ghi chú</span>
               <input value={f.notes} onChange={(e) => dat('notes', e.target.value)}
                 placeholder="vd: khách không nhớ ngày lắp, chỉ liên hệ khi máy lỗi" className={oChu} />
             </label>
 
+            {/* SĐT phụ — số công ty, số giúp việc, số người nhà. Nhập ngay lúc tạo
+                cho khỏi phải mở lại hồ sơ. */}
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-700">SĐT phụ</span>
+                <button type="button" onClick={() => setSdtPhu([...sdtPhu, { phone: '', contact_name: '', role: 'khac' }])}
+                  className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
+              </div>
+              {sdtPhu.length === 0 && <p className="mt-1 text-xs text-slate-400">Chưa có. Số công ty, giúp việc, người nhà…</p>}
+              {sdtPhu.map((x, i) => (
+                <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
+                  <input value={x.phone} placeholder="0xxxxxxxxx" inputMode="tel"
+                    onChange={(e) => setSdtPhu(sdtPhu.map((y, j) => j === i ? { ...y, phone: e.target.value } : y))}
+                    className="w-36 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-sm" />
+                  <input value={x.contact_name} placeholder="Tên người cầm máy"
+                    onChange={(e) => setSdtPhu(sdtPhu.map((y, j) => j === i ? { ...y, contact_name: e.target.value } : y))}
+                    className="w-44 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                  <select value={x.role}
+                    onChange={(e) => setSdtPhu(sdtPhu.map((y, j) => j === i ? { ...y, role: e.target.value } : y))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm">
+                    <option value="owner">Chủ nhà</option>
+                    <option value="family">Người nhà</option>
+                    <option value="helper">Giúp việc</option>
+                    <option value="manager">Quản lý</option>
+                    <option value="khac">Khác</option>
+                  </select>
+                  <button type="button" onClick={() => setSdtPhu(sdtPhu.filter((_, j) => j !== i))}
+                    className="text-xs text-slate-400 underline hover:text-red-600">xoá</button>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-700">Địa chỉ phụ</span>
+                <button type="button" onClick={() => setDcPhu([...dcPhu, { dia_chi: '', loai: 'nha' }])}
+                  className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
+              </div>
+              {dcPhu.length === 0 && <p className="mt-1 text-xs text-slate-400">Chưa có. Nhà thứ hai, kho, nơi lắp đặt…</p>}
+              {dcPhu.map((x, i) => (
+                <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
+                  <input value={x.dia_chi} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh"
+                    onChange={(e) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, dia_chi: e.target.value } : y))}
+                    className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                  <select value={x.loai}
+                    onChange={(e) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, loai: e.target.value } : y))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm">
+                    <option value="nha">Nhà</option>
+                    <option value="cty">Công ty</option>
+                    <option value="lap_dat">Lắp đặt</option>
+                    <option value="khac">Khác</option>
+                  </select>
+                  <button type="button" onClick={() => setDcPhu(dcPhu.filter((_, j) => j !== i))}
+                    className="text-xs text-slate-400 underline hover:text-red-600">xoá</button>
+                </div>
+              ))}
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block sm:col-span-2">
                 <span className="text-sm text-slate-700">Tên công ty</span>
                 <input value={f.ten_cty} onChange={(e) => dat('ten_cty', e.target.value)}
                   placeholder="CÔNG TY TNHH…" className={oChu} />
+              </label>
+              <label className="block">
+                <span className="text-sm text-slate-700">Người đại diện</span>
+                <input value={f.nguoi_dai_dien} onChange={(e) => dat('nguoi_dai_dien', e.target.value)}
+                  placeholder="Người ký hợp đồng" className={oChu} />
+              </label>
+              <label className="block">
+                <span className="text-sm text-slate-700">Chức danh</span>
+                <input value={f.chuc_vu_dai_dien} onChange={(e) => dat('chuc_vu_dai_dien', e.target.value)}
+                  placeholder="Giám đốc / Tổng giám đốc…" className={oChu} />
               </label>
               <label className="block">
                 <span className="text-sm text-slate-700">Mã số thuế</span>

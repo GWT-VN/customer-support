@@ -11,6 +11,7 @@ import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
 import type { PChon } from '@/lib/gopKhachChon'
+import { capNghiTrung, type CapNghiTrung } from '@/lib/nghiTrung'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -225,6 +226,8 @@ export type Customer = {
   dia_chi_cty: string | null
   sdt_cty: string | null
   email_cty: string | null
+  nguoi_dai_dien: string | null
+  chuc_vu_dai_dien: string | null
 }
 
 export async function getCustomer(id: string) {
@@ -264,6 +267,8 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
     dia_chi_cty: patch.dia_chi_cty || null,
     sdt_cty: patch.sdt_cty || null,
     email_cty: patch.email_cty || null,
+    nguoi_dai_dien: patch.nguoi_dai_dien || null,
+    chuc_vu_dai_dien: patch.chuc_vu_dai_dien || null,
   }
   // Sửa được SĐT hợp lệ -> hạ cờ needs_phone + xoá ghi chú lỗi
   if (sdt && /^0\d{9,10}$/.test(sdt)) { payload.needs_phone = false; payload.notes = null }
@@ -303,7 +308,7 @@ const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
     'full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone',
     // Thông tin công ty (mig 50) — thiếu ở đây thì CS sửa xong, admin duyệt, mà
     // trường vẫn không đổi: vòng duyệt lọc payload đúng theo danh sách này.
-    'ten_cty', 'mst', 'dia_chi_cty', 'sdt_cty', 'email_cty',
+    'ten_cty', 'mst', 'dia_chi_cty', 'sdt_cty', 'email_cty', 'nguoi_dai_dien', 'chuc_vu_dai_dien',
   ],
   filter_replacement: ['filter_code', 'replaced_at', 'note'],
   customer_contacts: ['phone', 'contact_name', 'role', 'zalo_ok'],
@@ -591,6 +596,45 @@ export async function xoaDiaChiKhach(
   await ghiAudit('xoa_dia_chi_khach', `khach:${customerId}`, { dia_chi_id: id })
   revalidatePath(`/khach/${customerId}`)
   return { ok: true }
+}
+
+/**
+ * Danh sách cặp hồ sơ NGHI TRÙNG để CS khỏi phải tự mò.
+ *
+ * Quét toàn bộ khách chưa xoá (vài trăm dòng — rẻ, không cần index riêng) rồi ghép
+ * cặp bằng hàm thuần `capNghiTrung`. Cố ý KHÔNG dò theo SĐT: `primary_phone` có
+ * ràng buộc UNIQUE nên không bao giờ có hai hồ sơ cùng số (đo prod: 0 cặp).
+ */
+export async function capKhachNghiTrung(): Promise<CapNghiTrung[]> {
+  await requireStaff()
+  const db = dataClient()
+  const { data, error } = await db.from('cs_customers')
+    .select('id, full_name, primary_phone, province, customer_code')
+    .neq('trang_thai', 'da_xoa')
+  if (error) throw new Error(error.message)
+  const ds = (data ?? []) as { id: string; full_name: string; primary_phone: string | null; province: string | null; customer_code: string | null }[]
+
+  // Đếm dữ liệu đính kèm cho TẤT CẢ trong 3 truy vấn, không phải 3 truy vấn/khách.
+  const [may, ticket, plan] = await Promise.all([
+    db.from('installed_base').select('customer_id').not('customer_id', 'is', null),
+    db.from('tickets').select('customer_id').not('customer_id', 'is', null),
+    db.from('maintenance_plan').select('customer_id').not('customer_id', 'is', null),
+  ])
+  const dem = (r: { data: unknown }) => {
+    const m = new Map<string, number>()
+    for (const x of (r.data ?? []) as { customer_id: string }[]) {
+      m.set(x.customer_id, (m.get(x.customer_id) ?? 0) + 1)
+    }
+    return m
+  }
+  const dMay = dem(may), dTicket = dem(ticket), dPlan = dem(plan)
+
+  return capNghiTrung(ds.map((k) => ({
+    ...k,
+    so_may: dMay.get(k.id) ?? 0,
+    so_ticket: dTicket.get(k.id) ?? 0,
+    so_plan: dPlan.get(k.id) ?? 0,
+  })))
 }
 
 /**
@@ -1166,16 +1210,46 @@ export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
 }
 
 /** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */
-export async function ganKhachBaoTri(planId: string, customerId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function ganKhachBaoTri(
+  planId: string, customerId: string, giuSdtPlan = false,
+): Promise<{ ok: true; themSdtPhu: boolean } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
   if (!customerId) return { ok: false, error: 'Chọn khách.' }
-  const { error } = await dataClient().from('maintenance_plan')
+  const db = dataClient()
+
+  // SĐT trên lịch (từ Asana) thường KHÁC SĐT trong hồ sơ khách — cùng một người
+  // nhưng hai số (số cá nhân vs số ghi lúc ký hợp đồng). Gán xong mà không giữ
+  // thì số trên lịch mất hẳn, không còn chỗ nào lưu.
+  let themSdtPhu = false
+  if (giuSdtPlan) {
+    const [{ data: pl }, { data: kh }] = await Promise.all([
+      db.from('maintenance_plan').select('source_phone, source_customer_name').eq('id', planId).maybeSingle(),
+      db.from('cs_customers').select('primary_phone').eq('id', customerId).maybeSingle(),
+    ])
+    const soPlan = chuanHoaSdt((pl as { source_phone: string | null } | null)?.source_phone ?? '')
+    const soKhach = chuanHoaSdt((kh as { primary_phone: string | null } | null)?.primary_phone ?? '')
+    if (soPlan.hopLe && soPlan.cuoi9 !== soKhach.cuoi9) {
+      const { data: daCo } = await db.from('customer_contacts')
+        .select('id').eq('customer_id', customerId).ilike('phone', `%${soPlan.cuoi9}`).limit(1)
+      if (!daCo || daCo.length === 0) {
+        await db.from('customer_contacts').insert({
+          customer_id: customerId, phone: soPlan.chuan,
+          contact_name: (pl as { source_customer_name: string | null } | null)?.source_customer_name ?? 'Số trên lịch bảo trì',
+          role: 'khac', is_primary: false, zalo_ok: true,
+        })
+        themSdtPhu = true
+      }
+    }
+  }
+
+  const { error } = await db.from('maintenance_plan')
     .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
   if (error) return { ok: false, error: error.message }
-  await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId })
+  await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId, giu_sdt_plan: themSdtPhu })
   revalidatePath('/bao-tri')
-  return { ok: true }
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true, themSdtPhu }
 }
 
 /**
@@ -3066,8 +3140,12 @@ export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
 export async function taoKhachChoDuyet(input: {
   full_name: string; primary_phone?: string; address?: string; province?: string
   /** Thông tin nâng cao — chỉ có khi tạo từ trang `/khach/moi`. */
-  notes?: string
+  notes?: string; source?: string; channel_id?: number | null
   ten_cty?: string; mst?: string; dia_chi_cty?: string; sdt_cty?: string; email_cty?: string
+  nguoi_dai_dien?: string; chuc_vu_dai_dien?: string
+  /** Tạo kèm luôn, khỏi phải mở lại hồ sơ để thêm. */
+  sdt_phu?: { phone: string; contact_name?: string; role?: string }[]
+  dia_chi_phu?: { dia_chi: string; loai: string }[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
   const ten = input.full_name?.trim()
@@ -3097,7 +3175,9 @@ export async function taoKhachChoDuyet(input: {
     full_name: ten, primary_phone: chuan,
     address: input.address?.trim() || null, province: input.province?.trim() || null,
     customer_code: customerCode,
-    source: customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký',
+    // Nguồn người dùng gõ thắng; không gõ thì suy như cũ.
+    source: input.source?.trim() || (customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký'),
+    channel_id: input.channel_id ?? null,
     // Tạo thẳng (đã duyệt): rác lớn nhất (SĐT sai/trùng) đã chặn ngay lúc tạo nên
     // không cần hàng chờ duyệt cho khách mới. Sửa/xoá khách vẫn qua duyệt như cũ.
     trang_thai: 'da_duyet', needs_phone: false,
@@ -3107,10 +3187,32 @@ export async function taoKhachChoDuyet(input: {
     dia_chi_cty: input.dia_chi_cty?.trim() || null,
     sdt_cty: input.sdt_cty?.trim() || null,
     email_cty: input.email_cty?.trim() || null,
+    nguoi_dai_dien: input.nguoi_dai_dien?.trim() || null,
+    chuc_vu_dai_dien: input.chuc_vu_dai_dien?.trim() || null,
   }).select('id').single()
   if (error) return { ok: false, error: error.message }
+  const id = (data as { id: string }).id
+
+  // SĐT phụ + địa chỉ phụ chèn SAU khi có id. Hỏng ở bước này KHÔNG huỷ khách vừa
+  // tạo — khách đã có là thắng lợi chính, số phụ thiếu thì thêm tay ở hồ sơ.
+  const sdtPhu = (input.sdt_phu ?? []).filter((x) => x.phone?.trim())
+  if (sdtPhu.length) {
+    await db.from('customer_contacts').insert(sdtPhu.map((x) => ({
+      customer_id: id, phone: chuanHoaSdt(x.phone).chuan || x.phone.trim(),
+      contact_name: x.contact_name?.trim() || null,
+      role: x.role?.trim() || 'khac', is_primary: false, zalo_ok: true,
+    })))
+  }
+  const dcPhu = (input.dia_chi_phu ?? []).filter((x) => x.dia_chi?.trim())
+  if (dcPhu.length) {
+    await db.from('customer_addresses').insert(dcPhu.map((x) => ({
+      customer_id: id, dia_chi: x.dia_chi.trim(),
+      loai: ['nha', 'cty', 'lap_dat', 'khac'].includes(x.loai) ? x.loai : 'khac',
+    })))
+  }
+
   revalidatePath('/khach'); revalidatePath('/khach-hang')
-  return { ok: true, id: (data as { id: string }).id }
+  return { ok: true, id }
 }
 
 /** Đăng ký bảo hành: gắn máy (serial) cho khách + kích hoạt BH. */

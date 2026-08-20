@@ -103,6 +103,18 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
                 className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
             </label>
             <label className="block">
+              <span className="text-sm text-slate-700">Người đại diện</span>
+              <input value={c.nguoi_dai_dien ?? ''} onChange={(e) => setC({ ...c, nguoi_dai_dien: e.target.value })}
+                placeholder="Người ký hợp đồng"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-700">Chức danh</span>
+              <input value={c.chuc_vu_dai_dien ?? ''} onChange={(e) => setC({ ...c, chuc_vu_dai_dien: e.target.value })}
+                placeholder="Giám đốc / Tổng giám đốc…"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+            </label>
+            <label className="block">
               <span className="text-sm text-slate-700">Mã số thuế</span>
               <input value={c.mst ?? ''} onChange={(e) => setC({ ...c, mst: e.target.value })}
                 placeholder="0123456789 hoặc 0123456789-001"
