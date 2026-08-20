@@ -58,8 +58,19 @@ function CotHoSo({ k, vai }: { k: KhachDayDu; vai: 'giu' | 'gop' }) {
         ))}
       </div>
       <p className="mt-2 text-xs text-slate-600">
-        {k.so_may} máy · {k.so_ticket} ticket · {k.so_plan} lịch bảo trì · {k.so_lien_he} liên hệ
+        {k.so_may} máy · {k.so_ticket} ticket · {k.so_plan} lịch bảo trì
       </p>
+
+      {/* SĐT phụ + địa chỉ phụ hiện CẢ NỘI DUNG chứ không chỉ đếm. Gộp là CỘNG DỒN
+          hai danh sách này (không phải chọn một), nên không có nút chọn — nhưng CS
+          vẫn phải nhìn được để biết mình sắp gom cái gì vào đâu. */}
+      {(k.sdt_phu.length > 0 || k.dia_chi_phu.length > 0 || k.address_truoc_sap_nhap) && (
+        <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
+          {k.sdt_phu.map((s) => <div key={s}>☎ {s}</div>)}
+          {k.dia_chi_phu.map((s) => <div key={s}>⌂ {s}</div>)}
+          {k.address_truoc_sap_nhap && <div>↩ trước sáp nhập: {k.address_truoc_sap_nhap}</div>}
+        </div>
+      )}
     </div>
   )
 }
@@ -137,20 +148,37 @@ export function GopKhachManHinh({
 
     dangGop.current = true
     setBusy(true); setErr(null); setMsg(null)
-    const r = await deXuatGopKhach(giu.id, gop.id, p)
-    dangGop.current = false
-    setBusy(false)
-    if (!r.ok) { setErr(r.error); return }
+    try {
+      const r = await deXuatGopKhach(giu.id, gop.id, p)
+      if (!r.ok) { setErr(r.error); return }
 
-    // Giữ nguyên hồ sơ vừa giữ ở cột trái để gộp tiếp — ca 3 hồ sơ trùng chỉ việc
-    // chọn tiếp bên phải, không phải tìm lại từ đầu.
-    const moi = await khachDayDu(giu.id)
-    datLai(moi ?? giu, null)
-    setMsg(
-      (r.applied ? 'Đã gộp xong.' : 'Đã gửi đề xuất gộp — chờ quản trị duyệt.') +
-      ' Còn hồ sơ trùng nữa? Chọn tiếp ở cột bên phải.',
-    )
-    router.refresh()
+      // Báo xong NGAY, đừng bắt người dùng chờ thêm lượt tải hồ sơ mới: phép gộp
+      // đã chạy xong rồi, để họ nhìn "Đang xử lý…" thêm giây nào cũng là nói dối.
+      setMsg(
+        (r.applied ? 'Đã gộp xong.' : 'Đã gửi đề xuất gộp — chờ quản trị duyệt.') +
+        ' Còn hồ sơ trùng nữa? Chọn tiếp ở cột bên phải.',
+      )
+      // Giữ nguyên hồ sơ vừa giữ ở cột trái để gộp tiếp — ca 3 hồ sơ trùng chỉ
+      // việc chọn tiếp bên phải, không phải tìm lại từ đầu.
+      datLai(giu, null)
+      router.refresh()
+      // Nạp lại bản mới nhất (đã trộn trường) ở lượt sau, hỏng cũng không sao vì
+      // phần gộp đã xong và người dùng đã được báo.
+      khachDayDu(giu.id).then((moi) => { if (moi) datLai(moi, null) }).catch(() => {})
+    } catch (e) {
+      // KHÔNG nói "gộp thất bại": lỗi ở đây có thể xảy ra SAU khi DB đã gộp xong
+      // (đúng ca 20/08 — audit ghi ok mà giao diện không bao giờ báo). Nói sai
+      // hướng là người dùng bấm lại lần nữa trên dữ liệu đã đổi.
+      setErr(
+        'Không rõ kết quả — mở lại hồ sơ để KIỂM TRA trước khi bấm gộp lần nữa. ' +
+        (e instanceof Error ? e.message : String(e)),
+      )
+    } finally {
+      // Trong finally: dù lỗi kiểu gì nút cũng phải trở lại bấm được, không treo
+      // vĩnh viễn ở "Đang xử lý…".
+      dangGop.current = false
+      setBusy(false)
+    }
   }
 
   return (

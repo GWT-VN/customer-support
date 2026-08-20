@@ -14,7 +14,7 @@ import type { PChon } from '@/lib/gopKhachChon'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, doChacHopLe,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, doChacHopLe, NHAN_LOAI_DIA_CHI,
   type TinhTrangBH, type DongNhapSerial, type DoChacNgayLap,
 } from '@/lib/danhSach'
 
@@ -418,9 +418,15 @@ async function apDungThayDoi(
   return db.from(doiTuong).update(patch).eq('id', banGhiId)
 }
 
-function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string) {
+function revalidateThayDoi(doiTuong: DoiTuong, banGhiId: string, loai?: LoaiTD) {
   if (doiTuong === 'cs_customers') {
-    revalidatePath('/khach'); revalidatePath(`/khach/${banGhiId}`); revalidatePath('/')
+    revalidatePath('/khach'); revalidatePath(`/khach/${banGhiId}`)
+    // GỘP khách KHÔNG revalidate '/'. Trang "Máy đã lắp" là trang ĐỘNG (dựng lại
+    // mỗi lần truy cập) nên revalidate chẳng giúp gì, nhưng lại bắt server dựng
+    // lại cả bảng 2.400 máy NGAY TRONG lượt gọi server action — nút "Gộp" đứng
+    // mãi ở "Đang xử lý…" dù DB đã xong từ lâu. CEO gặp đúng ca này 20/08/2026:
+    // audit ghi ok lúc 15:19:07, giao diện không bao giờ báo xong.
+    if (loai !== 'gop') revalidatePath('/')
   } else if (doiTuong === 'customer_contacts') {
     revalidatePath('/khach')
   } else {
@@ -445,7 +451,7 @@ export async function guiYeuCauThayDoi(input: {
     const { error } = await apDungThayDoi(db, input.doi_tuong, input.ban_ghi_id, input.loai, input.payload)
     if (error) return { ok: false, error: error.message }
     await ghiAudit(`${input.loai}_${input.doi_tuong}`, `${input.doi_tuong}:${input.ban_ghi_id}`, input.payload)
-    revalidateThayDoi(input.doi_tuong, input.ban_ghi_id)
+    revalidateThayDoi(input.doi_tuong, input.ban_ghi_id, input.loai)
     return { ok: true, applied: true }
   }
   const { error } = await db.from('yeu_cau_thay_doi').insert({
@@ -491,14 +497,17 @@ export async function khachGon(id: string): Promise<KhachGon | null> {
 export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
   await requireStaff()
   const db = dataClient()
-  const [{ data: k }, may, ticket, plan, lienHe] = await Promise.all([
+  const [{ data: k }, may, ticket, plan, lienHe, diaChiPhu] = await Promise.all([
     db.from('cs_customers')
-      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at, ten_cty, mst, dia_chi_cty, sdt_cty, email_cty')
+      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at, ten_cty, mst, dia_chi_cty, sdt_cty, email_cty, address_truoc_sap_nhap, province_truoc_sap_nhap')
       .eq('id', id).maybeSingle(),
     db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
     db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
     db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
-    db.from('customer_contacts').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+    // Lấy CẢ NỘI DUNG chứ không chỉ đếm: gộp xong hai bộ SĐT phụ / địa chỉ phụ
+    // nhập vào nhau, CS phải nhìn được chúng TRƯỚC khi bấm.
+    db.from('customer_contacts').select('phone, contact_name, role').eq('customer_id', id),
+    db.from('customer_addresses').select('dia_chi, loai').eq('customer_id', id),
   ])
   if (!k) return null
   const r = k as Record<string, unknown>
@@ -529,11 +538,18 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
     dia_chi_cty: (r.dia_chi_cty as string | null) ?? null,
     sdt_cty: (r.sdt_cty as string | null) ?? null,
     email_cty: (r.email_cty as string | null) ?? null,
+    address_truoc_sap_nhap: (r.address_truoc_sap_nhap as string | null) ?? null,
+    province_truoc_sap_nhap: (r.province_truoc_sap_nhap as string | null) ?? null,
     created_at: (r.created_at as string | null) ?? null,
     so_may: may.count ?? 0,
     so_ticket: ticket.count ?? 0,
     so_plan: plan.count ?? 0,
-    so_lien_he: lienHe.count ?? 0,
+    sdt_phu: ((lienHe.data ?? []) as { phone: string | null; contact_name: string | null; role: string | null }[])
+      .map((x) => [x.phone, x.contact_name].filter(Boolean).join(' · '))
+      .filter(Boolean),
+    dia_chi_phu: ((diaChiPhu.data ?? []) as { dia_chi: string; loai: string }[])
+      .map((x) => `${x.dia_chi} [${NHAN_LOAI_DIA_CHI[x.loai] ?? x.loai}]`),
+    so_lien_he: (lienHe.data ?? []).length,
   }
 }
 

@@ -63,6 +63,12 @@ export type KhachDayDu = KhachGon & {
   dia_chi_cty: string | null
   sdt_cty: string | null
   email_cty: string | null
+  /** Vết địa chỉ trước đợt sáp nhập tỉnh/phường 2025 — RPC tự lấp, không cho chọn. */
+  address_truoc_sap_nhap: string | null
+  province_truoc_sap_nhap: string | null
+  /** Nội dung SĐT phụ / địa chỉ phụ đang có — để CS nhìn TRƯỚC khi gộp. */
+  sdt_phu: string[]
+  dia_chi_phu: string[]
   so_lien_he: number
   created_at: string | null
 }
