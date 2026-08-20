@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { doiTenNhanVien, suaNhanVien } from '@/lib/nen-tang/nhan-su'
+import { doiTenNhanVien, guiLaiMatKhau, suaNhanVien } from '@/lib/nen-tang/nhan-su'
 import {
   HO_SO_VAI_TRO, NHAN_BO_PHAN, NHAN_VAI_TRO, VAI_TRO,
   apDungLoaiTruCapBac, apDungLoaiTruKhiTick, type BoPhan, type VaiTro,
@@ -18,7 +18,8 @@ export type DongNhanVien = {
 /** Tiêu đề cột phải ngắn — 13 cột mà viết đủ chữ thì bảng rộng gấp ba màn hình. */
 const TEN_COT: Record<VaiTro, string> = {
   ceo: 'CEO',
-  admin: 'Quản trị',
+  admin: 'Toàn quyền',
+  quan_tri_ht: 'Hệ thống',
   kt_giam_doc: 'GĐ',
   ky_thuat: 'NV',
   ctv_lap_dat: 'CTV',
@@ -55,6 +56,7 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
   const [ghiDe, setGhiDe] = useState<Record<string, VaiTro[]>>({})
   const [dangLuu, setDangLuu] = useState<Record<string, boolean>>({})
   const [loi, setLoi] = useState<Record<string, string>>({})
+  const [xong, setXong] = useState<Record<string, string>>({})
   const luot = useRef<Record<string, number>>({})
   const [, batDau] = useTransition()
 
@@ -168,7 +170,7 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
                     </td>
                   ))}
 
-                  <td className="px-3 py-2 border-b border-l whitespace-nowrap">
+                  <td className="px-3 py-2 border-b border-l whitespace-nowrap space-y-1">
                     <button
                       type="button"
                       disabled={dangChay}
@@ -182,6 +184,27 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
                     >
                       {nv.hoat_dong ? 'Đang hoạt động' : 'Đã khoá'}
                     </button>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={dangChay || !nv.email}
+                        title={nv.email ? 'Gửi email đặt lại mật khẩu' : 'Chưa có email'}
+                        onClick={() => {
+                          setXong((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== nv.id)))
+                          luu(nv.id, null, async () => {
+                            const r = await guiLaiMatKhau(nv.id)
+                            if (r.ok) setXong((x) => ({ ...x, [nv.id]: 'Đã gửi email đặt lại mật khẩu.' }))
+                            return r
+                          })
+                        }}
+                        className="text-[11px] text-slate-500 underline hover:text-slate-800 disabled:opacity-40 disabled:no-underline"
+                      >
+                        gửi lại mật khẩu
+                      </button>
+                    </div>
+                    {xong[nv.id] && (
+                      <div className="text-[11px] text-emerald-700">{xong[nv.id]}</div>
+                    )}
                   </td>
                 </tr>
               )

@@ -6,7 +6,7 @@
  * DB là đẻ ra "quyền ma" — tick vào thấy yên tâm nhưng chẳng gác gì cả.
  * DB chỉ lưu Ô NÀO ĐƯỢC TICK (bảng quyen_vai_tro).
  *
- * 45 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
+ * 47 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
  * Spec: docs/superpowers/specs/2026-08-20-nen-tang-tai-khoan-phan-quyen-design.md §6.1
  */
 import { VAI_TRO, type VaiTro } from './vai-tro'
@@ -43,7 +43,10 @@ export type MucMacDinh = 'A' | 'TCS' | 'CS' | 'NS' | 'SALES'
 const VAI_TRO_THEO_MUC: Record<MucMacDinh, readonly VaiTro[]> = {
   A: ['admin'],
   TCS: ['admin', 'cs_manager'],
-  CS: ['admin', 'cs_manager', 'cs', 'ky_thuat'],
+  // ky_thuat CỐ TÌNH không nằm trong mức CS (CEO chốt 20/08): kỹ thuật chỉ xem
+  // lịch chuyến của mình. Họ vẫn VÀO được khu CS (VAI_TRO_VAO_APP) — vào cửa và
+  // được-làm-gì là hai chuyện khác nhau.
+  CS: ['admin', 'cs_manager', 'cs'],
   NS: VAI_TRO,
   SALES: ['admin', 'sales_manager', 'sales'],
 }
@@ -81,7 +84,8 @@ const BANG_QUYEN = {
   'cs.ticket.xem': { nhom: 'ticket', nhan: 'Xem ticket', mucMacDinh: 'CS', chiXem: true },
   'cs.ticket.tao_sua': { nhom: 'ticket', nhan: 'Tạo, sửa, nhận ticket, ghi chú', mucMacDinh: 'CS' },
   'cs.ticket.chi_phi': { nhom: 'ticket', nhan: 'Ghi chi phí ticket, thu phí', mucMacDinh: 'CS' },
-  'cs.ticket.nhom_loi': { nhom: 'ticket', nhan: 'Nhóm lỗi: tạo, sửa, gán ticket', mucMacDinh: 'TCS' },
+  'cs.nhom_loi.cau_hinh': { nhom: 'ticket', nhan: 'Nhóm lỗi: tạo / sửa / xoá danh mục', mucMacDinh: 'TCS' },
+  'cs.nhom_loi.gan_ticket': { nhom: 'ticket', nhan: 'Gán ticket vào nhóm lỗi', mucMacDinh: 'TCS' },
 
   'cs.bao_tri.xem': { nhom: 'bao_tri', nhan: 'Xem lịch bảo trì, lượt tới hạn', mucMacDinh: 'CS', chiXem: true },
   'cs.bao_tri.ghi_ket_qua': { nhom: 'bao_tri', nhan: 'Ghi kết quả bảo trì', mucMacDinh: 'CS' },
@@ -110,6 +114,7 @@ const BANG_QUYEN = {
 
   'he_thong.nhan_su.xem': { nhom: 'he_thong', nhan: 'Xem danh sách nhân sự', mucMacDinh: 'A', chiXem: true },
   'he_thong.nhan_su.sua': { nhom: 'he_thong', nhan: 'Đổi vai trò, khoá, mời người', mucMacDinh: 'A' },
+  'he_thong.nhan_su.mat_khau': { nhom: 'he_thong', nhan: 'Gửi lại email đặt mật khẩu', mucMacDinh: 'A' },
   'he_thong.phan_quyen': { nhom: 'he_thong', nhan: 'Sửa CHÍNH ma trận quyền này', mucMacDinh: 'A' },
   'he_thong.nhat_ky': { nhom: 'he_thong', nhan: 'Xem nhật ký thao tác', mucMacDinh: 'A', chiXem: true },
   'he_thong.catalog': { nhom: 'he_thong', nhan: 'Đồng bộ danh mục sản phẩm', mucMacDinh: 'A' },
@@ -141,11 +146,44 @@ export const QUYEN_CHI_XEM = QUYEN.filter((q) => HO_SO_QUYEN[q].chiXem === true)
  * CEO là ngoại lệ CÓ CHỦ ĐÍCH: thấy toàn bộ công ty (mọi quyền xem) nhưng không
  * có quyền ghi nào — tránh ca lỡ tay xoá dữ liệu. Muốn cho ghi thì tick tay.
  */
+/** Quyền mức "mọi nhân sự" — nền chung, vai trò nào cũng có. */
+const QUYEN_NEN = QUYEN.filter((q) => HO_SO_QUYEN[q].mucMacDinh === 'NS')
+
+/**
+ * Quản trị hệ thống (IT) — CEO chốt 20/08.
+ *
+ * Lo NGƯỜI và CẤU HÌNH, **mù hoàn toàn với dữ liệu nghiệp vụ**: không xem được
+ * khách, máy, ticket, bảo trì, đơn hàng, doanh số. Đây là lý do phải tách
+ * `cs.nhom_loi.cau_hinh` (danh mục, IT sửa được) khỏi `cs.nhom_loi.gan_ticket`
+ * (chạm ticket của khách, IT KHÔNG được).
+ *
+ * Khác `admin` ở đúng chỗ đó: admin toàn quyền kể cả dữ liệu khách, nên admin là
+ * tài khoản phá-kính-khẩn-cấp; quan_tri_ht mới là tài khoản dùng hằng ngày.
+ */
+const QUYEN_QUAN_TRI_HT: MaQuyen[] = [
+  ...QUYEN_NEN,
+  'he_thong.nhan_su.xem',
+  'he_thong.nhan_su.sua',
+  'he_thong.nhan_su.mat_khau',
+  'he_thong.phan_quyen',
+  'he_thong.nhat_ky',
+  'he_thong.catalog',
+  'he_thong.kenh',
+  'he_thong.view_chung',
+  'cs.nhom_loi.cau_hinh',
+  'cs.may.trang_thai',
+]
+
 export const MAC_DINH: Record<VaiTro, MaQuyen[]> = Object.fromEntries(
   VAI_TRO.map((v) => [
     v,
     v === 'ceo'
       ? [...QUYEN_CHI_XEM]
-      : QUYEN.filter((q) => VAI_TRO_THEO_MUC[HO_SO_QUYEN[q].mucMacDinh].includes(v)),
+      : v === 'quan_tri_ht'
+        ? [...QUYEN_QUAN_TRI_HT]
+        : v === 'ky_thuat'
+          // CEO chốt: kỹ thuật CHỈ xem lịch chuyến của mình, ngoài ra chỉ quyền nền.
+          ? [...QUYEN_NEN]
+          : QUYEN.filter((q) => VAI_TRO_THEO_MUC[HO_SO_QUYEN[q].mucMacDinh].includes(v)),
   ])
 ) as Record<VaiTro, MaQuyen[]>

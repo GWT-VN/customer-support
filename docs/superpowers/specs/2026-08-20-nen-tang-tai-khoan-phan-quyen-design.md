@@ -215,6 +215,41 @@ plan bảo trì thì CHƯA có hàng chờ. Phải dựng thêm luồng đó —
 Vì ba ô này khác hiện trạng, tab "Lệch" ở GĐ2 sẽ hiện chúng ngay — đó là **kết quả đúng**, và cũng
 là phép thử thật cho cơ chế dò lệch. Chúng chỉ có hiệu lực THẬT từ GĐ3.
 
+### 6.1b Đợt 2 — CEO chốt 20/08 (sau khi xem màn ma trận)
+
+**1. Vai trò thứ 14: `quan_tri_ht` — "Quản trị hệ thống" (IT).**
+Lo NGƯỜI và CẤU HÌNH, **mù hoàn toàn với dữ liệu nghiệp vụ**. Được: quản lý nhân sự ·
+gửi lại mật khẩu · sửa ma trận quyền · nhật ký · đồng bộ danh mục · kênh bán · view bảng ·
+cấu hình nhóm lỗi · trạng thái máy. **KHÔNG được**: khách · máy · ticket · bảo trì ·
+doanh số · đơn Sales. Tổng 13 quyền.
+
+`admin` giữ nguyên nghĩa **toàn quyền** (đổi nhãn thành "Quản trị toàn quyền") — đó là tài
+khoản phá-kính-khẩn-cấp; `quan_tri_ht` mới là tài khoản IT dùng hằng ngày. Hai vai trò cùng
+bộ phận Hệ thống nên **loại trừ nhau**: tick admin là tự bỏ quan_tri_ht.
+
+**2. Tách `cs.ticket.nhom_loi` làm đôi** — điều kiện để (1) tồn tại:
+`cs.nhom_loi.cau_hinh` (danh mục, IT sửa được) ⊥ `cs.nhom_loi.gan_ticket` (chạm ticket của
+khách, IT KHÔNG được).
+
+**3. Thêm `he_thong.nhan_su.mat_khau`** — gửi email đặt lại mật khẩu. Dùng lại đúng luồng
+"Quên mật khẩu?" sẵn có; admin KHÔNG bao giờ biết mật khẩu của nhân viên.
+
+⚠️ **Bảng `staff` và `auth.users` là hai thứ khác nhau.** 19 dòng staff trên máy local nhưng
+chỉ 2 tài khoản đăng nhập thật — tài khoản chỉ sinh ra khi người đó đăng nhập Google lần đầu
+(hoặc admin tạo tay trên Supabase). `resetPasswordForEmail` cố ý báo THÀNH CÔNG cả khi email
+không có tài khoản (chống dò email), nên phải hỏi trước qua RPC `public.nen_tang_co_tai_khoan`
+— không thì nút này nói dối.
+
+**4. NV Kỹ thuật CHỈ xem lịch chuyến của mình** — từ 19 quyền (y hệt NV CSKH) xuống còn 3.
+`ky_thuat` rời khỏi mức mặc định `CS`. Họ VẪN vào được khu CS (`VAI_TRO_VAO_APP` không đổi):
+*vào cửa* và *được-làm-gì* là hai chuyện khác nhau.
+
+⇒ Tổng **47 quyền**, **14 vai trò**. Ba thay đổi 1-4 khác hiện trạng nên sẽ hiện ở tab "Lệch",
+và chỉ có hiệu lực THẬT từ GĐ3.
+
+**5. Sửa lỗi bảng nhân viên nhảy dòng:** `listAllStaff()` sắp xếp theo `vai_tro`, nên tick một ô
+là đổi khoá sắp xếp và dòng nhảy chỗ ngay giữa lúc đang tick. Bỏ `vai_tro` khỏi ORDER BY.
+
 ### 6.2 Một điểm lệch sẵn có trong code, CEO cần biết
 
 Trưởng CSKH **xem và TỪ CHỐI** được yêu cầu sửa dữ liệu (`listYeuCauThayDoi`, `tuChoiYeuCau` gác

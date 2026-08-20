@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { dataClient } from './db'
+import { headers } from 'next/headers'
+import { authClient, dataClient } from './db'
 import { laAdmin } from './gac-cong'
 import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, toStaff, type Staff } from './nhan-su-luat'
 import { ghiAudit } from './nhat-ky'
@@ -33,7 +34,10 @@ export async function listAllStaff(): Promise<(Staff & { hoat_dong: boolean })[]
   if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
   const { data, error } = await dataClient()
     .from('staff').select('id, ten, vai_tro, email, hoat_dong')
-    .order('hoat_dong', { ascending: false }).order('vai_tro').order('ten')
+    // KHÔNG sắp theo vai_tro: tick một ô là đổi khoá sắp xếp, dòng nhảy chỗ ngay
+    // giữa lúc đang tick — không theo dõi nổi. Chỉ hoat_dong (người khoá dồn xuống
+    // cuối) rồi tên; cả hai đều không đổi khi gán vai trò.
+    .order('hoat_dong', { ascending: false }).order('ten')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r) => ({ ...toStaff(r), hoat_dong: (r as { hoat_dong: boolean }).hoat_dong }))
 }
@@ -139,5 +143,56 @@ export async function moiNhanSu(email: string, vaiTro: string[]) {
 
   await ghiAudit('moi_nhan_su', `email:${kt.email}`, { vai_tro: kt.vaiTro })
   revalidatePath('/nhan-vien')
+  return { ok: true as const }
+}
+
+/**
+ * Gửi email đặt lại mật khẩu cho một nhân sự.
+ *
+ * Dùng LẠI đúng luồng "Quên mật khẩu?" ở trang đăng nhập (resetPasswordForEmail
+ * -> email recovery -> /auth/doi-mat-khau), chỉ khác là admin bấm hộ. KHÔNG đặt
+ * mật khẩu thay người ta: admin không bao giờ được biết mật khẩu của nhân viên.
+ *
+ * Cần SMTP của Supabase đã cấu hình thì email mới đi. Trên máy local, Mailpit
+ * (http://127.0.0.1:54324) hứng hết.
+ */
+export async function guiLaiMatKhau(id: string) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+
+  const { data, error: e1 } = await dataClient()
+    .from('staff').select('email').eq('id', id).maybeSingle()
+  if (e1) return { ok: false as const, error: e1.message }
+  const email = (data as { email: string | null } | null)?.email
+  if (!email) return { ok: false as const, error: 'Nhân sự này chưa có email.' }
+
+  // resetPasswordForEmail cố ý báo THÀNH CÔNG cả khi email không có tài khoản
+  // (chống dò email). Không chặn trước ở đây thì nút này nói dối: admin thấy
+  // "đã gửi" mà người kia chẳng nhận được gì.
+  const { data: coTk, error: e2 } = await dataClient()
+    .rpc('nen_tang_co_tai_khoan', { p_email: email })
+  if (e2) return { ok: false as const, error: e2.message }
+  if (!coTk) {
+    return {
+      ok: false as const,
+      error: 'Người này chưa có tài khoản đăng nhập nên không có mật khẩu để đặt lại. '
+        + 'Email @gwt.vn thì bảo họ bấm “Đăng nhập bằng Google” một lần là xong.',
+    }
+  }
+
+  // Lấy origin từ chính request thay vì đòi thêm biến môi trường: local, preview
+  // và production đều tự đúng. Trang login (chạy ở client) dùng window.location.origin
+  // cho cùng mục đích — ở Server Action thì không có window.
+  const h = await headers()
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  const scheme = h.get('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https')
+  if (!host) return { ok: false as const, error: 'Không xác định được địa chỉ trang.' }
+
+  const { error } = await (await authClient()).auth.resetPasswordForEmail(email, {
+    redirectTo: `${scheme}://${host}/auth/doi-mat-khau`,
+  })
+  if (error) return { ok: false as const, error: error.message }
+
+  await ghiAudit('gui_lai_mat_khau', `nv:${id}`, { email })
   return { ok: true as const }
 }

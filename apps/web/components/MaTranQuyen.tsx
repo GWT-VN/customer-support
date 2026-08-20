@@ -17,7 +17,7 @@ for (const q of QUYEN) {
 }
 
 const TEN_COT: Record<VaiTro, string> = {
-  ceo: 'CEO', admin: 'Quản trị',
+  ceo: 'CEO', admin: 'Toàn quyền', quan_tri_ht: 'QT Hệ thống',
   kt_giam_doc: 'GĐ KT', ky_thuat: 'NV KT', ctv_lap_dat: 'CTV',
   cs_manager: 'Trưởng CS', cs: 'NV CS',
   sales_manager: 'Trưởng SL', sales: 'NV SL',

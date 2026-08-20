@@ -12,7 +12,7 @@
  */
 
 export const VAI_TRO = [
-  'ceo', 'admin',
+  'ceo', 'admin', 'quan_tri_ht',
   'kt_giam_doc', 'ky_thuat', 'ctv_lap_dat',
   'cs_manager', 'cs',
   'sales_manager', 'sales',
@@ -44,7 +44,9 @@ export const NHAN_BO_PHAN: Record<BoPhan, string> = {
  */
 export const HO_SO_VAI_TRO: Record<VaiTro, { boPhan: BoPhan; capBac: number; nhan: string }> = {
   ceo: { boPhan: 'dieu_hanh', capBac: 0, nhan: 'CEO' },
-  admin: { boPhan: 'he_thong', capBac: 0, nhan: 'Quản trị hệ thống' },
+  // Hai cấp trong bộ phận Hệ thống, LOẠI TRỪ nhau: admin bao trùm quan_tri_ht.
+  admin: { boPhan: 'he_thong', capBac: 2, nhan: 'Quản trị toàn quyền' },
+  quan_tri_ht: { boPhan: 'he_thong', capBac: 1, nhan: 'Quản trị hệ thống' },
   kt_giam_doc: { boPhan: 'ky_thuat', capBac: 2, nhan: 'Giám đốc Kỹ thuật' },
   ky_thuat: { boPhan: 'ky_thuat', capBac: 1, nhan: 'Nhân viên Kỹ thuật' },
   ctv_lap_dat: { boPhan: 'ky_thuat', capBac: 0, nhan: 'CTV lắp đặt' },

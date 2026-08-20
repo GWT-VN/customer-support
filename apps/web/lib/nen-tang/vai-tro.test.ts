@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { VAI_TRO, apDungLoaiTruCapBac, apDungLoaiTruKhiTick, chuanHoaVaiTro, coQuyenQuanLy, laVaiTroHopLe } from './vai-tro'
 
 describe('danh sách 13 vai trò toàn công ty', () => {
-  it('có đủ 13 vai trò, đúng thứ tự khai báo', () => {
+  it('có đủ 14 vai trò, đúng thứ tự khai báo', () => {
     expect([...VAI_TRO]).toEqual([
-      'ceo', 'admin',
+      'ceo', 'admin', 'quan_tri_ht',
       'kt_giam_doc', 'ky_thuat', 'ctv_lap_dat',
       'cs_manager', 'cs',
       'sales_manager', 'sales',
@@ -89,5 +89,23 @@ describe('apDungLoaiTruKhiTick — vai trò VỪA BẤM là vai trò thắng', (
 
   it('kết quả theo thứ tự khai báo VAI_TRO', () => {
     expect(apDungLoaiTruKhiTick(['sales', 'kho'], 'admin')).toEqual(['admin', 'sales', 'kho'])
+  })
+})
+
+describe('vai trò quan_tri_ht — quản trị hệ thống KHÔNG đụng dữ liệu khách', () => {
+  it('là vai trò hợp lệ, nâng tổng lên 14', () => {
+    expect(laVaiTroHopLe('quan_tri_ht')).toBe(true)
+    expect(VAI_TRO.length).toBe(14)
+  })
+
+  it('cùng bộ phận Hệ thống với admin nên LOẠI TRỪ nhau', () => {
+    // admin bao trùm quan_tri_ht -> giữ cả hai là thừa và gây hiểu nhầm
+    expect(apDungLoaiTruCapBac(['admin', 'quan_tri_ht'])).toEqual(['admin'])
+    expect(apDungLoaiTruKhiTick(['quan_tri_ht'], 'admin')).toEqual(['admin'])
+    expect(apDungLoaiTruKhiTick(['admin'], 'quan_tri_ht')).toEqual(['quan_tri_ht'])
+  })
+
+  it('vẫn kiêm được vai trò bộ phận khác', () => {
+    expect(apDungLoaiTruKhiTick(['quan_tri_ht'], 'cs')).toEqual(['quan_tri_ht', 'cs'])
   })
 })
