@@ -83,7 +83,7 @@ Expected: `CREATE TABLE` … và `0`.
 ```
 
 - [ ] **Step 1: Viết migration** — giữ nguyên toàn bộ phần dời 5 bảng + ẩn mềm của migration 46. Chỉ thêm:
-  - `p_chon jsonb default null` vào chữ ký (dùng `create or replace`, **không drop** — drop là mất quyền `grant`).
+  - `p_chon jsonb default null` vào chữ ký. **PHẢI `drop function gop_khach(uuid,uuid)` trước** — thêm tham số có DEFAULT không phải sửa hàm cũ mà là tạo hàm NẠP CHỒNG; để cả hai thì lệnh gọi 2 tham số của app thành nhập nhằng và lỗi ngay. Drop xoá luôn GRANT nên phải `grant execute … to service_role` lại ở cuối file.
   - Nhánh `if p_chon is not null`: lấy giá trị trường từ `p_chon->'truong'`, `insert` `sdt_phu` vào `customer_contacts` (bỏ qua số đã tồn tại của khách đó), `insert` `dia_chi_them` vào `customer_addresses`.
   - `p_chon is null` → chạy nguyên luật coalesce cũ.
 - [ ] **Step 2: Áp LOCAL, thử cả 2 đường** — gọi 2 tham số (phải y như cũ) và gọi 3 tham số.
