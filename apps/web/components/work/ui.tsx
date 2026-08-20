@@ -104,16 +104,27 @@ export function TieuDeNhom({
   )
 }
 
-/** Một ô trong dải thống kê đầu trang. */
+/**
+ * Một ô trong dải thống kê đầu trang. Bấm vào là LỌC danh sách xuống đúng nhóm đó
+ * — con số chỉ có ích khi bấm được để xem nó gồm những việc nào.
+ */
 export function OThongKe({
-  nhan, so, phu, mauCham, mauSo, noiBat = false,
-}: { nhan: string; so: number; phu: string; mauCham: string; mauSo?: string; noiBat?: boolean }) {
+  nhan, so, phu, mauCham, mauSo, noiBat = false, onBam, dangLoc = false,
+}: {
+  nhan: string; so: number; phu: string; mauCham: string; mauSo?: string
+  noiBat?: boolean; onBam?: () => void; dangLoc?: boolean
+}) {
+  const Tag = onBam ? 'button' : 'div'
   return (
-    <div
-      className="relative overflow-hidden"
+    <Tag
+      onClick={onBam}
+      aria-pressed={onBam ? dangLoc : undefined}
+      className="relative overflow-hidden text-left w-full"
       style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
+        background: dangLoc ? 'var(--accent-wash)' : 'var(--surface)',
+        border: `1px solid ${dangLoc ? 'var(--accent)' : 'var(--border)'}`,
         borderRadius: 11, padding: '13px 15px', boxShadow: 'var(--shadow)',
+        cursor: onBam ? 'pointer' : undefined,
       }}
     >
       {noiBat && (
@@ -133,8 +144,10 @@ export function OThongKe({
       <div className="so" style={{ fontSize: 27, fontWeight: 680, letterSpacing: '-.02em', marginTop: 9, color: mauSo }}>
         {so}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{phu}</div>
-    </div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+        {dangLoc ? 'đang lọc — bấm lại để bỏ' : phu}
+      </div>
+    </Tag>
   )
 }
 

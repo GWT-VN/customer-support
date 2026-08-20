@@ -9,11 +9,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  chayTuSinh, batTatLuat, doiNguoiNhan, type ManTuSinh, type NenTang,
+  chayTuSinh, batTatLuat, doiNguoiNhan, hangLoat, type ManTuSinh, type NenTang,
 } from '@/app/work/actions'
 import { NHAN_UU_TIEN, nhanHan, ngayThang } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { ChiTietViec } from './ChiTietViec'
+import { ThanhHangLoat } from './ThanhHangLoat'
 import { Chip, Nut, oNhap, MAU_UT_VAR } from './ui'
 
 /** Nguồn sự kiện → màu chip, khớp màu module ở nav. */
@@ -37,34 +38,36 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
   const [loi, setLoi] = useState<string | null>(null)
   const [ketQua, setKetQua] = useState<string | null>(null)
   const [mo, setMo] = useState<number | null>(null)
+  const [chon, setChon] = useState<Set<number>>(new Set())
 
-  function chay(fn: () => Promise<void>) {
+  function doiChon(id: number, c: boolean) {
+    setChon((cu) => {
+      const moi = new Set(cu)
+      if (c) moi.add(id); else moi.delete(id)
+      return moi
+    })
+  }
+
+  function chay(fn: () => Promise<{ ok: boolean; loi?: string }>) {
     start(async () => {
-      try {
-        await fn()
-        setLoi(null)
-        router.refresh()
-      } catch (e) {
-        setLoi(e instanceof Error ? e.message : 'Thao tác không thành công')
-      }
+      const kq = await fn()
+      if (!kq.ok) { setLoi(kq.loi ?? 'Thao tác không thành công'); return }
+      setLoi(null)
+      router.refresh()
     })
   }
 
   function bamChayNgay() {
     start(async () => {
-      try {
-        const kq = await chayTuSinh()
-        const tong = kq.reduce((n, x) => n + x.da_tao, 0)
-        setKetQua(tong === 0
-          ? 'Quét xong — không có việc nào mới.'
-          : `Quét xong — sinh ${tong} việc mới: ` +
-            kq.filter((x) => x.da_tao > 0).map((x) => `${x.luat} (${x.da_tao})`).join(', '))
-        setLoi(null)
-        router.refresh()
-      } catch (e) {
-        setKetQua(null)
-        setLoi(e instanceof Error ? e.message : 'Không chạy được bộ quét')
-      }
+      const kq = await chayTuSinh()
+      if (!kq.ok) { setKetQua(null); setLoi(kq.loi); return }
+      const tong = kq.duLieu.reduce((n, x) => n + x.da_tao, 0)
+      setKetQua(tong === 0
+        ? 'Quét xong — không có việc nào mới.'
+        : `Quét xong — sinh ${tong} việc mới: ` +
+          kq.duLieu.filter((x) => x.da_tao > 0).map((x) => `${x.luat} (${x.da_tao})`).join(', '))
+      setLoi(null)
+      router.refresh()
     })
   }
 
@@ -177,7 +180,24 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
           <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: 'var(--surface-3)', padding: '2px 8px', borderRadius: 20 }}>
             {duLieu.gan_day.length}
           </span>
+          {duLieu.tong_auto > duLieu.gan_day.length && (
+            <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>
+              · bạn xem được {duLieu.gan_day.length}/{duLieu.tong_auto} việc, phần còn lại thuộc team khác
+            </span>
+          )}
         </div>
+
+        {duLieu.gan_day.length > 0 && (
+          <label className="flex items-center gap-2 px-1 mb-2" style={{ fontSize: 12, color: 'var(--muted)' }}>
+            <input
+              type="checkbox"
+              checked={duLieu.gan_day.every((v) => chon.has(v.id))}
+              onChange={(e) => setChon(e.target.checked ? new Set(duLieu.gan_day.map((v) => v.id)) : new Set())}
+              style={{ width: 14, height: 14, accentColor: 'var(--accent)' }}
+            />
+            Chọn tất cả {duLieu.gan_day.length} việc — rồi phân người / đổi trạng thái hàng loạt
+          </label>
+        )}
 
         {duLieu.gan_day.length === 0 ? (
           <div className="p-8 text-center"
@@ -197,9 +217,10 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
                   <DongViec
                     v={v}
                     pending={pending}
-                    onDoiTrangThai={() => { /* đổi trạng thái làm ở màn Việc của tôi */ }}
+                    onDoiTrangThai={(id, st) => chay(() => hangLoat([id], { status: st }))}
                     onMo={setMo}
                     cuoi={i === duLieu.gan_day.length - 1}
+                    dangChon={chon.has(v.id)} onChon={doiChon}
                   />
                 </ul>
               </li>
@@ -207,6 +228,16 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
           </ul>
         )}
       </section>
+
+      {chon.size > 0 && (
+        <ThanhHangLoat
+          ids={[...chon]}
+          nenTang={nenTang}
+          onBoChon={() => setChon(new Set())}
+          onXong={(tb) => { setKetQua(tb); setChon(new Set()); router.refresh() }}
+        />
+      )}
+      {chon.size > 0 && <div style={{ height: 72 }} aria-hidden />}
 
       {mo !== null && (
         <ChiTietViec taskId={mo} nenTang={nenTang} onDong={() => setMo(null)} onDoi={() => router.refresh()} />
