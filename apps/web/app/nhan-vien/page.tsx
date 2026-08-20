@@ -17,6 +17,12 @@ export default async function NhanVienPage() {
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Nhân viên</h1>
+          <a
+            href="/nhan-vien/phan-quyen"
+            className="rounded-lg border bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Phân quyền theo vai trò →
+          </a>
         </header>
 
         <p className="text-sm text-slate-500">

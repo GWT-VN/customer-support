@@ -145,7 +145,7 @@ không khoá nhầm người đang làm việc thật.
 Không cho admin tự thêm mã quyền trong DB: một mã quyền chỉ có nghĩa khi **có chỗ trong code
 kiểm tra nó**. Cho gõ tự do là đẻ ra quyền ma — tick vào thấy yên tâm nhưng không gác gì cả.
 
-### 6.1 Kho quyền — 42 quyền, chốt với CEO 20/08
+### 6.1 Kho quyền — 45 quyền, chốt với CEO 20/08
 
 Gom từ **149 hàm** thật trong `app/actions.ts`, `app/sales/actions.ts`, `app/work/actions.ts`,
 `lib/nen-tang/nhan-su.ts` theo *đối tượng + hành động*. Cột "Mặc định" = **hành vi HÔM NAY**,
