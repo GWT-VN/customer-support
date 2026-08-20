@@ -44,8 +44,30 @@ describe('mọi chỗ gác đều đi qua ma trận', () => {
     }
   })
 
+  it('PHỦ KÍN: mọi hàm chạm DB trong actions.ts đều đi qua ma trận', () => {
+    // Một hàm chạm dataClient() mà không qua coQuyen/doQuyen là VÔ HÌNH với ma trận:
+    // tick hay không tick cũng không ảnh hưởng tới nó, kể cả sau GĐ3.
+    const src = doc('../../app/actions.ts')
+    const doan = src.split(/(?=async function )/)
+    const viPham: string[] = []
+    for (const p of doan) {
+      const m = p.match(/\basync function (\w+)/)
+      if (!m) continue
+      if (!p.includes('dataClient(')) continue
+      if (!/\b(coQuyen|doQuyen)\(/.test(p)) viPham.push(m[1])
+    }
+    expect(
+      viPham,
+      `Hàm chạm DB nhưng KHÔNG qua ma trận: ${viPham.join(', ')}. ` +
+        "Thêm await doQuyen('<mã quyền>') ngay sau requireStaff().",
+    ).toEqual([])
+  })
+
   it('chốt mốc: đã nối đủ nhiều chỗ (chống test xanh giả khi đổi cấu trúc file)', () => {
-    const tong = FILE.reduce((n, [, src]) => n + [...src.matchAll(/coQuyen\(/g)].length, 0)
-    expect(tong).toBeGreaterThanOrEqual(60)
+    const tong = FILE.reduce(
+      (n, [, src]) => n + [...src.matchAll(/\b(?:coQuyen|doQuyen)\(/g)].length,
+      0,
+    )
+    expect(tong).toBeGreaterThanOrEqual(140)
   })
 })

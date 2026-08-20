@@ -7,7 +7,7 @@ import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
-import { coQuyen } from '@/lib/nen-tang/kiem-quyen'
+import { coQuyen, doQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
@@ -51,6 +51,7 @@ export async function searchMachines(
   tuyChon: TuyChonDanhSach & { maSanPham?: string; tinhTrangBH?: string; ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<Machine>> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_MAY, {
     cot: 'install_date', tang: false,
   })
@@ -133,6 +134,7 @@ export async function searchMachines(
  *  (không hardcode): mỗi internal_code xuất hiện đúng 1 lần, nhãn = product_name. */
 export async function machineModels(): Promise<{ internal_code: string; product_name: string | null }[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data, error } = await dataClient()
     .from('v_installed_base')
     .select('internal_code, product_name')
@@ -150,6 +152,7 @@ export async function machineModels(): Promise<{ internal_code: string; product_
 
 export async function getMachine(serial: string): Promise<Machine | null> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data, error } = await dataClient()
     .from('v_installed_base').select('*').eq('serial', serial).maybeSingle()
   if (error) throw new Error(error.message)
@@ -159,6 +162,7 @@ export async function getMachine(serial: string): Promise<Machine | null> {
 /** Kích hoạt bảo hành. RPC tự tính full_end/core_end từ product_warranty. */
 export async function activateWarranty(serial: string, startDate: string) {
   await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
     return { ok: false as const, error: 'Ngày không hợp lệ.' }
   }
@@ -196,6 +200,7 @@ export type Customer = {
 
 export async function getCustomer(id: string) {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const db = dataClient()
   const [{ data: c, error: e1 }, { data: contacts, error: e2 }] = await Promise.all([
     db.from('cs_customers').select('*').eq('id', id).maybeSingle(),
@@ -208,6 +213,7 @@ export async function getCustomer(id: string) {
 
 export async function updateCustomer(id: string, patch: Partial<Customer>) {
   await requireStaff()
+  await doQuyen('cs.khach.sua')
   const sdt = patch.primary_phone || null
   // Chống trùng SĐT khi SỬA: nếu 9 số cuối khớp khách KHÁC (chưa xoá) -> chặn.
   if (sdt) {
@@ -235,6 +241,7 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
 
 export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
   await requireStaff()
+  await doQuyen('cs.khach.sua')
   const { error } = await dataClient().from('customer_contacts').insert({
     customer_id: customerId,
     phone: c.phone || null,
@@ -250,6 +257,7 @@ export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
 
 export async function deleteContact(id: string, customerId: string) {
   await requireStaff()
+  await doQuyen('cs.khach.sua')
   // Xoá SĐT phụ CẦN ADMIN DUYỆT: admin xoá ngay, CS -> hàng chờ.
   return guiYeuCauThayDoi({
     doi_tuong: 'customer_contacts', ban_ghi_id: id, loai: 'xoa',
@@ -404,12 +412,14 @@ export async function guiYeuCauThayDoi(input: {
 /** Đề xuất XOÁ khách (ẩn mềm khi được duyệt). */
 export async function xoaKhach(id: string, lyDo?: string) {
   await requireStaff()
+  await doQuyen('cs.khach.xin_xoa')
   return guiYeuCauThayDoi({ doi_tuong: 'cs_customers', ban_ghi_id: id, loai: 'xoa', ly_do: lyDo })
 }
 
 /** Xoá máy đã lắp -> trả serial về tồn kho (gỡ BH + lịch thay lõi). Qua admin duyệt. */
 export async function xoaMayDaLap(serial: string) {
   await requireStaff()
+  await doQuyen('cs.khach.xin_xoa')
   return guiYeuCauThayDoi({
     doi_tuong: 'installed_base', ban_ghi_id: serial, loai: 'xoa',
     ly_do: `Trả serial ${serial} về tồn kho`,
@@ -419,6 +429,7 @@ export async function xoaMayDaLap(serial: string) {
 /** Đổi khách của máy (cùng serial, sang khách khác). Qua admin duyệt. */
 export async function doiKhachMay(serial: string, customerId: string) {
   await requireStaff()
+  await doQuyen('cs.khach.xin_xoa')
   if (!customerId) return { ok: false as const, error: 'Chọn khách.' }
   return guiYeuCauThayDoi({
     doi_tuong: 'installed_base', ban_ghi_id: serial, loai: 'sua',
@@ -429,6 +440,7 @@ export async function doiKhachMay(serial: string, customerId: string) {
 /** Đổi serial (giữ khách, nhầm serial). Chuyển bản ghi + BH sang serial mới. Qua admin duyệt. */
 export async function doiSerialMay(serialCu: string, serialMoi: string) {
   await requireStaff()
+  await doQuyen('cs.khach.xin_xoa')
   const sm = serialMoi.trim()
   if (!sm) return { ok: false as const, error: 'Chọn serial mới.' }
   if (sm === serialCu) return { ok: false as const, error: 'Serial mới trùng serial cũ.' }
@@ -504,6 +516,7 @@ type KhachXuat = {
 /** Lấy TẤT CẢ khách khớp bộ lọc để xuất (theo lô 1000, bỏ khách da_xoa). */
 async function layKhachXuat(q: string): Promise<KhachXuat[]> {
   await requireStaff()
+  await doQuyen('cs.khach.xin_xuat')
   const db = dataClient()
   const term = q.trim()
   const ra: KhachXuat[] = []
@@ -612,6 +625,7 @@ export async function tuChoiExport(id: string) {
 /** Yêu cầu export đã duyệt của TÔI (chưa tải) — để hiện nút tải. */
 export async function exportCuaToi(): Promise<YeuCauExport[]> {
   const u = await requireStaff()
+  await doQuyen('cs.khach.xin_xuat')
   const { data, error } = await dataClient().from('yeu_cau_export')
     .select('id, tieu_chi, nguoi_gui, created_at, trang_thai')
     .eq('nguoi_gui', u.email ?? '').eq('trang_thai', 'da_duyet').order('created_at', { ascending: false })
@@ -673,6 +687,7 @@ export async function coreForecast(
   tuyChon: TuyChonDanhSach & { tatPhanTrang?: boolean; ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<CoreDue>> {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_LOI, {
     cot: 'han_som', tang: true,
   })
@@ -723,6 +738,7 @@ export async function coreForecast(
 
 export async function coreCounts() {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   const db = dataClient()
   const keys = ['QUÁ HẠN', 'sắp đến hạn (≤30 ngày)', 'còn hạn']
   const out: Record<string, number> = {}
@@ -758,6 +774,7 @@ export async function maintenanceDue(
   tuyChon: TuyChonDanhSach & { ngtu?: string; ngden?: string } = {}
 ): Promise<KetQuaTrang<MaintenanceDue>> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_BAO_TRI, {
     cot: 'due_date', tang: true,
   })
@@ -805,6 +822,7 @@ export async function maintenanceDue(
 
 export async function maintenanceCounts() {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const db = dataClient()
   const keys = ['QUÁ HẠN', 'sắp đến hạn (≤30 ngày)', 'còn hạn']
   const out: Record<string, number> = {}
@@ -821,6 +839,7 @@ export async function maintenanceCounts() {
 /** Đánh dấu 1 lượt bảo trì đã làm (ghi completed_at). */
 export async function markMaintenanceDone(visitId: string, date: string) {
   await requireStaff()
+  await doQuyen('cs.bao_tri.ghi_ket_qua')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false as const, error: 'Ngày không hợp lệ.' }
   const { error } = await dataClient()
     .from('maintenance_visit').update({ completed_at: date }).eq('id', visitId)
@@ -832,6 +851,7 @@ export async function markMaintenanceDone(visitId: string, date: string) {
 /** Bỏ đánh dấu (ghi nhầm). */
 export async function unmarkMaintenanceDone(visitId: string) {
   await requireStaff()
+  await doQuyen('cs.bao_tri.ghi_ket_qua')
   const { error } = await dataClient()
     .from('maintenance_visit').update({ completed_at: null }).eq('id', visitId)
   if (error) return { ok: false as const, error: error.message }
@@ -852,6 +872,7 @@ export type KetQuaDo = {
  */
 export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ ok: true; doi: number } | { ok: false; error: string }> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.ghi_ket_qua')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(kq.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
   const db = dataClient()
   const num = (x?: number) => (typeof x === 'number' && !Number.isNaN(x) ? x : null)
@@ -907,6 +928,7 @@ export type PlanChuaMap = {
 /** Plan bảo trì CHƯA map khách + gợi ý khách khớp SĐT (9 số cuối). */
 export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const db = dataClient()
   const [{ data: plans }, { data: khach }] = await Promise.all([
     db.from('maintenance_plan')
@@ -949,6 +971,7 @@ export type PlanDaMap = {
 /** Plan bảo trì ĐÃ map khách + số lượt + ngày kích hoạt (ngày lắp sớm nhất) để lên lịch. */
 export async function baoTriDaMap(): Promise<PlanDaMap[]> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const db = dataClient()
   const { data: plans } = await db.from('maintenance_plan')
     .select('id, customer_id, bo_may, loai_goi, tong_lan, chu_ky_thang, ngay_bat_dau, vung')
@@ -997,6 +1020,7 @@ export type LuotThang = {
 /** Các lượt bảo trì có due_date trong 1 THÁNG (calendar view). thang = 'YYYY-MM'. */
 export async function baoTriTheoThang(thang: string): Promise<LuotThang[]> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const m = /^(\d{4})-(\d{2})$/.exec(thang)
   if (!m) return []
   const y = +m[1], mo = +m[2]
@@ -1023,6 +1047,7 @@ export type LuotKhach = {
 /** Lịch bảo trì của 1 KHÁCH (mọi plan đã map khách) + kết quả đo — hiện ở trang khách. */
 export async function baoTriCuaKhach(customerId: string): Promise<LuotKhach[]> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const db = dataClient()
   const { data: plans } = await db.from('maintenance_plan')
     .select('id, bo_may, loai_goi').eq('customer_id', customerId)
@@ -1146,6 +1171,7 @@ export type SapHetGoi = {
 /** Plan bảo trì SẮP HẾT (đã lên lịch + còn ≤1 lượt chưa làm) — nhắc CS chào gói mới. */
 export async function baoTriSapHet(): Promise<SapHetGoi[]> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const db = dataClient()
   const { data: plans } = await db.from('maintenance_plan')
     .select('id, customer_id, bo_may, tong_lan').not('customer_id', 'is', null).eq('trang_thai', 'dang_hoat_dong')
@@ -1182,6 +1208,7 @@ export type KyThuatInput = { ten: string; sdt?: string; vung?: string; email?: s
 /** Danh sách kỹ thuật (nhân viên + cộng tác viên). */
 export async function dsKyThuat(chiHoatDong = false): Promise<KyThuat[]> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.ho_so')
   let q = dataClient().from('ky_thuat').select('id, ten, sdt, vung, email, la_ctv, hoat_dong').order('ten')
   if (chiHoatDong) q = q.eq('hoat_dong', true)
   const { data, error } = await q
@@ -1192,6 +1219,7 @@ export async function dsKyThuat(chiHoatDong = false): Promise<KyThuat[]> {
 /** Hồ sơ kỹ thuật của NGƯỜI ĐANG ĐĂNG NHẬP (khớp theo email). null nếu không phải KT. */
 export async function kyThuatCuaToi(): Promise<KyThuat | null> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.lich_cua_toi')
   const nv = await layNhanVien()
   const email = (nv?.email ?? '').trim().toLowerCase()
   if (!email) return null
@@ -1241,6 +1269,7 @@ export type TrangThaiTaiKhoanKT = { co_login: boolean; hoat_dong: boolean }
 /** Map email(kỹ thuật) -> trạng thái tài khoản đăng nhập, để roster hiển thị. */
 export async function trangThaiTaiKhoanKT(): Promise<Record<string, TrangThaiTaiKhoanKT>> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.ho_so')
   const db = dataClient()
   const { data: kt } = await db.from('ky_thuat').select('email').not('email', 'is', null)
   const emails = [...new Set(((kt ?? []) as { email: string | null }[])
@@ -1327,6 +1356,7 @@ export type BoiCanhKhach = {
 /** Ngữ cảnh 1 khách để gán việc kỹ thuật: địa chỉ + tỉnh + bộ + máy (kèm địa chỉ + LÕI của từng máy) + ticket. */
 export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const db = dataClient()
   const [{ data: ib }, { data: plans }, { data: tks }, { data: kh }] = await Promise.all([
     db.from('installed_base').select('serial, internal_code, model_freetext, install_address').eq('customer_id', customerId).eq('status', 'active'),
@@ -1480,6 +1510,7 @@ export type LichKyThuatRow = {
  */
 async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> {
   await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
   const out = new Map<string, LoaiMay>()
   const ids = [...new Set(visitIds.filter(Boolean))]
   if (!ids.length) return out
@@ -1510,6 +1541,7 @@ async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> 
 /** Lịch kỹ thuật trong khoảng ngày (tuỳ chọn lọc 1 kỹ thuật). */
 export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string): Promise<LichKyThuatRow[]> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.xep_lich')
   const db = dataClient()
   let q = db.from('lich_ky_thuat')
     .select('id, ngay, ky_thuat_id, trang_thai, customer_id, dia_chi, tinh, ghi_chu')
@@ -1545,6 +1577,7 @@ export async function dsLichKyThuat(tu: string, den: string, kyThuatId?: string)
  */
 export async function lichCuaToi(tu: string, den: string): Promise<{ kt: KyThuat | null; rows: LichKyThuatRow[] }> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.lich_cua_toi')
   const kt = await kyThuatCuaToi()
   if (!kt) return { kt: null, rows: [] }
   const rows = await dsLichKyThuat(tu, den, kt.id)
@@ -1585,6 +1618,7 @@ export type TuanKyThuat = { chuyen: LichKyThuatRow[]; nghi: NghiKyThuat[]; tu: s
 /** Lịch TUẦN (T2-CN chứa `ngay`) của 1 kỹ thuật: chuyến + nghỉ phép — để tránh gán trùng. */
 export async function lichTuanKyThuat(kyThuatId: string, ngay: string): Promise<TuanKyThuat> {
   await requireStaff()
+  await doQuyen('cs.ky_thuat.xep_lich')
   if (!kyThuatId || !/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { chuyen: [], nghi: [], tu: ngay, den: ngay }
   const d = new Date(ngay + 'T00:00:00Z')
   const dow = (d.getUTCDay() + 6) % 7  // Thứ 2 = 0
@@ -1599,6 +1633,7 @@ export async function lichTuanKyThuat(kyThuatId: string, ngay: string): Promise<
 /** Lịch sử thay lõi của 1 máy — hiện ở trang chi tiết máy. */
 export async function replacementsOfSerial(serial: string) {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   const { data, error } = await dataClient()
     .from('filter_replacement').select('*').eq('serial', serial)
     .order('replaced_at', { ascending: false })
@@ -1614,6 +1649,7 @@ export async function logReplacement(input: {
   note?: string
 }) {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.replaced_at)) {
     return { ok: false as const, error: 'Ngày không hợp lệ.' }
   }
@@ -1634,6 +1670,7 @@ export async function logReplacement(input: {
 
 export async function deleteReplacement(id: string, serial: string) {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   // Xoá lịch thay lõi CẦN ADMIN DUYỆT: admin xoá ngay, CS -> hàng chờ.
   return guiYeuCauThayDoi({
     doi_tuong: 'filter_replacement', ban_ghi_id: id, loai: 'xoa',
@@ -1646,6 +1683,7 @@ export async function suaReplacement(
   id: string, patch: { filter_code?: string; replaced_at?: string; note?: string }
 ) {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   if (patch.replaced_at && !/^\d{4}-\d{2}-\d{2}$/.test(patch.replaced_at)) {
     return { ok: false as const, error: 'Ngày không hợp lệ.' }
   }
@@ -1754,6 +1792,7 @@ export async function searchTickets(
 /** Ticket của 1 máy — dùng ở trang chi tiết máy. */
 export async function ticketsOfSerial(serial: string): Promise<Ticket[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('v_tickets').select('*').eq('serial', serial)
     .order('created_at', { ascending: false })
@@ -1764,6 +1803,7 @@ export async function ticketsOfSerial(serial: string): Promise<Ticket[]> {
 /** Ticket của 1 khách — dùng ở trang khách. */
 export async function ticketsOfCustomer(customerId: string): Promise<Ticket[]> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const { data, error } = await dataClient()
     .from('v_tickets').select('*').eq('customer_id', customerId)
     .order('created_at', { ascending: false })
@@ -1773,6 +1813,7 @@ export async function ticketsOfCustomer(customerId: string): Promise<Ticket[]> {
 
 export async function getTicket(code: string): Promise<Ticket | null> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('v_tickets').select('*').eq('ticket_code', code).maybeSingle()
   if (error) throw new Error(error.message)
@@ -1786,6 +1827,7 @@ export async function getTicket(code: string): Promise<Ticket | null> {
  */
 export async function nhanTicket(code: string) {
   await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   const me = await layNhanVien()
   if (!me) return { ok: false as const, error: KHONG_DU_QUYEN }
   const db = dataClient()
@@ -1811,6 +1853,7 @@ export async function updateTicket(
   }
 ) {
   await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   if (patch.state && !['Open', 'Done', 'Cancel'].includes(patch.state)) {
     return { ok: false as const, error: 'Trạng thái không hợp lệ.' }
   }
@@ -1841,6 +1884,7 @@ export type TicketNote = {
 /** Các ghi chú của 1 ticket, mới nhất trước. */
 export async function listTicketNotes(code: string): Promise<TicketNote[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('ticket_note').select('id, noi_dung, tac_gia, created_at')
     .eq('ticket_code', code)
@@ -1852,6 +1896,7 @@ export async function listTicketNotes(code: string): Promise<TicketNote[]> {
 /** Thêm 1 dòng nhật ký. Người ghi = email đăng nhập. `khi` (ISO) trống -> giờ hiện tại. */
 export async function addTicketNote(code: string, noiDung: string, khi?: string) {
   const user = await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   const text = noiDung.trim()
   if (!text) return { ok: false as const, error: 'Nhập nội dung ghi chú.' }
   const row: Record<string, unknown> = { ticket_code: code, noi_dung: text, tac_gia: user.email ?? null }
@@ -1865,6 +1910,7 @@ export async function addTicketNote(code: string, noiDung: string, khi?: string)
 /** Sửa nội dung / thời gian 1 ghi chú. */
 export async function updateTicketNote(id: string, code: string, patch: { noi_dung?: string; khi?: string }) {
   await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   const upd: Record<string, unknown> = {}
   if (patch.noi_dung !== undefined) {
     const t = patch.noi_dung.trim()
@@ -1882,6 +1928,7 @@ export async function updateTicketNote(id: string, code: string, patch: { noi_du
 /** Xoá 1 ghi chú. */
 export async function deleteTicketNote(id: string, code: string) {
   await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   const { error } = await dataClient().from('ticket_note').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(`/ticket/${code}`)
@@ -1895,6 +1942,7 @@ export type DoanhSo = {
 }
 export async function doanhSoCskh(): Promise<DoanhSo[]> {
   await requireStaff()
+  await doQuyen('cs.bao_cao.doanh_so')
   const { data, error } = await dataClient()
     .from('v_doanh_so_cskh').select('*').order('thang', { ascending: false })
   if (error) throw new Error(error.message)
@@ -1904,6 +1952,7 @@ export async function doanhSoCskh(): Promise<DoanhSo[]> {
 /** Máy 1 khách đã lắp — dùng ở trang khách. */
 export async function machinesOfCustomer(customerId: string): Promise<Machine[]> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const { data, error } = await dataClient()
     .from('v_installed_base').select('*').eq('customer_id', customerId)
     .order('install_date', { ascending: false, nullsFirst: false })
@@ -1931,6 +1980,7 @@ export type SerialPending = {
  */
 async function truyVanSerial(q: string, limit: number, tu = 0, tt?: string) {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   let query = dataClient()
     .from('serial_registry')
     .select('serial, code, model, internal_code, ma_quoc_te, ten_noi_bo, po, trang_thai', { count: 'exact' })
@@ -1987,6 +2037,7 @@ export type SerialKho = {
 /** Kho serial + trạng thái kích hoạt (view v_serial_kho của DB). */
 export async function serialKho(q: string, trangThai?: string, limit = 100): Promise<SerialKho[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   let query = dataClient().from('v_serial_kho')
     .select('serial, ma_noi_bo, ten_noi_bo, ma_goc, po, trang_thai, bh_kich_hoat, ten_khach, sdt_khach, ngay_lap, bh_het_han')
   if (trangThai) query = query.eq('trang_thai', trangThai)
@@ -2005,6 +2056,7 @@ export async function serialKho(q: string, trangThai?: string, limit = 100): Pro
 
 export async function listSerialPending(trangThai = 'cho_duyet'): Promise<SerialPending[]> {
   await requireStaff()
+  await doQuyen('cs.serial.duyet')
   const { data, error } = await dataClient()
     .from('serial_pending')
     .select('id, serial, internal_code, model, ma_quoc_te, ten_noi_bo, ghi_chu, nguoi_tao, trang_thai, ly_do_tu_choi, created_at')
@@ -2020,6 +2072,7 @@ export async function createSerialPending(input: {
   ten_noi_bo?: string; code?: string; ghi_chu?: string
 }) {
   const user = await requireStaff()
+  await doQuyen('cs.serial.kho')
   const serial = input.serial?.trim()
   if (!serial) return { ok: false as const, error: 'Nhập serial.' }
   const db = dataClient()
@@ -2083,6 +2136,7 @@ export type CatalogChon = { internal_code: string; ten: string | null; danh_muc:
 /** Danh mục sản phẩm (catalog_item) cho ô chọn khi tạo/nhập serial. */
 export async function catalogChon(): Promise<CatalogChon[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data, error } = await dataClient()
     .from('catalog_item')
     .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 2"')
@@ -2101,6 +2155,7 @@ export async function catalogChon(): Promise<CatalogChon[]> {
 /** Thông tin phụ của 1 mã nội bộ để điền kèm khi ghi serial_registry. */
 async function thongTinCatalog(internalCode: string): Promise<{ ten: string | null } | null> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   if (!internalCode) return null
   const { data } = await dataClient()
     .from('catalog_item')
@@ -2226,6 +2281,7 @@ export type LinhKienCombo = { internal_code: string; ten: string | null; so_luon
 /** Danh sách combo cho ô chọn (đợt đầu chỉ WH15A/WH30A). */
 export async function comboChon(): Promise<{ combo: string; ten: string | null }[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data } = await dataClient()
     .from('product_bundle')
     .select('"Mã thành phẩm","Tên thành phẩm"')
@@ -2245,6 +2301,7 @@ export async function comboChon(): Promise<{ combo: string; ten: string | null }
  *  (ECO có 2× UPF10 -> cần 2 serial). */
 export async function linhKienCombo(combo: string): Promise<LinhKienCombo[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   if (!(MA_COMBO as readonly string[]).includes(combo)) return []
   const { data, error } = await dataClient()
     .from('product_bundle')
@@ -2279,6 +2336,7 @@ export async function lapBoCombo(input: {
   serials: { internal_code: string; serial: string }[]
 }): Promise<{ ok: true; ma_bo: string } | { ok: false; error: string }> {
   await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
   if (!(MA_COMBO as readonly string[]).includes(input.combo))
     return { ok: false, error: 'Combo không hợp lệ.' }
   if (!input.customer_id) return { ok: false, error: 'Chọn khách.' }
@@ -2311,6 +2369,7 @@ export type Kenh = { id: number; channel_l1: string; channel_l2: string | null; 
 /** Danh sách kênh (dim_channel) + số khách CSKH đang gắn — cho trang /kenh. */
 export async function listKenh(): Promise<Kenh[]> {
   await requireStaff()
+  await doQuyen('he_thong.kenh')
   const db = dataClient()
   const { data, error } = await db.from('dim_channel')
     .select('id, channel_l1, channel_l2, sort_order').order('channel_l1').order('sort_order').order('channel_l2')
@@ -2325,6 +2384,7 @@ export async function listKenh(): Promise<Kenh[]> {
 /** Danh sách kênh gọn cho ô chọn (gắn khách). */
 export async function kenhChon(): Promise<Kenh[]> {
   await requireStaff()
+  await doQuyen('he_thong.kenh')
   const { data, error } = await dataClient().from('dim_channel')
     .select('id, channel_l1, channel_l2, sort_order').order('channel_l1').order('sort_order').order('channel_l2')
   if (error) throw new Error(error.message)
@@ -2337,6 +2397,7 @@ export async function kenhChon(): Promise<Kenh[]> {
 /** Gắn / gỡ khách vào 1 kênh (nhân viên làm được). Taxonomy kênh do Sales quản. */
 export async function ganKenh(customerId: string, channelId: number | null) {
   await requireStaff()
+  await doQuyen('he_thong.kenh')
   if (!customerId) return { ok: false as const, error: 'Thiếu khách.' }
   const { error } = await dataClient().from('cs_customers')
     .update({ channel_id: channelId ?? null, updated_at: new Date().toISOString() }).eq('id', customerId)
@@ -2361,6 +2422,7 @@ async function ghiSuDung(
   input: { serial: string; su_kien: string; tu?: string | null; den?: string | null; customer_id?: string | null; ghi_chu?: string | null; luc?: string | null }
 ) {
   await requireStaff()
+  await doQuyen('cs.may.thay_loi')
   const nv = await layNhanVien()
   try {
     await db.from('serial_su_dung').insert({
@@ -2378,6 +2440,7 @@ async function ghiSuDung(
 /** Trạng thái hiện tại + timeline vòng đời của 1 serial (cho trang máy). */
 export async function lichSuSerial(serial: string): Promise<{ trang_thai: string | null; su_kien: SuDungSerial[] }> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const db = dataClient()
   const [{ data: sr }, { data: sk }] = await Promise.all([
     db.from('serial_registry').select('trang_thai').eq('serial', serial).maybeSingle(),
@@ -2612,6 +2675,7 @@ export type TrangThaiInput = { nhan: string; mau: string; thu_tu?: number; cho_d
 /** Danh mục trạng thái máy (ordered). chiDatTay=true -> chỉ trạng thái đặt-tay đang bật. */
 export async function dsTrangThai(chiDatTay = false): Promise<TrangThai[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   let q = dataClient().from('serial_trang_thai')
     .select('code, nhan, mau, thu_tu, he_thong, cho_dat_tay, hoat_dong').order('thu_tu')
   if (chiDatTay) q = q.eq('cho_dat_tay', true).eq('hoat_dong', true)
@@ -2683,6 +2747,7 @@ export type KhachTom = {
 /** Tìm khách (cho ô chọn khách khi đăng ký BH / tạo ticket). */
 export async function searchCustomers(q: string, limit = 20): Promise<KhachTom[]> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   let query = dataClient().from('cs_customers')
     .select('id, full_name, primary_phone, trang_thai, address, province')
     .neq('trang_thai', 'da_xoa')   // ẩn khách đã xoá mềm
@@ -2702,6 +2767,7 @@ export type MayKho = { internal_code: string; ten_noi_bo: string | null; con_lai
 /** Danh sách máy (có serial trong kho) cho ô chọn máy. Lọc bỏ lõi/vỏ (view v_may_kho). */
 export async function dsMayCoSerial(): Promise<MayKho[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data, error } = await dataClient().from('v_may_kho')
     .select('internal_code, ten_noi_bo, con_lai, tong').order('ten_noi_bo')
   if (error) throw new Error(error.message)
@@ -2711,6 +2777,7 @@ export async function dsMayCoSerial(): Promise<MayKho[]> {
 /** Serial của 1 máy (theo mã nội bộ) còn CHƯA kích hoạt BH — cho dropdown khi đã chọn máy. */
 export async function serialsTheoMay(internalCode: string, limit = 500): Promise<SerialKho[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const { data, error } = await dataClient().from('v_serial_kho')
     .select('serial, ma_noi_bo, ten_noi_bo, ma_goc, po, trang_thai, bh_kich_hoat, ten_khach, sdt_khach, ngay_lap, bh_het_han')
     .eq('ma_noi_bo', internalCode).eq('bh_kich_hoat', false)
@@ -2722,6 +2789,7 @@ export async function serialsTheoMay(internalCode: string, limit = 500): Promise
 /** Soi 1 serial (đã có khách/kích hoạt chưa) — cho ca điền serial trước để kiểm tra lại. */
 export async function serialInfo(serial: string): Promise<SerialKho | null> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const s = serial.trim()
   if (!s) return null
   const { data, error } = await dataClient().from('v_serial_kho')
@@ -2764,6 +2832,7 @@ export type KhachKhopSdt = {
  */
 export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const { cuoi9, hopLe } = chuanHoaSdt(sdt)
   if (!hopLe || cuoi9.length < 9) return { nguon: null }
   const db = dataClient()
@@ -2804,6 +2873,7 @@ export async function taoKhachChoDuyet(input: {
   full_name: string; primary_phone?: string; address?: string; province?: string
 }): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
+  await doQuyen('cs.khach.sua')
   const ten = input.full_name?.trim()
   if (!ten) return { ok: false, error: 'Nhập tên khách.' }
 
@@ -2846,6 +2916,7 @@ export async function dangKyBaoHanh(input: {
   serial: string; customer_id: string; install_date: string; install_address?: string
 }) {
   await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
   const serial = input.serial?.trim()
   if (!serial) return { ok: false as const, error: 'Chọn serial.' }
   if (!input.customer_id) return { ok: false as const, error: 'Chọn khách.' }
@@ -2918,6 +2989,7 @@ export type BHChoKichHoat = {
  */
 export async function bhChoKichHoat(q = '', nguon?: string, limit = 500): Promise<BHChoKichHoat[]> {
   await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
   let query = dataClient().from('v_bh_cho_kich_hoat')
     .select('nguon, serial, ma_noi_bo, ten_noi_bo, customer_id, ten_khach, sdt_khach, dia_chi, ngay_lap, ngay_dat_hang, ma_don, so_luong')
   if (nguon) query = query.eq('nguon', nguon)
@@ -2938,6 +3010,7 @@ export async function bhChoKichHoat(q = '', nguon?: string, limit = 500): Promis
 /** Đếm theo nguồn — cho nhãn tab, khỏi tải cả danh sách. */
 export async function bhChoKichHoatDem(): Promise<{ da_lap: number; don_sales: number }> {
   await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
   const db = dataClient()
   const dem = async (nguon: string) => {
     const { count, error } = await db.from('v_bh_cho_kich_hoat')
@@ -2970,6 +3043,7 @@ export async function kichHoatNhanh(input: {
 /** Khách đang chờ duyệt (admin xem/duyệt). */
 export async function listKhachChoDuyet(): Promise<KhachTom[]> {
   await requireStaff()
+  await doQuyen('cs.khach.duyet_cho')
   const { data, error } = await dataClient()
     .from('cs_customers').select('id, full_name, primary_phone, trang_thai')
     .eq('trang_thai', 'cho_duyet').order('created_at', { ascending: false })
@@ -3006,6 +3080,7 @@ export type TicketMuc = {
 
 export async function listTicketItems(code: string): Promise<TicketMuc[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.chi_phi')
   const { data, error } = await dataClient()
     .from('ticket_muc').select('*').eq('ticket_code', code).order('created_at')
   if (error) throw new Error(error.message)
@@ -3016,6 +3091,7 @@ export async function listTicketItems(code: string): Promise<TicketMuc[]> {
 export type CatalogItem = { code: string; ten: string | null; danh_muc: string | null }
 export async function listCatalogItems(): Promise<CatalogItem[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.chi_phi')
   const { data, error } = await dataClient()
     .from('catalog_item')
     .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1"')
@@ -3195,6 +3271,7 @@ export async function createTicket(input: {
   ky_thuat?: string | null
 }) {
   await requireStaff()
+  await doQuyen('cs.ticket.tao_sua')
   const nguoiTao = await layNhanVien()
   if (!input.customer_id?.trim()) return { ok: false as const, error: 'Bắt buộc chọn khách.' }
   if (!input.serial?.trim()) return { ok: false as const, error: 'Bắt buộc chọn serial máy báo lỗi (máy của khách).' }
@@ -3244,6 +3321,7 @@ export async function createTicket(input: {
 /** Các loại ticket đã dùng — gợi ý cho form tạo mới (Odoo có 18 loại). */
 export async function ticketTypes(): Promise<string[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('tickets').select('ticket_type').not('ticket_type', 'is', null)
   if (error) throw new Error(error.message)
@@ -3260,6 +3338,7 @@ export type BoThieuCon = { ma_bo: string; combo: string | null; customer_name: s
 /** Ticket thiếu MÁY (không serial trong hệ) hoặc thiếu KHÁCH — cần bổ sung. */
 export async function ticketThieuData(limit = 300): Promise<TicketThieu[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('v_tickets').select('ticket_code, created_at, customer_id, customer_name, serial, source_serial')
     .or('serial.is.null,customer_id.is.null')
@@ -3276,6 +3355,7 @@ export async function ticketThieuData(limit = 300): Promise<TicketThieu[]> {
 /** Bộ combo (WH15A/WH30A/ECO) chưa đủ 3 thiết bị con — cần bổ sung serial thiết bị. */
 export async function boComboThieuCon(): Promise<BoThieuCon[]> {
   await requireStaff()
+  await doQuyen('cs.may.xem')
   const db = dataClient()
   const [{ data: ib }, { data: me }] = await Promise.all([
     db.from('installed_base').select('parent_serial'),
@@ -3297,6 +3377,7 @@ export async function listToFix(
   tuyChon: TuyChonDanhSach = {}
 ): Promise<KetQuaTrang<Customer & { machines: number }>> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const db = dataClient()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_KHACH, {
     cot: 'full_name', tang: true,
@@ -3356,6 +3437,7 @@ export async function listKhachHang(
   tuyChon: TuyChonDanhSach = {}
 ): Promise<KetQuaTrang<Customer & { machines: number }>> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const db = dataClient()
   const sx = sapXepHopLe(tuyChon.cot, tuyChon.chieu, COT_KHACH, { cot: 'full_name', tang: true })
   const trang = Math.max(1, tuyChon.trang ?? 1)
@@ -3448,6 +3530,7 @@ const DUONG_DAN_BANG: Record<string, string> = {
 /** View của bảng: view CÁ NHÂN của mình + view CHUNG (mọi người). */
 export async function listBangView(bang: string): Promise<BangView[]> {
   const u = await requireStaff()
+  await doQuyen('he_thong.view_chung')
   const email = u.email ?? ''
   const { data, error } = await dataClient().from('bang_view')
     .select('id, ten, chu, cot').eq('bang', bang)
@@ -3539,6 +3622,7 @@ const UU_TIEN: Record<MucDo, number> = {
  *  cho v_installed_base/v_tickets) -> giữ nguyên có dấu, chỉ chặn ký tự phá cú pháp .or(). */
 export async function issueReport(baoHangOnly = false, q = ''): Promise<IssueReport[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   let truyVan = dataClient().from('v_issue_report').select('*').gt('so_ticket', 0)
   if (baoHangOnly) truyVan = truyVan.eq('bao_hang', true)
   const term = q.trim()
@@ -3556,6 +3640,7 @@ export async function issueReport(baoHangOnly = false, q = ''): Promise<IssueRep
 /** Ticket trong một nhóm lỗi — để soi bằng chứng, không tin số liệu suông. */
 export async function ticketsInGroup(groupCode: string): Promise<TicketIssue[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('v_ticket_issue').select('*')
     .eq('group_code', groupCode)
@@ -3567,6 +3652,7 @@ export async function ticketsInGroup(groupCode: string): Promise<TicketIssue[]> 
 /** Nhóm lỗi của MỘT ticket — nhúng vào trang chi tiết ticket. */
 export async function groupsOfTicket(ticketCode: string): Promise<TicketIssue[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('v_ticket_issue').select('*').eq('ticket_code', ticketCode)
   if (error) throw new Error(error.message)
@@ -3587,6 +3673,7 @@ export type ChuaPhanNhom = {
  *  q lọc trên mã ticket + mô tả. Không có cột bỏ dấu -> chỉ chặn ký tự phá cú pháp .or(). */
 export async function ticketsChuaPhanNhom(q = ''): Promise<ChuaPhanNhom[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   let truyVan = dataClient().from('v_ticket_chua_phan_nhom').select('*')
   const term = q.trim()
   if (term) {
@@ -3615,6 +3702,7 @@ const MUC_DO_HOP_LE: readonly MucDo[] = ['an_toan', 'nghiem_trong', 'thuong', 'n
 /** 1 nhóm lỗi để sửa (đọc thẳng bảng issue_group, không qua view báo cáo). */
 export async function nhomLoiChiTiet(code: string): Promise<NhomLoiChiTiet | null> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('issue_group')
     .select('code, ten, mo_ta, muc_do, bao_hang, mau_mo_ta, mau_may, thu_tu')
@@ -3626,6 +3714,7 @@ export async function nhomLoiChiTiet(code: string): Promise<NhomLoiChiTiet | nul
 /** Danh sách nhóm lỗi để CHỌN (gán tay ticket). */
 export async function nhomLoiChon(): Promise<NhomChon[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const { data, error } = await dataClient()
     .from('issue_group').select('code, ten, muc_do').order('thu_tu')
   if (error) throw new Error(error.message)
@@ -3749,6 +3838,7 @@ export async function boGanNhom(
 /** Gợi ý gom nhóm từ ticket CHƯA phân nhóm (có mô tả). Rule-based, chỉ đọc. */
 export async function goiYGomNhom(toiThieu = 3): Promise<CumGoiY[]> {
   await requireStaff()
+  await doQuyen('cs.ticket.xem')
   const chua = await ticketsChuaPhanNhom('')
   const coMoTa = chua
     .filter((t) => t.description && !t.ly_do.startsWith('thiếu mô tả'))
@@ -3776,6 +3866,7 @@ export type KetQuaTimGop = {
  */
 export async function timGop(q: string): Promise<KetQuaTimGop> {
   await requireStaff()
+  await doQuyen('cs.khach.xem')
   const term = q.trim()
   if (!term) {
     return { may: [], ticket: [], khach: [], tongMay: 0, tongTicket: 0, tongKhach: 0 }
