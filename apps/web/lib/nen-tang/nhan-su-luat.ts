@@ -7,6 +7,7 @@
 import {
   apDungLoaiTruCapBac, chuanHoaVaiTro, laVaiTroHopLe, type VaiTro,
 } from './vai-tro'
+import { chuanHoaEmail } from './vao-cua'
 
 export const KHONG_DU_QUYEN = 'Chỉ quản trị mới làm được việc này.'
 
@@ -33,4 +34,26 @@ export function chuanBiVaiTroDeGhi(
   if (vaiTro === undefined) return { ok: true, vaiTro: undefined }
   if (!vaiTro.every(laVaiTroHopLe)) return { ok: false, lyDo: 'Vai trò không hợp lệ.' }
   return { ok: true, vaiTro: apDungLoaiTruCapBac(chuanHoaVaiTro(vaiTro)) }
+}
+
+/**
+ * Luật lời mời — hàm THUẦN, test được.
+ *
+ * Vì sao chặn mời thẳng vào 'admin': lời mời là đường DUY NHẤT đưa email ngoài
+ * @gwt.vn vào hệ thống. Gõ nhầm một ký tự mà lại kèm quyền quản trị thì người lạ
+ * cầm chìa khoá. Mời trước (quyền thấp), admin gán quyền sau ở bảng bên dưới.
+ */
+export function kiemTraLoiMoi(
+  email: string,
+  vaiTro: string[]
+): { ok: true; email: string; vaiTro: VaiTro[] } | { ok: false; lyDo: string } {
+  const e = chuanHoaEmail(email)
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(e)) return { ok: false, lyDo: 'Email không hợp lệ.' }
+  if (vaiTro.length === 0) return { ok: false, lyDo: 'Phải chọn ít nhất một vai trò.' }
+  if (vaiTro.includes('admin')) {
+    return { ok: false, lyDo: 'Không mời thẳng vào quyền quản trị. Mời trước, gán quyền sau.' }
+  }
+  const kq = chuanBiVaiTroDeGhi(vaiTro)
+  if (!kq.ok) return { ok: false, lyDo: kq.lyDo }
+  return { ok: true, email: e, vaiTro: kq.vaiTro ?? [] }
 }

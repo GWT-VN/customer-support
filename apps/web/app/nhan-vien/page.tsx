@@ -1,4 +1,5 @@
 import { BangNhanVien } from '@/components/BangNhanVien'
+import { MoiNhanSu } from '@/components/MoiNhanSu'
 import { listAllStaff } from '@/lib/nen-tang/nhan-su'
 import { chanNeuKhongPhaiAdmin } from '@/lib/nen-tang/gac-cong'
 import { layNhanVien } from '@/lib/nen-tang/phien'
@@ -25,6 +26,8 @@ export default async function NhanVienPage() {
         </p>
 
         <BangNhanVien ds={ds} toiId={toi?.id ?? ''} />
+
+        <MoiNhanSu />
 
         <div className="bg-white rounded-xl border p-4 text-sm text-slate-600 space-y-1">
           <p className="font-medium text-slate-900">Cách gán vai trò</p>

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { dataClient } from './db'
 import { laAdmin } from './gac-cong'
-import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, toStaff, type Staff } from './nhan-su-luat'
+import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, toStaff, type Staff } from './nhan-su-luat'
 import { ghiAudit } from './nhat-ky'
 import { layNhanVien, requireStaff } from './phien'
 import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, type VaiTro } from './vai-tro'
@@ -101,6 +101,43 @@ export async function doiTenNhanVien(id: string, ten: string) {
   if (!t) return { ok: false as const, error: 'Tên không được để trống.' }
   const { error } = await dataClient().from('staff').update({ ten: t }).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
+  revalidatePath('/nhan-vien')
+  return { ok: true as const }
+}
+
+/**
+ * Mời một người vào hệ thống bằng email cá nhân — dùng cho CTV lắp đặt, những
+ * người không có email công ty.
+ *
+ * KHÔNG nới DOMAIN_CONG_TY: luật vào cửa vẫn là "có tên trong bảng staff thì
+ * vào được". Lời mời chính là việc ghi tên vào bảng đó.
+ *
+ * hoat_dong=true ngay: admin đã chủ động nhập email và chọn vai trò rồi, bắt
+ * duyệt thêm một lần nữa là thừa. Người được mời vẫn phải đăng nhập Google bằng
+ * ĐÚNG email đó mới vào được.
+ */
+export async function moiNhanSu(email: string, vaiTro: string[]) {
+  await requireStaff()
+  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+
+  const kt = kiemTraLoiMoi(email, vaiTro)
+  if (!kt.ok) return { ok: false as const, error: kt.lyDo }
+
+  const db = dataClient()
+  const { data: daCo, error: e1 } = await db
+    .from('staff').select('id').eq('email', kt.email).maybeSingle()
+  if (e1) return { ok: false as const, error: e1.message }
+  if (daCo) return { ok: false as const, error: 'Email này đã có trong danh sách nhân viên.' }
+
+  const { error } = await db.from('staff').insert({
+    email: kt.email,
+    ten: kt.email.split('@')[0],
+    vai_tro: kt.vaiTro,
+    hoat_dong: true,
+  })
+  if (error) return { ok: false as const, error: error.message }
+
+  await ghiAudit('moi_nhan_su', `email:${kt.email}`, { vai_tro: kt.vaiTro })
   revalidatePath('/nhan-vien')
   return { ok: true as const }
 }
