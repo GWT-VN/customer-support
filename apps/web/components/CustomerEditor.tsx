@@ -81,12 +81,55 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
             <span className="text-sm text-slate-700">Tỉnh/TP</span>
             <ChonTinh value={c.province} onChange={(v) => setC({ ...c, province: v })} />
           </label>
-          <label className="block">
+          <label className="block sm:col-span-2">
             <span className="text-sm text-slate-700">Địa chỉ</span>
             <input value={c.address ?? ''} onChange={(e) => setC({ ...c, address: e.target.value })}
               className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
           </label>
         </div>
+
+        {/* Thông tin công ty — trường RIÊNG, không nhét vào ghi chú, để còn lọc và
+            xuất hoá đơn/hợp đồng theo nó. 73 khách vốn có tên công ty + MST nằm
+            trong ô ghi chú do một đợt import; migration 50 đã kéo ra đúng cột. */}
+        <details className="rounded-lg border bg-slate-50 px-3 py-2" open={!!(c.ten_cty || c.mst)}>
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">
+            Thông tin công ty {c.ten_cty ? `· ${c.ten_cty}` : '(xuất hoá đơn, hợp đồng)'}
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="text-sm text-slate-700">Tên công ty</span>
+              <input value={c.ten_cty ?? ''} onChange={(e) => setC({ ...c, ten_cty: e.target.value })}
+                placeholder="CÔNG TY TNHH…"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-700">Mã số thuế</span>
+              <input value={c.mst ?? ''} onChange={(e) => setC({ ...c, mst: e.target.value })}
+                placeholder="0123456789 hoặc 0123456789-001"
+                className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-slate-900" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-700">SĐT công ty</span>
+              <input value={c.sdt_cty ?? ''} onChange={(e) => setC({ ...c, sdt_cty: e.target.value })}
+                className="mt-1 w-full rounded-lg border px-3 py-2 font-mono text-slate-900" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-700">Email công ty</span>
+              <input type="email" value={c.email_cty ?? ''} onChange={(e) => setC({ ...c, email_cty: e.target.value })}
+                placeholder="nhận hoá đơn điện tử"
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="text-sm text-slate-700">Địa chỉ công ty (đăng ký thuế)</span>
+              <input value={c.dia_chi_cty ?? ''} onChange={(e) => setC({ ...c, dia_chi_cty: e.target.value })}
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-slate-900" />
+              <span className="mt-1 block text-xs text-slate-400">
+                Khác địa chỉ nhà ở trên. Đây là địa chỉ in trên hoá đơn.
+              </span>
+            </label>
+          </div>
+        </details>
+
         <div className="flex items-center gap-3">
           <button onClick={save} disabled={busy}
             className="rounded-lg bg-slate-900 text-white px-4 py-2 font-medium disabled:opacity-50">

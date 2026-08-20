@@ -11,7 +11,8 @@ const k = (o: Partial<KhachGon> & { id: string }): KhachGon => ({
 const kd = (o: Partial<KhachDayDu> & { id: string }): KhachDayDu => ({
   full_name: 'Khách', primary_phone: null, address: null, so_may: 0, so_ticket: 0, so_plan: 0,
   province: null, customer_code: null, channel_id: null, ten_kenh: null, source: null,
-  partner_ref: null, notes: null, so_lien_he: 0, created_at: null, ...o,
+  partner_ref: null, notes: null, ten_cty: null, mst: null, dia_chi_cty: null,
+  sdt_cty: null, email_cty: null, so_lien_he: 0, created_at: null, ...o,
 })
 
 describe('kiemTraGop', () => {

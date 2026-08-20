@@ -219,6 +219,12 @@ export type Customer = {
   needs_phone: boolean
   notes: string | null
   channel_id: number | null
+  /** Thông tin công ty để xuất hoá đơn / làm hợp đồng (migration 50). */
+  ten_cty: string | null
+  mst: string | null
+  dia_chi_cty: string | null
+  sdt_cty: string | null
+  email_cty: string | null
 }
 
 export async function getCustomer(id: string) {
@@ -253,6 +259,11 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
     primary_phone: sdt,
     province: patch.province || null,
     address: patch.address || null,
+    ten_cty: patch.ten_cty || null,
+    mst: patch.mst || null,
+    dia_chi_cty: patch.dia_chi_cty || null,
+    sdt_cty: patch.sdt_cty || null,
+    email_cty: patch.email_cty || null,
   }
   // Sửa được SĐT hợp lệ -> hạ cờ needs_phone + xoá ghi chú lỗi
   if (sdt && /^0\d{9,10}$/.test(sdt)) { payload.needs_phone = false; payload.notes = null }
@@ -288,7 +299,12 @@ export async function deleteContact(id: string, customerId: string) {
 type DoiTuong = 'cs_customers' | 'filter_replacement' | 'customer_contacts' | 'installed_base'
 type LoaiTD = 'sua' | 'xoa' | 'doi_serial' | 'gop'
 const COT_CHO_PHEP: Record<DoiTuong, string[]> = {
-  cs_customers: ['full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone'],
+  cs_customers: [
+    'full_name', 'primary_phone', 'address', 'province', 'notes', 'needs_phone',
+    // Thông tin công ty (mig 50) — thiếu ở đây thì CS sửa xong, admin duyệt, mà
+    // trường vẫn không đổi: vòng duyệt lọc payload đúng theo danh sách này.
+    'ten_cty', 'mst', 'dia_chi_cty', 'sdt_cty', 'email_cty',
+  ],
   filter_replacement: ['filter_code', 'replaced_at', 'note'],
   customer_contacts: ['phone', 'contact_name', 'role', 'zalo_ok'],
   installed_base: ['customer_id', 'install_date', 'install_address'],
@@ -477,7 +493,7 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
   const db = dataClient()
   const [{ data: k }, may, ticket, plan, lienHe] = await Promise.all([
     db.from('cs_customers')
-      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at')
+      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at, ten_cty, mst, dia_chi_cty, sdt_cty, email_cty')
       .eq('id', id).maybeSingle(),
     db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
     db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
@@ -508,6 +524,11 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
     source: (r.source as string | null) ?? null,
     partner_ref: (r.partner_ref as string | null) ?? null,
     notes: (r.notes as string | null) ?? null,
+    ten_cty: (r.ten_cty as string | null) ?? null,
+    mst: (r.mst as string | null) ?? null,
+    dia_chi_cty: (r.dia_chi_cty as string | null) ?? null,
+    sdt_cty: (r.sdt_cty as string | null) ?? null,
+    email_cty: (r.email_cty as string | null) ?? null,
     created_at: (r.created_at as string | null) ?? null,
     so_may: may.count ?? 0,
     so_ticket: ticket.count ?? 0,

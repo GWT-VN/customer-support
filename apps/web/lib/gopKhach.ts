@@ -58,6 +58,11 @@ export type KhachDayDu = KhachGon & {
   source: string | null
   partner_ref: string | null
   notes: string | null
+  ten_cty: string | null
+  mst: string | null
+  dia_chi_cty: string | null
+  sdt_cty: string | null
+  email_cty: string | null
   so_lien_he: number
   created_at: string | null
 }

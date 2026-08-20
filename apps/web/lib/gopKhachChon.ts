@@ -25,6 +25,13 @@ export const TRUONG_GOP = [
   { khoa: 'channel_id', nhan: 'Kênh / đối tác' },
   { khoa: 'source', nhan: 'Nguồn' },
   { khoa: 'partner_ref', nhan: 'Mã đối tác' },
+  // Thông tin công ty (mig 50) — hồ sơ khách lẻ và hồ sơ khách công ty của cùng
+  // một người hay nằm tách nhau, gộp lại thì phần công ty phải theo sang.
+  { khoa: 'ten_cty', nhan: 'Tên công ty' },
+  { khoa: 'mst', nhan: 'Mã số thuế' },
+  { khoa: 'dia_chi_cty', nhan: 'Địa chỉ công ty' },
+  { khoa: 'sdt_cty', nhan: 'SĐT công ty' },
+  { khoa: 'email_cty', nhan: 'Email công ty' },
   { khoa: 'notes', nhan: 'Ghi chú' },
 ] as const
 
