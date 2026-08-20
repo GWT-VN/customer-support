@@ -313,3 +313,33 @@ export const NHAN_TINH_TRANG_BH: Record<TinhTrangBH, string> = {
   het_may_con_loi: 'Hết hạn máy, còn lõi',
   het_ca_hai: 'Hết cả hai',
 }
+
+/**
+ * Ngày lắp đáng tin tới đâu (migration 47).
+ *
+ * Nhiều khách chỉ liên hệ khi máy hỏng, hỏi ngày lắp thì người nhớ người không.
+ * Trước đây ngày đoán và ngày thật nằm lẫn nhau trong cùng một cột `install_date`,
+ * nhìn vào không phân biệt được — mà hạn bảo hành lại suy ra từ đúng cột đó, nên CS
+ * đọc hạn rồi báo chắc nịch cho khách trong khi mốc gốc chỉ là phỏng đoán.
+ *
+ * Cố ý KHÔNG cho `install_date` null: bảo hành, lịch bảo trì, lịch thay lõi đều tính
+ * từ nó. Vẫn điền ngày đoán tốt nhất, chỉ đánh dấu rõ là đoán.
+ */
+export const DO_CHAC_NGAY_LAP = ['chinh_xac', 'uoc_luong', 'khong_ro'] as const
+export type DoChacNgayLap = (typeof DO_CHAC_NGAY_LAP)[number]
+
+export const NHAN_DO_CHAC: Record<DoChacNgayLap, string> = {
+  chinh_xac: 'Khách nhớ chính xác',
+  uoc_luong: 'Khách áng chừng',
+  khong_ro: 'Khách không nhớ',
+}
+
+/**
+ * Giá trị lạ (client cũ, gõ tay, dữ liệu bẩn) rơi về 'chinh_xac' thay vì ném lỗi —
+ * ràng buộc CHECK ở DB chỉ nhận 3 giá trị, để lọt là cả lần kích hoạt BH đổ.
+ */
+export function doChacHopLe(v: string | null | undefined): DoChacNgayLap {
+  return (DO_CHAC_NGAY_LAP as readonly string[]).includes(v ?? '')
+    ? (v as DoChacNgayLap)
+    : 'chinh_xac'
+}

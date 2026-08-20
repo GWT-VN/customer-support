@@ -13,8 +13,8 @@ import { kiemTraGop, moTaGop, type KhachGon } from '@/lib/gopKhach'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
-  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay,
-  type TinhTrangBH, type DongNhapSerial,
+  XUAT_MAY_COT, XUAT_BAOTRI_COT, XUAT_LOI_COT, MA_COMBO, docLocNgay, doChacHopLe,
+  type TinhTrangBH, type DongNhapSerial, type DoChacNgayLap,
 } from '@/lib/danhSach'
 
 /** Câu từ chối dùng chung cho các action chỉ dành cho admin. */
@@ -67,6 +67,8 @@ export type Machine = {
   con_han_may: boolean | null
   con_han_loi: boolean | null
   co_chinh_sach_bh: boolean
+  ngay_lap_do_chac: DoChacNgayLap | null
+  ghi_chu: string | null
 }
 
 /** Tra máy theo serial / tên khách / SĐT / địa chỉ (không dấu). Rỗng -> máy lắp gần nhất. */
@@ -2944,12 +2946,14 @@ export async function taoKhachChoDuyet(input: {
 /** Đăng ký bảo hành: gắn máy (serial) cho khách + kích hoạt BH. */
 export async function dangKyBaoHanh(input: {
   serial: string; customer_id: string; install_date: string; install_address?: string
+  ngay_lap_do_chac?: DoChacNgayLap; ghi_chu?: string
 }) {
   await requireStaff()
   const serial = input.serial?.trim()
   if (!serial) return { ok: false as const, error: 'Chọn serial.' }
   if (!input.customer_id) return { ok: false as const, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.install_date)) return { ok: false as const, error: 'Ngày lắp không hợp lệ.' }
+  const doChac = doChacHopLe(input.ngay_lap_do_chac)
   const db = dataClient()
   // Chặn GHI ĐÈ CHỦ MÁY: serial đã lắp cho khách KHÁC thì từ chối, không upsert đè.
   // NV gõ nhầm 1 ký tự serial không được phép đổi chủ máy của người khác.
@@ -2981,6 +2985,8 @@ export async function dangKyBaoHanh(input: {
     customer_id: input.customer_id,
     install_date: input.install_date,
     install_address: input.install_address?.trim() || null,
+    ngay_lap_do_chac: doChac,
+    ghi_chu: input.ghi_chu?.trim() || null,
     channel_source: 'CSKH đăng ký', status: 'active',
   }, { onConflict: 'serial' })
   if (e1) return { ok: false as const, error: e1.message }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
 import { getMachine, ticketsOfSerial, lichSuSerial, dsTrangThai } from '@/app/actions'
+import { NHAN_DO_CHAC } from '@/lib/danhSach'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
@@ -26,10 +27,25 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
     { label: 'Máy', value: m.product_name ?? '—' },
     { label: 'Mã nội bộ', value: m.internal_code ?? '—', mono: true },
     { label: 'Nhóm', value: m.category_l2 ?? '—' },
-    { label: 'Ngày bắt đầu BH', value: vnDate(m.warranty_start ?? m.install_date) },
+    {
+      label: 'Ngày bắt đầu BH',
+      value: (
+        <>
+          {vnDate(m.warranty_start ?? m.install_date)}
+          {/* Ngày đoán phải nhìn ra ngay — nếu không, CS đọc hạn BH rồi báo chắc nịch
+              cho khách trong khi mốc gốc chỉ là ước lượng. */}
+          {m.ngay_lap_do_chac && m.ngay_lap_do_chac !== 'chinh_xac' && (
+            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              {NHAN_DO_CHAC[m.ngay_lap_do_chac]} — ngày chỉ là ước lượng
+            </span>
+          )}
+        </>
+      ),
+    },
     { label: 'Trạng thái máy', value: m.status },
     { label: 'Hết BH máy', value: vnDate(m.warranty_full_end) },
     { label: 'Hết BH linh kiện', value: vnDate(m.warranty_core_end) },
+    ...(m.ghi_chu ? [{ label: 'Ghi chú', value: m.ghi_chu }] : []),
   ]
 
   return (

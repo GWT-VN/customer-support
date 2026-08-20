@@ -6,6 +6,7 @@ import {
   dangKyBaoHanh, dsMayCoSerial, serialsTheoMay, serialInfo,
   type SerialKho, type MayKho, type KhachTom, type CatalogChon,
 } from '@/app/actions'
+import { DO_CHAC_NGAY_LAP, NHAN_DO_CHAC, type DoChacNgayLap } from '@/lib/danhSach'
 import { SerialPicker } from '@/components/SerialPicker'
 import { KhachPicker } from '@/components/KhachPicker'
 import { ChonCatalog } from '@/components/ChonCatalog'
@@ -39,6 +40,8 @@ export function DangKyBHForm() {
   const [tinhLap, setTinhLap] = useState('')
 
   const [ngay, setNgay] = useState(HOM_NAY())
+  const [doChac, setDoChac] = useState<DoChacNgayLap>('chinh_xac')
+  const [ghiChu, setGhiChu] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -116,12 +119,15 @@ export function DangKyBHForm() {
     const r = await dangKyBaoHanh({
       serial, customer_id: khachId, install_date: ngay,
       install_address: dcLapCuoi.trim() || undefined,
+      ngay_lap_do_chac: doChac,
+      ghi_chu: ghiChu.trim() || undefined,
     })
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
     setMsg(`Đã đăng ký + kích hoạt BH cho serial ${serial}.`)
     setMayCode(''); setSerial(''); setSerialQ(''); setSerialOpen(false); setInfo(null); setSerialList([])
     setKhachId(''); setKhachAddr(null); setDcLap(''); setTinhLap(''); setDungDcKhach(true); setNgay(HOM_NAY())
+    setDoChac('chinh_xac'); setGhiChu('')
     router.refresh()
   }
 
@@ -234,11 +240,35 @@ export function DangKyBHForm() {
       </div>
 
       {/* 5. Ngày bắt đầu BH */}
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">5. Ngày bắt đầu bảo hành</span>
-        <input type="date" value={ngay} max={HOM_NAY()} onChange={(e) => setNgay(e.target.value)}
-          className="mt-1 block rounded-lg border px-3 py-2 text-sm text-slate-900" />
-      </label>
+      <div>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">5. Ngày bắt đầu bảo hành</span>
+          <input type="date" value={ngay} max={HOM_NAY()} onChange={(e) => setNgay(e.target.value)}
+            className="mt-1 block rounded-lg border px-3 py-2 text-sm text-slate-900" />
+        </label>
+
+        {/* Khách chỉ liên hệ lúc máy hỏng thì thường không nhớ ngày lắp. Vẫn phải
+            điền một ngày (bảo hành + lịch bảo trì + lịch thay lõi đều tính từ đó),
+            nhưng đánh dấu rõ đây là ngày đoán để sau này đọc còn biết. */}
+        <div className="mt-2">
+          <span className="text-sm font-medium text-slate-700">Ngày này chắc tới đâu?</span>
+          <select value={doChac} onChange={(e) => setDoChac(e.target.value as DoChacNgayLap)}
+            className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-slate-900 bg-white">
+            {DO_CHAC_NGAY_LAP.map((k) => <option key={k} value={k}>{NHAN_DO_CHAC[k]}</option>)}
+          </select>
+          {doChac !== 'chinh_xac' && (
+            <>
+              <textarea value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} rows={2}
+                placeholder="Khách nói gì? vd: chỉ nhớ mùa hè năm ngoái · lấy theo ngày hoá đơn đại lý"
+                className="mt-2 w-full rounded-lg border px-3 py-2 text-sm text-slate-900" />
+              <p className="text-xs text-amber-600 mt-1">
+                Hạn bảo hành vẫn tính từ ngày trên, nhưng máy sẽ hiện nhãn
+                “{NHAN_DO_CHAC[doChac].toLowerCase()}” để người sau biết mà kiểm lại.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <button onClick={luu} disabled={busy || !serial.trim() || !khachId || daKichHoat}
