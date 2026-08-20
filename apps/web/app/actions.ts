@@ -9,7 +9,7 @@ import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
-import { kiemTraGop, moTaGop, type KhachGon } from '@/lib/gopKhach'
+import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -456,6 +456,56 @@ export async function khachGon(id: string): Promise<KhachGon | null> {
   const r = k as { id: string; full_name: string; primary_phone: string | null; address: string | null }
   return {
     ...r, so_may: may.count ?? 0, so_ticket: ticket.count ?? 0, so_plan: plan.count ?? 0,
+  }
+}
+
+/**
+ * Hồ sơ khách ĐỦ TRƯỜNG cho màn so sánh trước khi gộp (/khach/gop).
+ *
+ * Khác `khachGon` ở chỗ trả thêm tỉnh, mã KH, kênh, nguồn, ghi chú — bản cũ chỉ
+ * có tên + SĐT, mà rất nhiều khách không có SĐT nên CS không có gì để phân biệt
+ * hai hồ sơ trùng tên.
+ */
+export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
+  await requireStaff()
+  const db = dataClient()
+  const [{ data: k }, may, ticket, plan, lienHe] = await Promise.all([
+    db.from('cs_customers')
+      .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at')
+      .eq('id', id).maybeSingle(),
+    db.from('installed_base').select('serial', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('tickets').select('ticket_code', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+    db.from('customer_contacts').select('id', { count: 'exact', head: true }).eq('customer_id', id),
+  ])
+  if (!k) return null
+  const r = k as Record<string, unknown>
+
+  // Tên kênh nằm ở bảng của Sales — chỉ tra khi khách thật sự có kênh.
+  let tenKenh: string | null = null
+  if (r.channel_id != null) {
+    const { data: ch } = await db.from('dim_channel')
+      .select('channel_l1, channel_l2').eq('id', r.channel_id).maybeSingle()
+    const c = ch as { channel_l1: string | null; channel_l2: string | null } | null
+    if (c) tenKenh = [c.channel_l1, c.channel_l2].filter(Boolean).join(' · ') || null
+  }
+
+  return {
+    id: r.id as string,
+    full_name: r.full_name as string,
+    primary_phone: (r.primary_phone as string | null) ?? null,
+    address: (r.address as string | null) ?? null,
+    province: (r.province as string | null) ?? null,
+    customer_code: (r.customer_code as string | null) ?? null,
+    ten_kenh: tenKenh,
+    source: (r.source as string | null) ?? null,
+    partner_ref: (r.partner_ref as string | null) ?? null,
+    notes: (r.notes as string | null) ?? null,
+    created_at: (r.created_at as string | null) ?? null,
+    so_may: may.count ?? 0,
+    so_ticket: ticket.count ?? 0,
+    so_plan: plan.count ?? 0,
+    so_lien_he: lienHe.count ?? 0,
   }
 }
 
@@ -1037,6 +1087,30 @@ export async function ganKhachBaoTri(planId: string, customerId: string): Promis
     .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
   if (error) return { ok: false, error: error.message }
   await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId })
+  revalidatePath('/bao-tri')
+  return { ok: true }
+}
+
+/**
+ * Gỡ khách khỏi plan — đường HOÀN TÁC cho lỡ gán nhầm.
+ *
+ * Trước đây gán là một chiều: bấm nhầm một cái là plan dính vào khách sai, muốn
+ * sửa phải nhờ kỹ thuật chạy SQL. Gán chỉ là đặt `customer_id`, gỡ ra rẻ như gán
+ * vào, nên không có lý do gì bắt người dùng sống chung với cái nhầm.
+ * Lượt bảo trì đã sinh KHÔNG bị đụng — chúng treo theo plan, không theo khách.
+ */
+export async function goGanKhachBaoTri(planId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  const db = dataClient()
+  const { data: cu } = await db.from('maintenance_plan')
+    .select('customer_id').eq('id', planId).maybeSingle()
+  const { error } = await db.from('maintenance_plan')
+    .update({ customer_id: null, updated_at: new Date().toISOString() }).eq('id', planId)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('go_gan_khach_bao_tri', `plan:${planId}`, {
+    customer_id_cu: (cu as { customer_id: string | null } | null)?.customer_id ?? null,
+  })
   revalidatePath('/bao-tri')
   return { ok: true }
 }

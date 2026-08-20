@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ganKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
+import { ganKhachBaoTri, goGanKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
+import { TimKhachChiTiet } from '@/components/TimKhachChiTiet'
 import { sinhLichBaoTri, vungTheoTinh, macDinhTheoBoMay, type Vung } from '@/lib/lichBaoTri'
 import { tinCayThap } from '@/lib/khopPlanKhach'
 import { KhachPicker } from '@/components/KhachPicker'
@@ -85,12 +86,32 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
     setSuaLan(null); setMsg(r.them > 0 ? `Đã đặt số lần + nối thêm ${r.them} lượt.` : 'Đã cập nhật số lần.'); router.refresh()
   }
 
-  async function gan(planId: string, customerId: string) {
+  /**
+   * Gán khách cho plan. LUÔN hỏi lại trước khi ghi.
+   *
+   * Trước đây bấm phát là gán luôn — gợi ý xếp sát nhau, bấm trượt một ô là plan
+   * dính vào khách sai mà không có gì báo. Nay phải đọc đúng tên khách rồi mới
+   * xác nhận; lỡ sai thì còn nút "gỡ gán" ở danh sách đã map.
+   */
+  async function gan(planId: string, customerId: string, tenPlan: string, tenKhach: string) {
+    if (!window.confirm(
+      `Gán lịch bảo trì:\n  "${tenPlan}"\n\ncho khách:\n  "${tenKhach}"\n\nĐúng người chưa?`
+    )) return
     setBusy(planId); setErr(null); setMsg(null)
     const r = await ganKhachBaoTri(planId, customerId)
     setBusy(null)
     if (!r.ok) { setErr(r.error); return }
-    setChonTay(null); setMsg('Đã map khách.'); router.refresh()
+    setChonTay(null); setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
+    router.refresh()
+  }
+
+  async function goGan(planId: string, tenKhach: string | null) {
+    if (!window.confirm(`Gỡ lịch bảo trì này khỏi khách "${tenKhach ?? '—'}"?\n\nLịch quay về nhóm "chưa khớp khách". Các lượt bảo trì đã có KHÔNG bị xoá.`)) return
+    setBusy(planId); setErr(null); setMsg(null)
+    const r = await goGanKhachBaoTri(planId)
+    setBusy(null)
+    if (!r.ok) { setErr(r.error); return }
+    setMsg('Đã gỡ gán — lịch quay về nhóm chưa khớp khách.'); router.refresh()
   }
   async function lenLich(planId: string, macDinhLan: number | null) {
     setBusy(planId); setErr(null); setMsg(null)
@@ -157,7 +178,8 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                           // rõ, thay vì ẩn hẳn (vẫn còn giá trị hơn phải mò tay trong 400 khách).
                           const yeu = tinCayThap(g.diem)
                           return (
-                            <button key={g.id} disabled={busy === p.id} onClick={() => gan(p.id, g.id)}
+                            <button key={g.id} disabled={busy === p.id}
+                              onClick={() => gan(p.id, g.id, p.source_customer_name ?? '(không tên)', `${g.ten}${g.sdt ? ` (${g.sdt})` : ''}`)}
                               className={
                                 'rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 text-left ' +
                                 (yeu ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-emerald-600 text-white')
@@ -178,7 +200,17 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                   </div>
                 </div>
                 {chonTay === p.id && (
-                  <div className="pt-1"><KhachPicker onPick={(id) => gan(p.id, id)} /></div>
+                  <div className="pt-1">
+                    {/* Ô tìm hiện đủ tỉnh + địa chỉ: nhiều khách không có SĐT nên
+                        tên trơn không đủ để dám bấm gán. */}
+                    <TimKhachChiTiet
+                      onChon={(k) => gan(
+                        p.id, k.id,
+                        p.source_customer_name ?? '(không tên)',
+                        `${k.full_name}${k.primary_phone ? ` (${k.primary_phone})` : ''}${k.province ? ` — ${k.province}` : ''}`,
+                      )}
+                    />
+                  </div>
                 )}
               </li>
             ))}
@@ -297,10 +329,18 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
-                    <button onClick={() => moFormLich(p)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800">
-                      {p.so_visit > 0 ? 'Sinh lại lịch' : 'Lên lịch'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Đường HOÀN TÁC cho lỡ gán nhầm khách — trước đây gán là một
+                          chiều, sai thì phải nhờ kỹ thuật chạy SQL mới gỡ được. */}
+                      <button disabled={busy === p.id} onClick={() => goGan(p.id, p.ten_khach)}
+                        className="text-xs text-slate-500 underline hover:text-red-600 disabled:opacity-50">
+                        gỡ gán
+                      </button>
+                      <button onClick={() => moFormLich(p)}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800">
+                        {p.so_visit > 0 ? 'Sinh lại lịch' : 'Lên lịch'}
+                      </button>
+                    </div>
                     {p.so_may === 0 && <span className="text-[10px] text-amber-500">khách chưa có máy kích hoạt BH</span>}
                   </div>
                 </div>
