@@ -108,6 +108,32 @@ export function apDungLoaiTruCapBac(vaiTro: VaiTro[]): VaiTro[] {
   return VAI_TRO.filter((v) => giu.has(v))
 }
 
+/**
+ * Luật loại trừ cho GIAO DIỆN: vai trò VỪA BẤM là vai trò thắng.
+ *
+ * Khác apDungLoaiTruCapBac() ở chỗ nào và vì sao cần cả hai:
+ *  - apDungLoaiTruCapBac(tập) — không biết người dùng vừa bấm cái nào, nên phải
+ *    chọn theo quy tắc cố định "cấp cao nhất thắng". Dùng ở SERVER như lưới an
+ *    toàn cho tập vai trò gửi lên, và để dọn dữ liệu cũ.
+ *  - apDungLoaiTruKhiTick(tập, vừaBấm) — biết chính xác ô nào vừa được bấm, nên
+ *    ô đó thắng.
+ *
+ * Vì sao KHÔNG dùng "cấp cao nhất thắng" cho giao diện: đang là Trưởng CSKH mà
+ * bấm Nhân viên CSKH thì "cao nhất thắng" trả lại đúng Trưởng CSKH — cú bấm rơi
+ * vào hư không, KHÔNG BAO GIỜ hạ cấp được ai, mà cũng chẳng báo lỗi gì.
+ *
+ * Vai trò ở các bộ phận KHÁC giữ nguyên (chỉ dọn nếu bản thân chúng vi phạm luật
+ * từ trước) — kiêm nhiệm chéo mảng là hợp lệ.
+ */
+export function apDungLoaiTruKhiTick(dangCo: VaiTro[], vuaTick: VaiTro): VaiTro[] {
+  const boPhanVuaTick = HO_SO_VAI_TRO[vuaTick].boPhan
+  const boPhanKhac = apDungLoaiTruCapBac(
+    dangCo.filter((v) => HO_SO_VAI_TRO[v].boPhan !== boPhanVuaTick)
+  )
+  const giu = new Set<VaiTro>([...boPhanKhac, vuaTick])
+  return VAI_TRO.filter((v) => giu.has(v))
+}
+
 /** Có quyền admin không. Nhận chuỗi cũ HOẶC mảng mới (đọc được cả 2 thời kỳ schema). */
 export function laQuyenAdmin(vaiTro: string | string[] | null | undefined): boolean {
   return chuanHoaVaiTro(vaiTro).includes('admin')

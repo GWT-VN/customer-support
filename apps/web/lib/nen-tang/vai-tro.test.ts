@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VAI_TRO, apDungLoaiTruCapBac, chuanHoaVaiTro, coQuyenQuanLy, laVaiTroHopLe } from './vai-tro'
+import { VAI_TRO, apDungLoaiTruCapBac, apDungLoaiTruKhiTick, chuanHoaVaiTro, coQuyenQuanLy, laVaiTroHopLe } from './vai-tro'
 
 describe('danh sách 13 vai trò toàn công ty', () => {
   it('có đủ 13 vai trò, đúng thứ tự khai báo', () => {
@@ -49,5 +49,45 @@ describe('apDungLoaiTruCapBac — chỉ loại trừ TRONG cùng bộ phận', (
 
   it('mảng rỗng -> mảng rỗng', () => {
     expect(apDungLoaiTruCapBac([])).toEqual([])
+  })
+})
+
+describe('apDungLoaiTruKhiTick — vai trò VỪA BẤM là vai trò thắng', () => {
+  it('LỖI CEO BÁO: đang Trưởng CSKH, bấm Nhân viên CSKH -> HẠ CẤP được', () => {
+    expect(apDungLoaiTruKhiTick(['cs_manager'], 'cs')).toEqual(['cs'])
+  })
+
+  it('chiều ngược lại: đang Nhân viên CSKH, bấm Trưởng CSKH -> lên cấp', () => {
+    expect(apDungLoaiTruKhiTick(['cs'], 'cs_manager')).toEqual(['cs_manager'])
+  })
+
+  it('khác bộ phận thì cộng thêm, không đụng nhau', () => {
+    expect(apDungLoaiTruKhiTick(['cs_manager'], 'sales_manager')).toEqual(['cs_manager', 'sales_manager'])
+    expect(apDungLoaiTruKhiTick(['cs', 'sales'], 'kho')).toEqual(['cs', 'sales', 'kho'])
+  })
+
+  it('đổi cấp trong bộ phận này KHÔNG đụng bộ phận kia', () => {
+    expect(apDungLoaiTruKhiTick(['cs', 'sales'], 'cs_manager')).toEqual(['cs_manager', 'sales'])
+  })
+
+  it('bộ phận Kỹ thuật 3 cấp: bấm cái nào ra cái đó', () => {
+    expect(apDungLoaiTruKhiTick(['kt_giam_doc'], 'ctv_lap_dat')).toEqual(['ctv_lap_dat'])
+    expect(apDungLoaiTruKhiTick(['ctv_lap_dat'], 'ky_thuat')).toEqual(['ky_thuat'])
+  })
+
+  it('bấm lại vai trò đã có thì giữ nguyên (không nhân đôi)', () => {
+    expect(apDungLoaiTruKhiTick(['cs', 'sales'], 'cs')).toEqual(['cs', 'sales'])
+  })
+
+  it('người chưa có vai trò nào', () => {
+    expect(apDungLoaiTruKhiTick([], 'ceo')).toEqual(['ceo'])
+  })
+
+  it('dữ liệu cũ vi phạm luật ở bộ phận KHÁC cũng được dọn luôn', () => {
+    expect(apDungLoaiTruKhiTick(['cs', 'cs_manager'], 'sales')).toEqual(['cs_manager', 'sales'])
+  })
+
+  it('kết quả theo thứ tự khai báo VAI_TRO', () => {
+    expect(apDungLoaiTruKhiTick(['sales', 'kho'], 'admin')).toEqual(['admin', 'sales', 'kho'])
   })
 })
