@@ -296,6 +296,46 @@ Chỉ chạy khi tab "Lệch" **im lặng vài ngày trên dữ liệu dùng th�
   *không tự khoá mình* và *phải còn ít nhất một admin hoạt động*. Tick nhầm không được phép
   khoá chết hệ thống.
 
+### 7.1 GĐ3 đã làm — ghi lại những gì chỉ lộ ra khi bật thật
+
+**1. `doQuyen()` trả boolean là KHÔNG chặn gì cả.** 91 chỗ gọi nó như một câu lệnh
+trống (`await doQuyen('...')`), không ai đọc giá trị trả về. Ở GĐ2 vô hại; bật GĐ3
+lên thì nó tính ra "cấm" rồi vẫn chạy tiếp. Chỉ lộ khi thử thật bằng tài khoản kỹ
+thuật. Sửa: `doQuyen` **đá về trang chủ** (`redirect`), không trả boolean.
+
+Ném lỗi cũng chặn được nhưng người dùng thấy trang trắng *"A server error occurred"* —
+đúng cái `requireStaff()` đã cố tránh. Dùng `redirect` cho thống nhất với phần còn lại.
+
+**2. Gác cấp TRANG (12 trang)** đổi sang `chanNeuThieuQuyen(mã, gateCũ)`. Trong lúc
+map lộ thêm một lỗ cùng loại với ca kỹ thuật: trang `/doanh-so` gác `laAdmin` nhưng
+hàm `doanhSoCskh` phía sau chỉ có `requireStaff` ⇒ nhân viên CS gọi thẳng vẫn ra số.
+Hạ `cs.bao_cao.doanh_so` về mức A cho khớp rào của trang.
+
+**3. Biểu ngữ trang phân quyền phải theo trạng thái cầu dao.** Bản đầu ghi cứng
+"CHẠY THỬ" — nguy hiểm, vì khi đã bật thật mà màn hình vẫn nói chưa ảnh hưởng ai thì
+người dùng tick thoải mái rồi khoá nhầm người.
+
+**Đã kiểm cả hai chiều trên local:** `MA_TRAN_QUYEN=on` → tài khoản chỉ giữ vai
+`ky_thuat` bị đá khỏi `/khach-hang` về màn rút gọn; `=off` → vào lại được như cũ và
+vẫn ghi lệch. Admin vào đủ 14 trang, không chặn nhầm.
+
+### 7.2 Dọn kèm
+
+Xoá 3 shim `lib/{supabase,auth,quyen}.ts`, chuyển **32 file** sang import thẳng
+`lib/nen-tang/*`. 3 file test cũ dời sang `lib/nen-tang/`, mỗi file khác **đúng 2
+dòng import** — không khẳng định nào bị đụng.
+
+### 7.3 CÒN NỢ trước khi bật trên production
+
+**Giao diện vẫn ẩn/hiện nút theo LUẬT CŨ** (16 trang + `Sidebar`/`TopNav` gọi
+`laAdmin()`/`laQuanLy()`). Hôm nay chưa sai vì giá trị khởi tạo của ma trận trùng
+luật cũ — nhưng **ngay khi CEO tick khác đi là lệch**: nút vẫn hiện, bấm vào thì bị
+chặn (hoặc ngược lại, nút bị ẩn dù đã được cấp quyền).
+
+Không sửa được bằng một phép thay máy móc: mỗi cờ boolean đang gác NHIỀU nút thuộc
+các quyền khác nhau (ví dụ trang ticket dùng chung một cờ cho *sửa hàng loạt* và
+*xuất Excel*). Phải tách theo từng nút — một lượt riêng.
+
 ## 8. Ngoài phạm vi (YAGNI)
 
 - Ngoại lệ quyền cho từng người (per-person override) — dùng thêm role.
