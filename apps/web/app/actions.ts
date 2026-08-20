@@ -3065,6 +3065,9 @@ export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
 /** Tạo khách mới TỪ CS -> trạng thái chờ admin duyệt (khách đại lý/Shopee đăng ký sau). */
 export async function taoKhachChoDuyet(input: {
   full_name: string; primary_phone?: string; address?: string; province?: string
+  /** Thông tin nâng cao — chỉ có khi tạo từ trang `/khach/moi`. */
+  notes?: string
+  ten_cty?: string; mst?: string; dia_chi_cty?: string; sdt_cty?: string; email_cty?: string
 }): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
   const ten = input.full_name?.trim()
@@ -3098,9 +3101,15 @@ export async function taoKhachChoDuyet(input: {
     // Tạo thẳng (đã duyệt): rác lớn nhất (SĐT sai/trùng) đã chặn ngay lúc tạo nên
     // không cần hàng chờ duyệt cho khách mới. Sửa/xoá khách vẫn qua duyệt như cũ.
     trang_thai: 'da_duyet', needs_phone: false,
+    notes: input.notes?.trim() || null,
+    ten_cty: input.ten_cty?.trim() || null,
+    mst: input.mst?.trim() || null,
+    dia_chi_cty: input.dia_chi_cty?.trim() || null,
+    sdt_cty: input.sdt_cty?.trim() || null,
+    email_cty: input.email_cty?.trim() || null,
   }).select('id').single()
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/khach')
+  revalidatePath('/khach'); revalidatePath('/khach-hang')
   return { ok: true, id: (data as { id: string }).id }
 }
 

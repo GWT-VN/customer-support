@@ -28,7 +28,7 @@ const CHA: ReadonlyArray<readonly [string, string]> = [
   ['/may/', '/'], ['/ticket/', '/ticket'], ['/nhom-loi/', '/nhom-loi'],
   // '/khach/gop' phải đứng TRƯỚC '/khach/': find() lấy cái khớp đầu tiên, để sau
   // thì màn gộp lại sáng đèn ở mục "Khách hàng".
-  ['/khach/gop', '/khach/gop'], ['/khach/', '/khach-hang'],
+  ['/khach/gop', '/khach/gop'], ['/khach/moi', '/khach-hang'], ['/khach/', '/khach-hang'],
   ['/sales/don/', '/sales'], ['/sales/khach/', '/sales/khach'],
 ]
 function khopHref(pathname: string, href: string): boolean {
