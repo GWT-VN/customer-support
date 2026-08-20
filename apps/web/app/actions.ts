@@ -7,6 +7,7 @@ import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
+import { coQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
@@ -380,7 +381,9 @@ export async function guiYeuCauThayDoi(input: {
   // XOÁ thông tin khách phải qua ADMIN duyệt. Cấp quản lý (cs_manager) áp trực tiếp
   // các thay đổi KHÁC; riêng xoá khách của họ vẫn vào hàng chờ để admin duyệt.
   const laXoaKhach = input.doi_tuong === 'cs_customers' && input.loai === 'xoa'
-  const apTrucTiep = laXoaKhach ? await laAdmin() : await laQuanLy()
+  const apTrucTiep = laXoaKhach
+    ? await coQuyen('cs.khach.duyet_xoa', 'ADMIN')
+    : await coQuyen('cs.yeu_cau.ap_thang', 'QUANLY')
   if (apTrucTiep) {
     const { error } = await apDungThayDoi(db, input.doi_tuong, input.ban_ghi_id, input.loai, input.payload)
     if (error) return { ok: false, error: error.message }
@@ -443,7 +446,7 @@ export type YeuCauThayDoi = {
 /** Hàng chờ duyệt yêu cầu sửa/xoá (CHỈ ADMIN). */
 export async function listYeuCauThayDoi(): Promise<YeuCauThayDoi[]> {
   await requireStaff()
-  if (!(await laQuanLy())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('cs.yeu_cau.xem', 'QUANLY'))) throw new Error(KHONG_DU_QUYEN)
   const { data, error } = await dataClient().from('yeu_cau_thay_doi')
     .select('id, doi_tuong, ban_ghi_id, loai, payload, ly_do, nguoi_gui, created_at')
     .eq('trang_thai', 'cho_duyet').order('created_at', { ascending: false })
@@ -454,7 +457,7 @@ export async function listYeuCauThayDoi(): Promise<YeuCauThayDoi[]> {
 /** Duyệt 1 yêu cầu -> áp thật (CHỈ ADMIN). */
 export async function duyetYeuCau(id: string) {
   const user = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.yeu_cau.duyet', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: yc, error: e0 } = await db.from('yeu_cau_thay_doi')
     .select('doi_tuong, ban_ghi_id, loai, payload, trang_thai').eq('id', id).maybeSingle()
@@ -462,7 +465,7 @@ export async function duyetYeuCau(id: string) {
   const y = yc as { doi_tuong: DoiTuong; ban_ghi_id: string; loai: LoaiTD; payload: Record<string, unknown> | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'cho_duyet') return { ok: false as const, error: 'Yêu cầu không tồn tại hoặc đã xử lý.' }
   // Duyệt yêu cầu XOÁ thông tin khách chỉ dành cho admin (memory: xoá khách cần admin).
-  if (y.doi_tuong === 'cs_customers' && y.loai === 'xoa' && !(await laAdmin())) {
+  if (y.doi_tuong === 'cs_customers' && y.loai === 'xoa' && !(await coQuyen('cs.khach.duyet_xoa', 'ADMIN'))) {
     return { ok: false as const, error: 'Duyệt xoá thông tin khách cần quyền quản trị (admin).' }
   }
   const { error } = await apDungThayDoi(db, y.doi_tuong, y.ban_ghi_id, y.loai, y.payload)
@@ -478,7 +481,7 @@ export async function duyetYeuCau(id: string) {
 /** Từ chối 1 yêu cầu (CHỈ ADMIN). */
 export async function tuChoiYeuCau(id: string, lyDo?: string) {
   const user = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.yeu_cau.duyet', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('yeu_cau_thay_doi')
     .update({ trang_thai: 'tu_choi', ly_do_tu_choi: lyDo?.trim() || null, duyet_boi: user.email ?? '', duyet_luc: new Date().toISOString() })
     .eq('id', id).eq('trang_thai', 'cho_duyet')
@@ -553,7 +556,7 @@ export async function xuatKhach(q: string, cot: string[]): Promise<
     await ghiAudit('export_khach', 'cs_customers', { q, cot: cols, so_dong: rows.length })
     return { ok: true, csv: noiDungXuatKhach(rows, cols) }
   }
-  if (await laQuanLy()) {
+  if (await coQuyen('cs.khach.duyet_xuat', 'QUANLY')) {
     const rows = await layKhachXuat(q)
     await ghiAudit('export_khach_pii', 'cs_customers', { q, cot: cols, so_dong: rows.length })
     return { ok: true, csv: noiDungXuatKhach(rows, cols) }
@@ -574,7 +577,7 @@ export type YeuCauExport = {
 /** Yêu cầu export PII chờ duyệt (admin). */
 export async function listYeuCauExport(): Promise<YeuCauExport[]> {
   await requireStaff()
-  if (!(await laQuanLy())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('cs.khach.duyet_xuat', 'QUANLY'))) throw new Error(KHONG_DU_QUYEN)
   const { data, error } = await dataClient().from('yeu_cau_export')
     .select('id, tieu_chi, nguoi_gui, created_at, trang_thai')
     .eq('trang_thai', 'cho_duyet').order('created_at', { ascending: false })
@@ -584,7 +587,7 @@ export async function listYeuCauExport(): Promise<YeuCauExport[]> {
 
 export async function duyetExport(id: string) {
   const u = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.khach.duyet_xuat', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('yeu_cau_export')
     .update({ trang_thai: 'da_duyet', duyet_boi: u.email ?? '', duyet_luc: new Date().toISOString() })
     .eq('id', id).eq('trang_thai', 'cho_duyet')
@@ -596,7 +599,7 @@ export async function duyetExport(id: string) {
 
 export async function tuChoiExport(id: string) {
   const u = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.khach.duyet_xuat', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('yeu_cau_export')
     .update({ trang_thai: 'tu_choi', duyet_boi: u.email ?? '', duyet_luc: new Date().toISOString() })
     .eq('id', id).eq('trang_thai', 'cho_duyet')
@@ -625,7 +628,7 @@ export async function taiExportDaDuyet(id: string): Promise<{ ok: true; csv: str
   if (e0) return { ok: false, error: e0.message }
   const y = yc as { tieu_chi: { q?: string; cot?: string[] } | null; nguoi_gui: string | null; trang_thai: string } | null
   if (!y || y.trang_thai !== 'da_duyet') return { ok: false, error: 'Yêu cầu chưa được duyệt hoặc đã tải.' }
-  if (!(await laQuanLy()) && y.nguoi_gui !== (u.email ?? '')) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.khach.duyet_xuat', 'QUANLY')) && y.nguoi_gui !== (u.email ?? '')) return { ok: false, error: KHONG_DU_QUYEN }
   const cot = Array.isArray(y.tieu_chi?.cot) && y.tieu_chi.cot.length
     ? y.tieu_chi.cot : XUAT_KHACH_COT.map((c) => c.key)
   const rows = await layKhachXuat(y.tieu_chi?.q ?? '')
@@ -926,7 +929,7 @@ export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
 /** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */
 export async function ganKhachBaoTri(planId: string, customerId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!customerId) return { ok: false, error: 'Chọn khách.' }
   const { error } = await dataClient().from('maintenance_plan')
     .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
@@ -1050,7 +1053,7 @@ export async function lenLichBaoTri(
   planId: string, input: LenLichInput
 ): Promise<{ ok: true; so_lan: number } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: plan } = await db.from('maintenance_plan')
     .select('customer_id, ngay_bat_dau, chu_ky_thang, tong_lan, vung').eq('id', planId).maybeSingle()
@@ -1103,7 +1106,7 @@ export async function taoPlanBaoTri(
   input: { boMay?: string; chuKyThang: number | null; tongLan: number; ngayBatDau: string; vung?: Vung; loaiGoi?: string; ngayList?: string[] }
 ): Promise<{ ok: true; plan_id: string; so_lan: number } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!customerId) return { ok: false, error: 'Chọn khách.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngayBatDau)) return { ok: false, error: 'Ngày bắt đầu không hợp lệ.' }
   // Mốc do CS sửa tay (nếu có) — ưu tiên dùng thẳng, không sinh lại.
@@ -1198,7 +1201,7 @@ export async function kyThuatCuaToi(): Promise<KyThuat | null> {
 }
 
 export async function taoKyThuat(input: KyThuatInput): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.ho_so', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!input.ten.trim()) return { ok: false, error: 'Thiếu tên kỹ thuật.' }
   const { error } = await dataClient().from('ky_thuat').insert({
     ten: input.ten.trim(), sdt: input.sdt?.trim() || null, vung: input.vung?.trim() || null,
@@ -1210,7 +1213,7 @@ export async function taoKyThuat(input: KyThuatInput): Promise<{ ok: true } | { 
 }
 
 export async function suaKyThuat(id: string, input: KyThuatInput): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.ho_so', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!input.ten.trim()) return { ok: false, error: 'Thiếu tên kỹ thuật.' }
   const { error } = await dataClient().from('ky_thuat').update({
     ten: input.ten.trim(), sdt: input.sdt?.trim() || null, vung: input.vung?.trim() || null,
@@ -1221,7 +1224,7 @@ export async function suaKyThuat(id: string, input: KyThuatInput): Promise<{ ok:
 }
 
 export async function xoaKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.ho_so', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('ky_thuat').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   await ghiAudit('xoa_ky_thuat', `ky-thuat:${id}`); revalidatePath('/ky-thuat'); return { ok: true }
@@ -1255,7 +1258,7 @@ export async function trangThaiTaiKhoanKT(): Promise<Record<string, TrangThaiTai
 export async function capTaiKhoanKyThuat(
   kyThuatId: string,
 ): Promise<{ ok: true; mat_khau_tam: string | null; da_co_auth: boolean } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.tai_khoan', 'ADMIN'))) return { ok: false, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: kt } = await db.from('ky_thuat').select('id, ten, email').eq('id', kyThuatId).maybeSingle()
   const row = kt as { id: string; ten: string; email: string | null } | null
@@ -1292,7 +1295,7 @@ export async function capTaiKhoanKyThuat(
 
 /** Thu quyền đăng nhập của 1 kỹ thuật: gỡ role ky_thuat; hết role thì khoá. CHỈ ADMIN. */
 export async function thuTaiKhoanKyThuat(kyThuatId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laAdmin())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.tai_khoan', 'ADMIN'))) return { ok: false, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: kt } = await db.from('ky_thuat').select('email').eq('id', kyThuatId).maybeSingle()
   const email = ((kt as { email: string | null } | null)?.email ?? '').trim().toLowerCase()
@@ -1368,7 +1371,7 @@ export async function boiCanhKhach(customerId: string): Promise<BoiCanhKhach> {
 
 /** Cập nhật địa chỉ lắp cho MỌI máy đang active của khách (khi khách chuyển địa chỉ mới). CHỈ QUẢN LÝ. */
 export async function capNhatDiaChiMay(customerId: string, diaChi: string): Promise<{ ok: true; so: number } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.may.lap_thu_doi', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const d = diaChi.trim()
   if (!d) return { ok: false, error: 'Địa chỉ trống.' }
   const { error, count } = await dataClient().from('installed_base')
@@ -1384,7 +1387,7 @@ export async function capNhatDiaChiMay(customerId: string, diaChi: string): Prom
 export async function taoLichKyThuat(input: {
   kyThuatId: string; ngay: string; customerId?: string; diaChi?: string; tinh?: string; ghiChu?: string; viec: ViecInput[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.xep_lich', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!input.kyThuatId) return { ok: false, error: 'Chọn kỹ thuật.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
   const viec = input.viec.filter((v) => v.loai_viec)
@@ -1419,7 +1422,7 @@ export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' |
   const db = dataClient()
   // Quản lý làm được mọi trạng thái. Kỹ thuật CHỈ được đổi chuyến CỦA MÌNH sang
   // xong/hẹn-lại (không tự huỷ chuyến — đó là quyết định của quản lý).
-  if (!(await laQuanLy())) {
+  if (!(await coQuyen('cs.ky_thuat.xep_lich', 'QUANLY'))) {
     const me = await kyThuatCuaToi()
     const { data: owner } = await db.from('lich_ky_thuat').select('ky_thuat_id').eq('id', id).maybeSingle()
     const chuChuyen = !!me && (owner as { ky_thuat_id: string | null } | null)?.ky_thuat_id === me.id
@@ -1449,7 +1452,7 @@ export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' |
 }
 
 export async function xoaLichKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.xep_lich', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('lich_ky_thuat').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/ky-thuat'); return { ok: true }
@@ -1560,7 +1563,7 @@ export type NghiKyThuat = { id: string; ngay: string; ly_do: string | null }
 
 /** Báo nghỉ phép cho kỹ thuật 1 ngày. CHỈ QUẢN LÝ. */
 export async function taoNghiKyThuat(kyThuatId: string, ngay: string, lyDo?: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.xep_lich', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!kyThuatId) return { ok: false, error: 'Chọn kỹ thuật.' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
   const { error } = await dataClient().from('ky_thuat_nghi')
@@ -1571,7 +1574,7 @@ export async function taoNghiKyThuat(kyThuatId: string, ngay: string, lyDo?: str
 }
 
 export async function xoaNghiKyThuat(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireStaff(); if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  await requireStaff(); if (!(await coQuyen('cs.ky_thuat.xep_lich', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('ky_thuat_nghi').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/ky-thuat'); return { ok: true }
@@ -1715,7 +1718,7 @@ export async function searchTickets(
   if (mineStaffId) truyVan = truyVan.or(`cs_phu_trach.eq.${mineStaffId},ky_thuat.eq.${mineStaffId}`)
   // Miền phụ trách: NV thường chỉ thấy ticket CỦA MÌNH + ticket CHƯA gán (để nhận
   // việc). Quản lý/admin thấy hết. (mineStaffId ở trên là bộ lọc opt-in, độc lập.)
-  if (!(await laQuanLy())) {
+  if (!(await coQuyen('cs.ticket.xem_tat_ca', 'QUANLY'))) {
     const me = await layNhanVien()
     const id = me?.id ?? '00000000-0000-0000-0000-000000000000'
     truyVan = truyVan.or(`cs_phu_trach.is.null,cs_phu_trach.eq.${id},ky_thuat.eq.${id}`)
@@ -2043,7 +2046,7 @@ export async function createSerialPending(input: {
 /** Duyệt serial pending (CHỈ ADMIN) — đẩy lên serial_registry qua RPC nguyên tử. */
 export async function approveSerial(id: string) {
   const user = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.duyet', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().rpc('duyet_serial_pending', { p_id: id, p_admin: user.email ?? '' })
   if (error) return { ok: false as const, error: error.message }
   await ghiAudit('duyet_serial', `serial-pending:${id}`)
@@ -2054,7 +2057,7 @@ export async function approveSerial(id: string) {
 /** Từ chối serial pending (CHỈ ADMIN). */
 export async function rejectSerial(id: string, lyDo?: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.duyet', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('serial_pending')
     .update({ trang_thai: 'tu_choi', ly_do_tu_choi: lyDo?.trim() || null }).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
@@ -2066,7 +2069,7 @@ export async function rejectSerial(id: string, lyDo?: string) {
 /** Xoá hẳn 1 serial pending (CHỈ ADMIN — theo quy tắc xoá cần quyền cao). */
 export async function deleteSerialPending(id: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.duyet', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('serial_pending').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   await ghiAudit('xoa_serial_pending', `serial-pending:${id}`)
@@ -2114,7 +2117,7 @@ export async function themSerialKho(input: {
   serial: string; internal_code: string; ma_quoc_te?: string; model?: string; ghi_chu?: string
 }) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.kho', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const serial = input.serial?.trim()
   const ic = input.internal_code?.trim()
   if (!serial) return { ok: false as const, error: 'Nhập serial.' }
@@ -2156,7 +2159,7 @@ export async function nhapSerialBang(input: {
   dong: DongNhapSerial[]; internal_code: string; ma_quoc_te?: string
 }): Promise<{ ok: true; kq: KetQuaNhapLo } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.kho', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const ic = input.internal_code?.trim()
   if (!ic) return { ok: false, error: 'Chọn sản phẩm (mã nội bộ) cho cả lô.' }
 
@@ -2391,7 +2394,7 @@ export async function lichSuSerial(serial: string): Promise<{ trang_thai: string
  *  lấy từ bảng cấu hình serial_trang_thai (cho_dat_tay + hoat_dong). */
 export async function datTrangThaiSerial(serial: string, den: string, ghiChu?: string, ngay?: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.serial.kho', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const moTa = ghiChu?.trim()
   if (!moTa) return { ok: false as const, error: 'Cần ghi mô tả hiện trạng máy khi đổi trạng thái.' }
   const luc = ngay?.trim()
@@ -2421,7 +2424,7 @@ export async function lapMayChoKhach(
   serial: string, customerId: string, ngay: string, kichBH: boolean, ghiChu?: string, diaChi?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.lap_thu_doi', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const s = serial?.trim()
   if (!s) return { ok: false, error: 'Thiếu serial.' }
   if (!customerId) return { ok: false, error: 'Chọn khách.' }
@@ -2469,7 +2472,7 @@ export async function datSoLanBaoTri(
   planId: string, tongLan: number
 ): Promise<{ ok: true; them: number } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const soMoi = Math.floor(tongLan)
   if (!soMoi || soMoi < 1) return { ok: false, error: 'Số lần phải ≥ 1.' }
   const db = dataClient()
@@ -2507,7 +2510,7 @@ export async function datSoLanBaoTri(
 /** Sửa MỐC NGÀY (và mô tả) của 1 sự kiện vòng đời đã ghi — để chỉnh mốc lịch sử. CHỈ ADMIN. */
 export async function suaSuKien(id: string, ngay: string, ghiChu?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày không hợp lệ (YYYY-MM-DD).' }
   const db = dataClient()
   const { data: ev } = await db.from('serial_su_dung').select('serial').eq('id', id).maybeSingle()
@@ -2528,7 +2531,7 @@ export async function suaSuKien(id: string, ngay: string, ghiChu?: string): Prom
  */
 export async function thuHoiMay(serial: string, ghiChu?: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.lap_thu_doi', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: ib } = await db.from('installed_base').select('customer_id, parent_serial').eq('serial', serial).maybeSingle()
   if (!ib) return { ok: false as const, error: 'Máy này không ở trạng thái đã lắp.' }
@@ -2554,7 +2557,7 @@ export async function thuHoiMay(serial: string, ghiChu?: string) {
  */
 export async function doiMayChoKhach(serialCu: string, serialMoi: string, ghiChu?: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.lap_thu_doi', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const cu = serialCu?.trim(); const moi = serialMoi?.trim()
   if (!moi) return { ok: false as const, error: 'Chọn serial máy mới.' }
   if (moi === cu) return { ok: false as const, error: 'Serial mới trùng máy cũ.' }
@@ -2620,7 +2623,7 @@ export async function dsTrangThai(chiDatTay = false): Promise<TrangThai[]> {
 /** Thêm trạng thái mới (không phải hệ thống). CHỈ ADMIN. */
 export async function taoTrangThai(code: string, input: TrangThaiInput): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.trang_thai', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const ma = code.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
   if (ma.length < 2) return { ok: false, error: 'Mã trạng thái cần ≥2 ký tự (a-z, 0-9, gạch dưới).' }
   if (!input.nhan.trim()) return { ok: false, error: 'Thiếu tên hiển thị.' }
@@ -2641,7 +2644,7 @@ export async function taoTrangThai(code: string, input: TrangThaiInput): Promise
 /** Sửa trạng thái (nhãn/màu/thứ tự/đặt-tay/bật-tắt). Không đổi mã. CHỈ ADMIN. */
 export async function suaTrangThai(code: string, input: TrangThaiInput): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.trang_thai', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!input.nhan.trim()) return { ok: false, error: 'Thiếu tên hiển thị.' }
   const { error, count } = await dataClient().from('serial_trang_thai').update({
     nhan: input.nhan.trim(), mau: input.mau || 'slate', thu_tu: input.thu_tu ?? 100,
@@ -2657,7 +2660,7 @@ export async function suaTrangThai(code: string, input: TrangThaiInput): Promise
 /** Xoá trạng thái. Chặn nếu là hệ thống hoặc còn máy đang dùng. CHỈ ADMIN. */
 export async function xoaTrangThai(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.may.trang_thai', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const db = dataClient()
   const { data: tt } = await db.from('serial_trang_thai').select('he_thong').eq('code', code).maybeSingle()
   if (!tt) return { ok: false, error: 'Không thấy trạng thái.' }
@@ -2977,7 +2980,7 @@ export async function listKhachChoDuyet(): Promise<KhachTom[]> {
 /** Duyệt khách chờ (CHỈ ADMIN). */
 export async function duyetKhach(id: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.khach.duyet_cho', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('cs_customers').update({ trang_thai: 'da_duyet' }).eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   await ghiAudit('duyet_khach', `khach:${id}`)
@@ -3035,7 +3038,7 @@ export async function addTicketItem(code: string, input: {
   serial_cu?: string; serial_moi?: string; ngay_thu_phi?: string | null
 }) {
   const user = await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.ticket.chi_phi', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   if (!['hang_muc', 'doi_may'].includes(input.loai)) {
     return { ok: false as const, error: 'Loại mục không hợp lệ.' }
   }
@@ -3075,7 +3078,7 @@ export async function addTicketItem(code: string, input: {
 
 export async function deleteTicketItem(id: string, code: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.ticket.chi_phi', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('ticket_muc').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(`/ticket/${code}`)
@@ -3088,7 +3091,7 @@ export async function ticketsCsv(
 ): Promise<string> {
   await requireStaff()
   // Nút export đã ẩn với vai trò cs, nhưng đây mới là rào thật.
-  if (!(await laQuanLy())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('cs.bao_cao.xuat', 'QUANLY'))) throw new Error(KHONG_DU_QUYEN)
   const mineId = mine ? (await currentStaff())?.id : undefined
   const { rows } = await searchTickets(q, state, onlyKhan, mineId)
   const head = ['Mã', 'Ngày', 'Trạng thái', 'Khẩn', 'Loại', 'Khách', 'SĐT', 'Serial',
@@ -3110,7 +3113,7 @@ export async function xuatTicket(
   q: string, state: string | undefined, onlyKhan: boolean, mine: boolean, cot: string[], ngtu?: string, ngden?: string
 ): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_cao.xuat', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const mineId = mine ? (await currentStaff())?.id : undefined
   const rows = await gomTatCa((trang, moiTrang) => searchTickets(q, state, onlyKhan, mineId, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_TICKET_COT.filter((c) => cot.includes(c.key))
@@ -3153,7 +3156,7 @@ function noiDungCsvBang(rows: Record<string, unknown>[], cols: readonly { key: s
 
 export async function xuatMay(q: string, sp: string | undefined, bh: string | undefined, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_cao.xuat', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const rows = await gomTatCa((trang, moiTrang) => searchMachines(q, { trang, moiTrang, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }))
   const cols = XUAT_MAY_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_may', 'installed_base', { q, so_dong: rows.length })
@@ -3162,7 +3165,7 @@ export async function xuatMay(q: string, sp: string | undefined, bh: string | un
 
 export async function xuatBaoTri(tt: string | undefined, q: string, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_cao.xuat', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const rows = await gomTatCa((trang, moiTrang) => maintenanceDue(tt ?? '', q, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_BAOTRI_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_bao_tri', 'maintenance_visit', { q, so_dong: rows.length })
@@ -3171,7 +3174,7 @@ export async function xuatBaoTri(tt: string | undefined, q: string, cot: string[
 
 export async function xuatLoi(tt: string | undefined, q: string, cot: string[], ngtu?: string, ngden?: string): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.bao_cao.xuat', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const rows = await gomTatCa((trang, moiTrang) => coreForecast(tt ?? '', q, { trang, moiTrang, ngtu, ngden }))
   const cols = XUAT_LOI_COT.filter((c) => cot.includes(c.key))
   await ghiAudit('export_loi', 'filter_replacement', { q, so_dong: rows.length })
@@ -3401,7 +3404,7 @@ function revalidateHangLoat(bang: string) {
 /** Cập nhật 1 trường cho NHIỀU dòng (CHỈ ADMIN). Whitelist trường theo SUA_HL_BANG, chia lô 200. */
 export async function capNhatHangLoat(bang: string, ids: string[], truong: string, giaTri: string) {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.hang_loat.cap_nhat', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const reg = SUA_HL_BANG[bang]
   if (!reg) return { ok: false as const, error: 'Bảng không hỗ trợ sửa hàng loạt.' }
   if (!reg.some((f) => f.key === truong)) return { ok: false as const, error: 'Trường không hợp lệ.' }
@@ -3420,7 +3423,7 @@ export async function capNhatHangLoat(bang: string, ids: string[], truong: strin
 /** Xoá NHIỀU dòng (CHỈ ADMIN). Khách = ẩn mềm (da_xoa). Chia lô 200, audit. */
 export async function xoaHangLoat(bang: string, ids: string[]) {
   await requireStaff()
-  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.khach.xoa_hang_loat', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   if (bang !== 'cs_customers') return { ok: false as const, error: 'Bảng không hỗ trợ xoá hàng loạt.' }
   if (!ids.length) return { ok: false as const, error: 'Chưa chọn dòng nào.' }
   const db = dataClient()
@@ -3459,7 +3462,7 @@ export async function luuBangView(bang: string, ten: string, cot: string[], chun
   const t = ten.trim()
   if (!t) return { ok: false as const, error: 'Nhập tên view.' }
   if (!cot.length) return { ok: false as const, error: 'View phải có ít nhất 1 cột.' }
-  if (chung && !(await laQuanLy())) return { ok: false as const, error: 'Chỉ quản lý/admin lưu view chung.' }
+  if (chung && !(await coQuyen('he_thong.view_chung', 'QUANLY'))) return { ok: false as const, error: 'Chỉ quản lý/admin lưu view chung.' }
   const chu = chung ? 'chung' : (u.email ?? '')
   const { error } = await dataClient().from('bang_view')
     .insert({ bang, ten: t, chu, cot, tao_boi: u.email ?? null })
@@ -3475,7 +3478,7 @@ export async function xoaBangView(id: string) {
   const db = dataClient()
   const { data } = await db.from('bang_view').select('chu, bang').eq('id', id).maybeSingle()
   const row = data as { chu: string; bang: string } | null
-  if (row?.chu !== (u.email ?? '') && !(await laQuanLy())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (row?.chu !== (u.email ?? '') && !(await coQuyen('he_thong.view_chung', 'QUANLY'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { error } = await db.from('bang_view').delete().eq('id', id)
   if (error) return { ok: false as const, error: error.message }
   revalidatePath(DUONG_DAN_BANG[row?.bang ?? ''] ?? '/khach-hang')
@@ -3650,7 +3653,7 @@ export async function taoNhomLoi(
   input: NhomLoiInput
 ): Promise<{ ok: true; code: string } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.nhom_loi.cau_hinh', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const code = chuanMaNhom(input.code)
   if (code.length < 2) return { ok: false, error: 'Mã nhóm cần ≥2 ký tự (A-Z, 0-9, gạch ngang).' }
   const ten = input.ten.trim()
@@ -3680,7 +3683,7 @@ export async function suaNhomLoi(
   code: string, input: Omit<NhomLoiInput, 'code'>
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.nhom_loi.cau_hinh', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const ten = input.ten.trim()
   if (!ten) return { ok: false, error: 'Thiếu tên nhóm.' }
   if (!MUC_DO_HOP_LE.includes(input.muc_do)) return { ok: false, error: 'Mức độ không hợp lệ.' }
@@ -3704,7 +3707,7 @@ export async function suaNhomLoi(
 /** Xoá nhóm lỗi (FK cascade tự xoá override của nhóm). CHỈ ADMIN. */
 export async function xoaNhomLoi(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.nhom_loi.cau_hinh', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('issue_group').delete().eq('code', code)
   if (error) return { ok: false, error: error.message }
   await ghiAudit('xoa_nhom_loi', `nhom:${code}`)
@@ -3717,7 +3720,7 @@ export async function ganTicketVaoNhom(
   ticketCode: string, groupCode: string, lyDo?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.nhom_loi.gan_ticket', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const nv = await layNhanVien()
   const { error } = await dataClient().from('issue_override').upsert({
     ticket_code: ticketCode, group_code: groupCode, gan: true,
@@ -3734,7 +3737,7 @@ export async function boGanNhom(
   ticketCode: string, groupCode: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('cs.nhom_loi.gan_ticket', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   const { error } = await dataClient().from('issue_override').delete()
     .eq('ticket_code', ticketCode).eq('group_code', groupCode)
   if (error) return { ok: false, error: error.message }
@@ -3899,7 +3902,7 @@ export type CatalogSyncLog = {
 /** Bấm tay chạy đồng bộ 6 bảng catalog ngay (CHỈ ADMIN). Cron vẫn tự chạy hàng ngày. */
 export async function syncCatalogNow() {
   await requireStaff()
-  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('he_thong.catalog', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const { data, error } = await dataClient().rpc('sync_catalog')
   if (error) return { ok: false as const, error: error.message }
   revalidatePath('/dong-bo-catalog')
@@ -3909,7 +3912,7 @@ export async function syncCatalogNow() {
 /** Nhật ký các lần đồng bộ gần nhất (admin xem). */
 export async function catalogSyncLast(n = 10): Promise<CatalogSyncLog[]> {
   await requireStaff()
-  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('he_thong.catalog', 'ADMIN'))) throw new Error(KHONG_DU_QUYEN)
   const { data, error } = await dataClient()
     .from('catalog_sync_log').select('id, chay_luc, ok, chi_tiet, thong_bao, ms')
     .order('id', { ascending: false }).limit(n)
@@ -3931,7 +3934,7 @@ export type AuditRow = {
 /** Vết thao tác nhạy cảm gần nhất (CHỈ ADMIN xem). */
 export async function auditLog(limit = 100, hanhDong?: string): Promise<AuditRow[]> {
   await requireStaff()
-  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('he_thong.nhat_ky', 'ADMIN'))) throw new Error(KHONG_DU_QUYEN)
   let q = dataClient()
     .from('audit_log').select('id, luc, actor, hanh_dong, doi_tuong, chi_tiet, ket_qua')
   if (hanhDong) q = q.eq('hanh_dong', hanhDong)

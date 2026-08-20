@@ -3,9 +3,9 @@ import { VAI_TRO } from './vai-tro'
 import { HO_SO_QUYEN, MAC_DINH, QUYEN, laMaQuyenHopLe } from './quyen'
 
 describe('kho quyền', () => {
-  it('có đủ 47 quyền, không trùng mã', () => {
-    expect(QUYEN.length).toBe(47)
-    expect(new Set(QUYEN).size).toBe(47)
+  it('có đủ 50 quyền, không trùng mã', () => {
+    expect(QUYEN.length).toBe(50)
+    expect(new Set(QUYEN).size).toBe(50)
   })
 
   it('mã quyền theo khuôn khu.đối_tượng.hành_động', () => {
@@ -48,7 +48,7 @@ describe('giá trị khởi tạo — sinh từ hành vi HÔM NAY', () => {
   })
 
   it('quyền chỉ-admin không rơi xuống Trưởng CSKH', () => {
-    for (const q of ['he_thong.nhan_su.sua', 'he_thong.phan_quyen', 'cs.yeu_cau.duyet', 'cs.khach.xoa_hang_loat'] as const) {
+    for (const q of ['he_thong.nhan_su.sua', 'he_thong.phan_quyen', 'cs.khach.duyet_xoa', 'cs.khach.xoa_hang_loat'] as const) {
       expect(MAC_DINH.cs_manager, `${q} không được rơi xuống cs_manager`).not.toContain(q)
       expect(MAC_DINH.admin).toContain(q)
     }
@@ -119,7 +119,7 @@ describe('quan_tri_ht — quản trị hệ thống, mù dữ liệu khách', ()
     for (const q of [
       'cs.khach.xem', 'cs.khach.sua', 'cs.may.xem', 'cs.ticket.xem', 'cs.ticket.tao_sua',
       'cs.bao_tri.xem', 'cs.bao_cao.doanh_so', 'cs.bao_cao.xuat',
-      'sales.don.xem', 'sales.don.ghi', 'cs.nhom_loi.gan_ticket',
+      'sales.don.xem', 'sales.don.ghi', 'cs.nhom_loi.gan_ticket', 'cs.ticket.xem_tat_ca',
     ] as const) {
       expect(MAC_DINH.quan_tri_ht, `KHÔNG được có ${q}`).not.toContain(q)
     }
@@ -131,5 +131,30 @@ describe('quan_tri_ht — quản trị hệ thống, mù dữ liệu khách', ()
         && q !== 'cs.may.trang_thai' && q !== 'cs.nhom_loi.cau_hinh',
         `${q} là dữ liệu nghiệp vụ, không phải cấu hình`).toBe(false)
     }
+  })
+})
+
+describe('sửa theo SỰ THẬT trong code (đọc lại 20/08 khi nối GĐ2-B)', () => {
+  it('Trưởng CSKH DUYỆT được yêu cầu sửa — trước tôi ghi nhầm là chỉ admin', () => {
+    // duyetYeuCau gác bằng laQuanLy(), không phải laAdmin()
+    expect(MAC_DINH.cs_manager).toContain('cs.yeu_cau.duyet')
+  })
+
+  it('nhưng duyệt XOÁ hồ sơ khách thì vẫn CHỈ admin', () => {
+    // duyetYeuCau có luật con: doi_tuong=cs_customers + loai=xoa -> đòi thêm laAdmin()
+    expect(MAC_DINH.admin).toContain('cs.khach.duyet_xoa')
+    expect(MAC_DINH.cs_manager).not.toContain('cs.khach.duyet_xoa')
+  })
+
+  it('quyền phạm vi: nhân viên chỉ thấy ticket của mình, quản lý thấy hết', () => {
+    expect(MAC_DINH.cs_manager).toContain('cs.ticket.xem_tat_ca')
+    expect(MAC_DINH.cs).not.toContain('cs.ticket.xem_tat_ca')
+    expect(MAC_DINH.cs).toContain('cs.ticket.xem') // vẫn xem được, chỉ hẹp hơn
+  })
+
+  it('quản lý sửa dữ liệu ÁP THẲNG, nhân viên phải qua duyệt', () => {
+    expect(MAC_DINH.cs_manager).toContain('cs.yeu_cau.ap_thang')
+    expect(MAC_DINH.cs).not.toContain('cs.yeu_cau.ap_thang')
+    expect(MAC_DINH.cs).toContain('cs.yeu_cau.gui')
   })
 })

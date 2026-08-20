@@ -6,7 +6,7 @@
  * DB là đẻ ra "quyền ma" — tick vào thấy yên tâm nhưng chẳng gác gì cả.
  * DB chỉ lưu Ô NÀO ĐƯỢC TICK (bảng quyen_vai_tro).
  *
- * 47 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
+ * 50 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
  * Spec: docs/superpowers/specs/2026-08-20-nen-tang-tai-khoan-phan-quyen-design.md §6.1
  */
 import { VAI_TRO, type VaiTro } from './vai-tro'
@@ -70,7 +70,8 @@ const BANG_QUYEN = {
   'cs.khach.gop': { nhom: 'khach', nhan: 'Gộp 2 hồ sơ trùng ngay', mucMacDinh: 'TCS' },
   'cs.khach.duyet_cho': { nhom: 'khach', nhan: 'Duyệt khách chờ', mucMacDinh: 'TCS' },
   'cs.khach.xin_xuat': { nhom: 'khach', nhan: 'Xin xuất danh sách khách', mucMacDinh: 'CS' },
-  'cs.khach.duyet_xuat': { nhom: 'khach', nhan: 'Duyệt yêu cầu xuất khách', mucMacDinh: 'TCS' },
+  'cs.khach.duyet_xuat': { nhom: 'khach', nhan: 'Duyệt yêu cầu xuất + tự xuất khách', mucMacDinh: 'TCS' },
+  'cs.khach.duyet_xoa': { nhom: 'khach', nhan: 'Duyệt XOÁ hồ sơ khách', mucMacDinh: 'A' },
   'cs.khach.xoa_hang_loat': { nhom: 'khach', nhan: 'Xoá nhiều khách một lúc', mucMacDinh: 'A' },
 
   'cs.may.xem': { nhom: 'may', nhan: 'Xem máy, tra serial, lịch sử', mucMacDinh: 'CS', chiXem: true },
@@ -82,6 +83,7 @@ const BANG_QUYEN = {
   'cs.may.trang_thai': { nhom: 'may', nhan: 'Trạng thái máy tuỳ chỉnh', mucMacDinh: 'TCS' },
 
   'cs.ticket.xem': { nhom: 'ticket', nhan: 'Xem ticket', mucMacDinh: 'CS', chiXem: true },
+  'cs.ticket.xem_tat_ca': { nhom: 'ticket', nhan: 'Xem ticket của MỌI người', mucMacDinh: 'TCS', chiXem: true },
   'cs.ticket.tao_sua': { nhom: 'ticket', nhan: 'Tạo, sửa, nhận ticket, ghi chú', mucMacDinh: 'CS' },
   'cs.ticket.chi_phi': { nhom: 'ticket', nhan: 'Ghi chi phí ticket, thu phí', mucMacDinh: 'CS' },
   'cs.nhom_loi.cau_hinh': { nhom: 'ticket', nhan: 'Nhóm lỗi: tạo / sửa / xoá danh mục', mucMacDinh: 'TCS' },
@@ -101,8 +103,9 @@ const BANG_QUYEN = {
   'cs.bao_cao.doanh_so': { nhom: 'bao_cao', nhan: 'Xem doanh số CSKH', mucMacDinh: 'CS', chiXem: true },
 
   'cs.yeu_cau.gui': { nhom: 'yeu_cau', nhan: 'Gửi yêu cầu sửa dữ liệu', mucMacDinh: 'CS' },
-  'cs.yeu_cau.tu_choi': { nhom: 'yeu_cau', nhan: 'Xem + từ chối yêu cầu sửa', mucMacDinh: 'TCS' },
-  'cs.yeu_cau.duyet': { nhom: 'yeu_cau', nhan: 'DUYỆT yêu cầu sửa dữ liệu', mucMacDinh: 'A' },
+  'cs.yeu_cau.xem': { nhom: 'yeu_cau', nhan: 'Xem hàng chờ yêu cầu sửa', mucMacDinh: 'TCS', chiXem: true },
+  'cs.yeu_cau.duyet': { nhom: 'yeu_cau', nhan: 'Duyệt / từ chối yêu cầu sửa', mucMacDinh: 'TCS' },
+  'cs.yeu_cau.ap_thang': { nhom: 'yeu_cau', nhan: 'Sửa áp thẳng, không qua duyệt', mucMacDinh: 'TCS' },
   'cs.hang_loat.cap_nhat': { nhom: 'yeu_cau', nhan: 'Cập nhật hàng loạt bản ghi', mucMacDinh: 'TCS' },
 
   'work.viec.xem_tao': { nhom: 'work', nhan: 'Xem + tạo việc, bình luận', mucMacDinh: 'NS' },

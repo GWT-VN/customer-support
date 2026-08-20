@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { authClient, dataClient } from './db'
 import { laAdmin } from './gac-cong'
 import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, toStaff, type Staff } from './nhan-su-luat'
+import { coQuyen } from './kiem-quyen'
 import { ghiAudit } from './nhat-ky'
 import { layNhanVien, requireStaff } from './phien'
 import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, type VaiTro } from './vai-tro'
@@ -31,7 +32,7 @@ export async function currentStaff(): Promise<Staff | null> {
 /** Toàn bộ NV kể cả đã khoá — cho màn /nhan-vien. Khác listStaff() vốn chỉ lấy NV đang hoạt động. */
 export async function listAllStaff(): Promise<(Staff & { hoat_dong: boolean })[]> {
   await requireStaff()
-  if (!(await laAdmin())) throw new Error(KHONG_DU_QUYEN)
+  if (!(await coQuyen('he_thong.nhan_su.xem', 'ADMIN'))) throw new Error(KHONG_DU_QUYEN)
   const { data, error } = await dataClient()
     .from('staff').select('id, ten, vai_tro, email, hoat_dong')
     // KHÔNG sắp theo vai_tro: tick một ô là đổi khoá sắp xếp, dòng nhảy chỗ ngay
@@ -54,7 +55,7 @@ export async function suaNhanVien(
 ) {
   await requireStaff()
   const toi = await layNhanVien()
-  if (!toi || !(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!toi || !(await coQuyen('he_thong.nhan_su.sua', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
 
   // Chặn role lạ, khử trùng, áp loại trừ cấp bậc. undefined = không đổi role.
   const kq = chuanBiVaiTroDeGhi(patch.vai_tro)
@@ -100,7 +101,7 @@ export async function suaNhanVien(
 /** Sửa tên hiển thị — người vào lần đầu chỉ có tên tạm lấy từ email. */
 export async function doiTenNhanVien(id: string, ten: string) {
   await requireStaff()
-  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('he_thong.nhan_su.sua', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
   const t = ten.trim()
   if (!t) return { ok: false as const, error: 'Tên không được để trống.' }
   const { error } = await dataClient().from('staff').update({ ten: t }).eq('id', id)
@@ -122,7 +123,7 @@ export async function doiTenNhanVien(id: string, ten: string) {
  */
 export async function moiNhanSu(email: string, vaiTro: string[]) {
   await requireStaff()
-  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('he_thong.nhan_su.sua', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
 
   const kt = kiemTraLoiMoi(email, vaiTro)
   if (!kt.ok) return { ok: false as const, error: kt.lyDo }
@@ -158,7 +159,7 @@ export async function moiNhanSu(email: string, vaiTro: string[]) {
  */
 export async function guiLaiMatKhau(id: string) {
   await requireStaff()
-  if (!(await laAdmin())) return { ok: false as const, error: KHONG_DU_QUYEN }
+  if (!(await coQuyen('he_thong.nhan_su.mat_khau', 'ADMIN'))) return { ok: false as const, error: KHONG_DU_QUYEN }
 
   const { data, error: e1 } = await dataClient()
     .from('staff').select('email').eq('id', id).maybeSingle()

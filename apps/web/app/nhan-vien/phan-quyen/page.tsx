@@ -1,13 +1,14 @@
 import Link from 'next/link'
+import { BangLechQuyen } from '@/components/BangLechQuyen'
 import { MaTranQuyen } from '@/components/MaTranQuyen'
 import { chanNeuKhongPhaiAdmin } from '@/lib/nen-tang/gac-cong'
-import { docMaTran } from '@/lib/nen-tang/ma-tran'
+import { docLech, docMaTran } from '@/lib/nen-tang/ma-tran'
 import { QUYEN } from '@/lib/nen-tang/quyen'
 
 export default async function PhanQuyenPage() {
   // Rào THẬT của trang này.
   await chanNeuKhongPhaiAdmin()
-  const maTran = await docMaTran()
+  const [maTran, lech] = await Promise.all([docMaTran(), docLech()])
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -34,7 +35,15 @@ export default async function PhanQuyenPage() {
           cột việc luôn dính bên trái. Di chuột vào tên cột để xem tên vai trò đầy đủ.
         </p>
 
-        <MaTranQuyen maTran={maTran} />
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold text-slate-900">Lệch — ma trận nói khác luật đang chạy</h2>
+          <BangLechQuyen ds={lech} />
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold text-slate-900">Ma trận</h2>
+          <MaTranQuyen maTran={maTran} />
+        </section>
       </div>
     </main>
   )
