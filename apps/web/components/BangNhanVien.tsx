@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { doiTenNhanVien, suaNhanVien } from '@/app/actions'
+import { doiTenNhanVien, suaNhanVien } from '@/lib/nen-tang/nhan-su'
 import { NHAN_VAI_TRO, VAI_TRO } from '@/lib/quyen'
 
 export type DongNhanVien = {

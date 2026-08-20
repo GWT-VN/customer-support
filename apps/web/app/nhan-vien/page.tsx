@@ -1,7 +1,8 @@
 import { BangNhanVien } from '@/components/BangNhanVien'
-import { listAllStaff } from '@/app/actions'
-import { chanNeuKhongPhaiAdmin, layNhanVien } from '@/lib/supabase'
-import { laQuyenAdmin } from '@/lib/quyen'
+import { listAllStaff } from '@/lib/nen-tang/nhan-su'
+import { chanNeuKhongPhaiAdmin } from '@/lib/nen-tang/gac-cong'
+import { layNhanVien } from '@/lib/nen-tang/phien'
+import { laQuyenAdmin } from '@/lib/nen-tang/vai-tro'
 
 export default async function NhanVienPage() {
   // Rào THẬT của trang này. Ẩn mục menu chỉ là cho gọn mắt.

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, listBangView, type Ticket } from '@/app/actions'
+import { searchTickets, ticketTypes, khoaTatCaTicket, listBangView, type Ticket } from '@/app/actions'
+import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import type { KetQuaTrang } from '@/bang'
 import { ExportTicketButton } from '@/components/ExportTicketButton'
 import { BangTicket } from '@/components/BangTicket'
