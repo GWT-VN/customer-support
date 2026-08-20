@@ -52,6 +52,8 @@ export function moTaGop(giu: KhachGon, gop: KhachGon): string {
 export type KhachDayDu = KhachGon & {
   province: string | null
   customer_code: string | null
+  /** Khoá thật của kênh — cần để dựng payload gộp; `ten_kenh` chỉ để hiển thị. */
+  channel_id: number | null
   ten_kenh: string | null
   source: string | null
   partner_ref: string | null

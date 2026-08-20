@@ -497,6 +497,7 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
     address: (r.address as string | null) ?? null,
     province: (r.province as string | null) ?? null,
     customer_code: (r.customer_code as string | null) ?? null,
+    channel_id: (r.channel_id as number | null) ?? null,
     ten_kenh: tenKenh,
     source: (r.source as string | null) ?? null,
     partner_ref: (r.partner_ref as string | null) ?? null,
