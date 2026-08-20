@@ -48,7 +48,7 @@ export type LuaChon = {
 export type PChon = {
   truong: Record<string, string | number>
   sdt_phu: { phone: string; contact_name?: string; role?: string }[]
-  dia_chi_them: { dia_chi: string; loai: string; ghi_chu?: string }[]
+  dia_chi_them: { dia_chi: string; loai: string; ghi_chu?: string; tinh?: string }[]
 }
 
 /** Giá trị hiển thị/so sánh của một trường, đã bỏ khoảng trắng thừa. */

@@ -1210,8 +1210,14 @@ export async function baoTriChuaMap(): Promise<PlanChuaMap[]> {
 }
 
 /** Gán khách cho 1 plan bảo trì (map với khách kích hoạt máy). CHỈ QUẢN LÝ. */
+/**
+ * `sdtChinh` quyết SỐ NÀO thành số chính của khách khi lịch và hồ sơ ghi hai số:
+ *   'khach' — giữ số đang có, số trên lịch xuống SĐT phụ (mặc định)
+ *   'plan'  — lấy số trên lịch làm chính, số cũ của khách xuống SĐT phụ
+ *   'bo'    — bỏ số trên lịch, không lưu đâu cả
+ */
 export async function ganKhachBaoTri(
-  planId: string, customerId: string, giuSdtPlan = false,
+  planId: string, customerId: string, sdtChinh: 'khach' | 'plan' | 'bo' = 'khach',
 ): Promise<{ ok: true; themSdtPhu: boolean } | { ok: false; error: string }> {
   await requireStaff()
   if (!(await laQuanLy())) return { ok: false, error: KHONG_DU_QUYEN }
@@ -1222,23 +1228,45 @@ export async function ganKhachBaoTri(
   // nhưng hai số (số cá nhân vs số ghi lúc ký hợp đồng). Gán xong mà không giữ
   // thì số trên lịch mất hẳn, không còn chỗ nào lưu.
   let themSdtPhu = false
-  if (giuSdtPlan) {
+  if (sdtChinh !== 'bo') {
     const [{ data: pl }, { data: kh }] = await Promise.all([
       db.from('maintenance_plan').select('source_phone, source_customer_name').eq('id', planId).maybeSingle(),
       db.from('cs_customers').select('primary_phone').eq('id', customerId).maybeSingle(),
     ])
     const soPlan = chuanHoaSdt((pl as { source_phone: string | null } | null)?.source_phone ?? '')
     const soKhach = chuanHoaSdt((kh as { primary_phone: string | null } | null)?.primary_phone ?? '')
+
     if (soPlan.hopLe && soPlan.cuoi9 !== soKhach.cuoi9) {
-      const { data: daCo } = await db.from('customer_contacts')
-        .select('id').eq('customer_id', customerId).ilike('phone', `%${soPlan.cuoi9}`).limit(1)
-      if (!daCo || daCo.length === 0) {
-        await db.from('customer_contacts').insert({
-          customer_id: customerId, phone: soPlan.chuan,
-          contact_name: (pl as { source_customer_name: string | null } | null)?.source_customer_name ?? 'Số trên lịch bảo trì',
-          role: 'khac', is_primary: false, zalo_ok: true,
-        })
-        themSdtPhu = true
+      // Số nào KHÔNG được chọn làm chính thì xuống số phụ — không vứt cái nào.
+      const soPhu = sdtChinh === 'plan' ? soKhach : soPlan
+      const soMoiLamChinh = sdtChinh === 'plan' ? soPlan : null
+
+      if (soMoiLamChinh) {
+        // Đổi số chính: giải phóng số cũ TRƯỚC (primary_phone có ràng buộc UNIQUE
+        // toàn bảng, gán trùng là vỡ) — nhưng chỉ khi số mới chưa thuộc khách khác.
+        const { data: aiDangGiu } = await db.from('cs_customers')
+          .select('id').neq('trang_thai', 'da_xoa').neq('id', customerId)
+          .ilike('primary_phone', `%${soMoiLamChinh.cuoi9}`).limit(1)
+        if (aiDangGiu && aiDangGiu.length) {
+          return { ok: false, error: 'SĐT trên lịch đang là số chính của một khách khác — không lấy làm số chính được. Chọn giữ số cũ, hoặc kiểm tra lại đúng người chưa.' }
+        }
+        await db.from('cs_customers')
+          .update({ primary_phone: soMoiLamChinh.chuan, needs_phone: false, updated_at: new Date().toISOString() })
+          .eq('id', customerId)
+      }
+
+      if (soPhu.hopLe) {
+        const { data: daCo } = await db.from('customer_contacts')
+          .select('id').eq('customer_id', customerId).ilike('phone', `%${soPhu.cuoi9}`).limit(1)
+        if (!daCo || daCo.length === 0) {
+          await db.from('customer_contacts').insert({
+            customer_id: customerId, phone: soPhu.chuan,
+            contact_name: (pl as { source_customer_name: string | null } | null)?.source_customer_name ?? null,
+            role: 'khac', is_primary: false, zalo_ok: true,
+            ghi_chu: sdtChinh === 'plan' ? 'Số cũ trong hồ sơ' : 'Số ghi trên lịch bảo trì',
+          })
+          themSdtPhu = true
+        }
       }
     }
   }
@@ -1246,7 +1274,7 @@ export async function ganKhachBaoTri(
   const { error } = await db.from('maintenance_plan')
     .update({ customer_id: customerId, updated_at: new Date().toISOString() }).eq('id', planId)
   if (error) return { ok: false, error: error.message }
-  await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId, giu_sdt_plan: themSdtPhu })
+  await ghiAudit('gan_khach_bao_tri', `plan:${planId}`, { customer_id: customerId, sdt_chinh: sdtChinh, them_sdt_phu: themSdtPhu })
   revalidatePath('/bao-tri')
   revalidatePath(`/khach/${customerId}`)
   return { ok: true, themSdtPhu }
@@ -3140,12 +3168,12 @@ export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
 export async function taoKhachChoDuyet(input: {
   full_name: string; primary_phone?: string; address?: string; province?: string
   /** Thông tin nâng cao — chỉ có khi tạo từ trang `/khach/moi`. */
-  notes?: string; source?: string; channel_id?: number | null
+  notes?: string; channel_id?: number | null
   ten_cty?: string; mst?: string; dia_chi_cty?: string; sdt_cty?: string; email_cty?: string
   nguoi_dai_dien?: string; chuc_vu_dai_dien?: string
   /** Tạo kèm luôn, khỏi phải mở lại hồ sơ để thêm. */
-  sdt_phu?: { phone: string; contact_name?: string; role?: string }[]
-  dia_chi_phu?: { dia_chi: string; loai: string }[]
+  sdt_phu?: { phone: string; contact_name?: string; role?: string; zalo_ok?: boolean; ghi_chu?: string }[]
+  dia_chi_phu?: { dia_chi: string; loai: string; tinh?: string }[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
   const ten = input.full_name?.trim()
@@ -3175,8 +3203,9 @@ export async function taoKhachChoDuyet(input: {
     full_name: ten, primary_phone: chuan,
     address: input.address?.trim() || null, province: input.province?.trim() || null,
     customer_code: customerCode,
-    // Nguồn người dùng gõ thắng; không gõ thì suy như cũ.
-    source: input.source?.trim() || (customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký'),
+    // `source` là dấu vết HỆ THỐNG (đợt import / đường tạo), không phải kênh bán
+    // — cố ý không cho người dùng gõ, kẻo lẫn với `channel_id`.
+    source: customerCode ? 'Sales (khớp SĐT)' : 'CSKH đăng ký',
     channel_id: input.channel_id ?? null,
     // Tạo thẳng (đã duyệt): rác lớn nhất (SĐT sai/trùng) đã chặn ngay lúc tạo nên
     // không cần hàng chờ duyệt cho khách mới. Sửa/xoá khách vẫn qua duyệt như cũ.
@@ -3200,7 +3229,8 @@ export async function taoKhachChoDuyet(input: {
     await db.from('customer_contacts').insert(sdtPhu.map((x) => ({
       customer_id: id, phone: chuanHoaSdt(x.phone).chuan || x.phone.trim(),
       contact_name: x.contact_name?.trim() || null,
-      role: x.role?.trim() || 'khac', is_primary: false, zalo_ok: true,
+      role: x.role?.trim() || 'khac', is_primary: false,
+      zalo_ok: x.zalo_ok ?? true, ghi_chu: x.ghi_chu?.trim() || null,
     })))
   }
   const dcPhu = (input.dia_chi_phu ?? []).filter((x) => x.dia_chi?.trim())
@@ -3208,6 +3238,7 @@ export async function taoKhachChoDuyet(input: {
     await db.from('customer_addresses').insert(dcPhu.map((x) => ({
       customer_id: id, dia_chi: x.dia_chi.trim(),
       loai: ['nha', 'cty', 'lap_dat', 'khac'].includes(x.loai) ? x.loai : 'khac',
+      tinh: x.tinh?.trim() || null,
     })))
   }
 

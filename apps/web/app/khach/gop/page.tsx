@@ -43,7 +43,11 @@ export default async function GopKhachPage({
           {' '}thì hồ sơ giữ thắng — bảng bên dưới nói rõ từng dòng.
         </div>
 
-        <GopKhachManHinh giuBanDau={kGiu} gopBanDau={kGop} />
+        {/* `key` theo đúng cặp id: bấm "Xem & gộp" ở danh sách bên dưới là điều
+            hướng trong CÙNG route /khach/gop, React giữ nguyên component cũ nên
+            state khởi tạo từ props (giu/gop) không bao giờ chạy lại — màn hình
+            trống trơn dù server đã trả đúng hai hồ sơ. Đổi key = ép dựng lại. */}
+        <GopKhachManHinh key={`${giu ?? ''}-${gop ?? ''}`} giuBanDau={kGiu} gopBanDau={kGop} />
 
         {/* Danh sách việc cần làm nằm DƯỚI khu thao tác: vào thẳng từ menu thì
             cuộn một chút là thấy, còn vào từ nút trong hồ sơ khách (đã có sẵn một

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { taoKhachChoDuyet, timKhachTheoSdt, type KhachKhopSdt, type Kenh } from '@/app/actions'
 import { ChonTinh } from '@/components/ChonTinh'
+import { ChonKenh } from '@/components/ChonKenh'
 import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
 
 /**
@@ -20,12 +21,12 @@ import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
 export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
   const [f, setF] = useState({
     full_name: '', primary_phone: '', address: '', province: '',
-    notes: '', source: '', ten_cty: '', mst: '', dia_chi_cty: '', sdt_cty: '', email_cty: '',
+    notes: '', ten_cty: '', mst: '', dia_chi_cty: '', sdt_cty: '', email_cty: '',
     nguoi_dai_dien: '', chuc_vu_dai_dien: '',
   })
   const [kenhId, setKenhId] = useState('')
-  const [sdtPhu, setSdtPhu] = useState<{ phone: string; contact_name: string; role: string }[]>([])
-  const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string }[]>([])
+  const [sdtPhu, setSdtPhu] = useState<{ phone: string; contact_name: string; role: string; zalo_ok: boolean; ghi_chu: string }[]>([])
+  const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string; tinh: string }[]>([])
   const [khop, setKhop] = useState<KhachKhopSdt | null>(null)
   const [dangTra, setDangTra] = useState(false)
   const [nangCao, setNangCao] = useState(false)
@@ -149,27 +150,7 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
 
         {nangCao && (
           <div className="space-y-3 border-t border-slate-200 px-5 py-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-sm text-slate-700">Nguồn khách</span>
-                <input value={f.source} onChange={(e) => dat('source', e.target.value)}
-                  placeholder="Trực tiếp · Shopee · giới thiệu…" className={oChu} />
-                <span className="mt-1 block text-xs text-slate-400">
-                  Bỏ trống thì tự ghi &ldquo;CSKH đăng ký&rdquo;, hoặc &ldquo;Sales (khớp SĐT)&rdquo; nếu trùng khách Sales.
-                </span>
-              </label>
-              <label className="block">
-                <span className="text-sm text-slate-700">Kênh / đối tác</span>
-                <select value={kenhId} onChange={(e) => setKenhId(e.target.value)} className={`${oChu} bg-white`}>
-                  <option value="">— Không qua kênh nào —</option>
-                  {kenh.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {[k.channel_l1, k.channel_l2].filter(Boolean).join(' · ')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <ChonKenh kenh={kenh} value={kenhId} onChange={setKenhId} />
 
             <label className="block">
               <span className="text-sm text-slate-700">Ghi chú</span>
@@ -182,7 +163,7 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-slate-700">SĐT phụ</span>
-                <button type="button" onClick={() => setSdtPhu([...sdtPhu, { phone: '', contact_name: '', role: 'khac' }])}
+                <button type="button" onClick={() => setSdtPhu([...sdtPhu, { phone: '', contact_name: '', role: 'khac', zalo_ok: true, ghi_chu: '' }])}
                   className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
               </div>
               {sdtPhu.length === 0 && <p className="mt-1 text-xs text-slate-400">Chưa có. Số công ty, giúp việc, người nhà…</p>}
@@ -203,6 +184,14 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
                     <option value="manager">Quản lý</option>
                     <option value="khac">Khác</option>
                   </select>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-700">
+                    <input type="checkbox" checked={x.zalo_ok}
+                      onChange={(e) => setSdtPhu(sdtPhu.map((y, j) => j === i ? { ...y, zalo_ok: e.target.checked } : y))} />
+                    Zalo
+                  </label>
+                  <input value={x.ghi_chu} placeholder="Ghi chú: giờ gọi được, số của ai…"
+                    onChange={(e) => setSdtPhu(sdtPhu.map((y, j) => j === i ? { ...y, ghi_chu: e.target.value } : y))}
+                    className="min-w-[180px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                   <button type="button" onClick={() => setSdtPhu(sdtPhu.filter((_, j) => j !== i))}
                     className="text-xs text-slate-400 underline hover:text-red-600">xoá</button>
                 </div>
@@ -212,25 +201,32 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-slate-700">Địa chỉ phụ</span>
-                <button type="button" onClick={() => setDcPhu([...dcPhu, { dia_chi: '', loai: 'nha' }])}
+                <button type="button" onClick={() => setDcPhu([...dcPhu, { dia_chi: '', loai: 'nha', tinh: '' }])}
                   className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
               </div>
+              {/* KHÔNG có loại "công ty" ở đây: địa chỉ công ty đã là ô riêng trong
+                  khối Thông tin công ty (in nguyên văn lên hoá đơn). Để hai chỗ cùng
+                  chứa được địa chỉ công ty là lúc xuất hoá đơn không biết lấy cái nào. */}
               {dcPhu.length === 0 && <p className="mt-1 text-xs text-slate-400">Chưa có. Nhà thứ hai, kho, nơi lắp đặt…</p>}
               {dcPhu.map((x, i) => (
-                <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
-                  <input value={x.dia_chi} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh"
+                <div key={i} className="mt-2 flex flex-wrap items-end gap-2">
+                  <input value={x.dia_chi} placeholder="Số nhà, đường, phường/xã, quận/huyện"
                     onChange={(e) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, dia_chi: e.target.value } : y))}
                     className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                  <div className="w-44">
+                    <ChonTinh value={x.tinh}
+                      onChange={(v) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, tinh: v } : y))}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900" />
+                  </div>
                   <select value={x.loai}
                     onChange={(e) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, loai: e.target.value } : y))}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm">
                     <option value="nha">Nhà</option>
-                    <option value="cty">Công ty</option>
                     <option value="lap_dat">Lắp đặt</option>
                     <option value="khac">Khác</option>
                   </select>
                   <button type="button" onClick={() => setDcPhu(dcPhu.filter((_, j) => j !== i))}
-                    className="text-xs text-slate-400 underline hover:text-red-600">xoá</button>
+                    className="pb-1.5 text-xs text-slate-400 underline hover:text-red-600">xoá</button>
                 </div>
               ))}
             </div>
