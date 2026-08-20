@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/TopNav";
-import { layNguoiDung } from "@/lib/supabase";
+import { layNguoiDung } from "@/lib/nen-tang/phien";
 import { CauHinhBang } from "@/bang";
 import { TEN_COT, NGHIA_SAP_XEP } from "@/lib/danhSach";
 

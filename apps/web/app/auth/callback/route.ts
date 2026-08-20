@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { authClient, ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { authClient } from '@/lib/nen-tang/db'
+import { ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 
 /**
  * Google (và magic link / đặt lại mật khẩu) gọi ngược về đây sau khi xác thực.

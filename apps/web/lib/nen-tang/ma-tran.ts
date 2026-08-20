@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { dataClient } from './db'
-import { laAdmin } from './gac-cong'
 import { KHONG_DU_QUYEN } from './nhan-su-luat'
 import { coQuyen } from './kiem-quyen'
 import { ghiAudit } from './nhat-ky'

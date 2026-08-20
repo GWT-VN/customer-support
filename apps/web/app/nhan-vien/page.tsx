@@ -1,13 +1,13 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { BangNhanVien } from '@/components/BangNhanVien'
 import { MoiNhanSu } from '@/components/MoiNhanSu'
 import { listAllStaff } from '@/lib/nen-tang/nhan-su'
-import { chanNeuKhongPhaiAdmin } from '@/lib/nen-tang/gac-cong'
 import { layNhanVien } from '@/lib/nen-tang/phien'
 import { laQuyenAdmin } from '@/lib/nen-tang/vai-tro'
 
 export default async function NhanVienPage() {
   // Rào THẬT của trang này. Ẩn mục menu chỉ là cho gọn mắt.
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuThieuQuyen('he_thong.nhan_su.xem', 'ADMIN')
 
   const [ds, toi] = await Promise.all([listAllStaff(), layNhanVien()])
   const soAdmin = ds.filter((n) => n.hoat_dong && laQuyenAdmin(n.vai_tro)).length

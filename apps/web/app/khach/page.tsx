@@ -5,7 +5,7 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function ToFixPage({

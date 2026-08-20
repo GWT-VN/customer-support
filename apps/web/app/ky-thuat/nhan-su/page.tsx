@@ -1,11 +1,12 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import Link from 'next/link'
-import { chanNeuKhongPhaiQuanLy, laAdmin } from '@/lib/supabase'
+import { laAdmin } from '@/lib/nen-tang/gac-cong'
 import { dsKyThuat, trangThaiTaiKhoanKT } from '@/app/actions'
 import { RosterKyThuat } from '@/components/RosterKyThuat'
 
 /** Quản lý danh sách kỹ thuật + (admin) cấp/thu quyền đăng nhập cho họ. */
 export default async function NhanSuKyThuatPage() {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.ky_thuat.ho_so', 'QUANLY')
   const [dsKt, admin, trangThai] = await Promise.all([dsKyThuat(false), laAdmin(), trangThaiTaiKhoanKT()])
 
   return (

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { issueReport, ticketsChuaPhanNhom, goiYGomNhom } from '@/app/actions'
-import { laAdmin } from '@/lib/supabase'
+import { laAdmin } from '@/lib/nen-tang/gac-cong'
 import { MucDoBadge, BaoHangBadge } from '@/components/NhomLoiBadge'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'

@@ -1,4 +1,5 @@
-import { coTheVaoCS, laAdmin, laChiKyThuatVien, laQuanLy, layNguoiDung } from '@/lib/supabase'
+import { layNguoiDung } from '@/lib/nen-tang/phien'
+import { coTheVaoCS, laAdmin, laChiKyThuatVien, laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { SidebarNav } from './SidebarNav'
 
 /**

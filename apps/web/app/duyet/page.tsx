@@ -1,11 +1,11 @@
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { listKhachChoDuyet, listYeuCauThayDoi, listYeuCauExport } from '@/app/actions'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 import { DuyetList } from '@/components/DuyetList'
 import { DuyetExportList } from '@/components/DuyetExportList'
 
 export default async function DuyetPage() {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.yeu_cau.xem', 'QUANLY')
   const [khachCho, yeuCau, yeuCauExport] = await Promise.all([
     listKhachChoDuyet(), listYeuCauThayDoi(), listYeuCauExport(),
   ])

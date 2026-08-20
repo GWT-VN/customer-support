@@ -1,4 +1,4 @@
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { listKhachChoDuyet } from '@/app/actions'
 import { ChonKieuLap } from '@/components/ChonKieuLap'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'

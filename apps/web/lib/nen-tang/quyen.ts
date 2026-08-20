@@ -100,7 +100,9 @@ const BANG_QUYEN = {
   'cs.ky_thuat.tai_khoan': { nhom: 'ky_thuat', nhan: 'Cấp / thu tài khoản cho KTV', mucMacDinh: 'A' },
 
   'cs.bao_cao.xuat': { nhom: 'bao_cao', nhan: 'Xuất Excel ticket / máy / bảo trì', mucMacDinh: 'TCS' },
-  'cs.bao_cao.doanh_so': { nhom: 'bao_cao', nhan: 'Xem doanh số CSKH', mucMacDinh: 'CS', chiXem: true },
+  // Trang /doanh-so vốn gác admin, nhưng hàm doanhSoCskh phía sau chỉ có
+  // requireStaff ⇒ nhân viên CS gọi thẳng vẫn ra số. Lấy mức của TRANG làm chuẩn.
+  'cs.bao_cao.doanh_so': { nhom: 'bao_cao', nhan: 'Xem doanh số CSKH', mucMacDinh: 'A', chiXem: true },
 
   'cs.yeu_cau.gui': { nhom: 'yeu_cau', nhan: 'Gửi yêu cầu sửa dữ liệu', mucMacDinh: 'CS' },
   'cs.yeu_cau.xem': { nhom: 'yeu_cau', nhan: 'Xem hàng chờ yêu cầu sửa', mucMacDinh: 'TCS', chiXem: true },

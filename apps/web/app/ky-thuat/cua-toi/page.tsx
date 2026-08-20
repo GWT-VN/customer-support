@@ -1,4 +1,4 @@
-import { requireStaff } from '@/lib/supabase'
+import { requireStaff } from '@/lib/nen-tang/phien'
 import { lichCuaToi } from '@/app/actions'
 import { LichCuaToiKT } from '@/components/LichCuaToiKT'
 import { DoiMatKhau } from '@/components/DoiMatKhau'

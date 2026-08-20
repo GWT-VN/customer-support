@@ -2,7 +2,8 @@
 
 import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
-import { dataClient, laAdmin, laQuanLy, layNhanVien, requireStaff } from '@/lib/supabase'
+import { dataClient } from '@/lib/nen-tang/db'
+import { layNhanVien, requireStaff } from '@/lib/nen-tang/phien'
 import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'

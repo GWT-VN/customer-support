@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { notFound } from 'next/navigation'
 import { getTicket, groupsOfTicket, listTicketNotes, listTicketItems, listCatalogItems, ticketTypes } from '@/app/actions'
 import { listStaff, currentStaff } from '@/lib/nen-tang/nhan-su'

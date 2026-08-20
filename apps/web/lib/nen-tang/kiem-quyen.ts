@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { dataClient } from './db'
 import { laAdmin, laQuanLy } from './gac-cong'
@@ -84,9 +85,33 @@ export async function coQuyen(ma: MaQuyen, gateCu: GateCu): Promise<boolean> {
 /**
  * Dùng ở chỗ TRƯỚC ĐÂY KHÔNG CÓ RÀO nào ngoài requireStaff().
  *
- * Chỉ đo và ghi lệch, luôn cho qua ở GĐ2 — nhưng ở GĐ3 thì chặn thật. Đây là chỗ
- * bắt được ca kỹ thuật thuần: hôm nay họ sửa được hồ sơ khách, ma trận nói không.
+ * KHÔNG trả boolean mà ĐÁ VỀ TRANG CHỦ khi bị từ chối. Hai lý do:
+ *
+ *  1. 91 chỗ gọi hàm này đều gọi như một câu lệnh trống (`await doQuyen('...')`),
+ *     không ai đọc giá trị trả về — trả boolean thì ở GĐ3 nó tính ra "cấm" rồi
+ *     vẫn chạy tiếp, tức là KHÔNG chặn gì cả.
+ *  2. Ném lỗi thì chặn được, nhưng người dùng chỉ thấy trang trắng "A server
+ *     error occurred" — đúng cái mà requireStaff() đã cố tránh. redirect() cho
+ *     họ về trang chủ kèm lý do đọc được.
+ *
+ * LƯU Ý: redirect() hoạt động bằng cách ném NEXT_REDIRECT — người gọi TUYỆT ĐỐI
+ * không được bọc doQuyen() trong try/catch, sẽ nuốt mất redirect.
+ *
+ * Ở GĐ2 (cầu dao tắt) coQuyen luôn trả kết quả luật cũ = true nên không bao giờ
+ * đá ai — chỉ ghi lệch. Từ GĐ3 mới chặn thật.
  */
-export async function doQuyen(ma: MaQuyen): Promise<boolean> {
-  return coQuyen(ma, 'NHANVIEN')
+export async function doQuyen(ma: MaQuyen): Promise<void> {
+  if (!(await coQuyen(ma, 'NHANVIEN'))) redirect('/?loi=khong_du_quyen')
+}
+
+/**
+ * Chặn TRANG theo quyền — thay chanNeuKhongPhaiAdmin()/chanNeuKhongPhaiQuanLy().
+ *
+ * Ẩn mục menu KHÔNG phải phân quyền: ai biết đường dẫn vẫn mở được. Rào thật nằm
+ * ở đây và ở từng Server Action.
+ *
+ * Ở GĐ2 vẫn cho qua đúng như luật cũ (và ghi lệch); từ GĐ3 thì ma trận chặn thật.
+ */
+export async function chanNeuThieuQuyen(ma: MaQuyen, gateCu: GateCu) {
+  if (!(await coQuyen(ma, gateCu))) redirect('/?loi=khong_du_quyen')
 }

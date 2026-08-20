@@ -7,7 +7,7 @@ import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
 import { QuanLyMay } from '@/components/QuanLyMay'
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params

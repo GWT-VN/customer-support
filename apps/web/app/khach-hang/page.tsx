@@ -6,7 +6,7 @@ import { BangKhach } from '@/components/BangKhach'
 import { SUA_HL_KHACH } from '@/lib/danhSach'
 import { OTimKiem, ThanhDangLoc, PhanTrang } from '@/bang'
 import { KhungChon, ThanhDaChon } from '@/bang'
-import { laAdmin, laQuanLy } from '@/lib/supabase'
+import { laAdmin, laQuanLy } from '@/lib/nen-tang/gac-cong'
 
 export default async function KhachHangPage({
   searchParams,

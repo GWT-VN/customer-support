@@ -1,8 +1,9 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { authClient, ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { authClient } from '@/lib/nen-tang/db'
+import { ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 
 /** Thoát khỏi app: xoá session Supabase rồi về trang đăng nhập. */
 export async function dangXuat() {

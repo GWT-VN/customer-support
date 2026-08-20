@@ -1,4 +1,5 @@
-import { coTheVaoCS, coTheVaoSales, laAdmin, laChiKyThuatVien, laQuanLy, layNguoiDung } from '@/lib/supabase'
+import { layNguoiDung } from '@/lib/nen-tang/phien'
+import { coTheVaoCS, coTheVaoSales, laAdmin, laChiKyThuatVien, laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { TopNavClient } from './TopNavClient'
 
 /**

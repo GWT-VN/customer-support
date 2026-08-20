@@ -1,5 +1,5 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import Link from 'next/link'
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { dsKyThuat, dsLichKyThuat } from '@/app/actions'
 import { LichKyThuatList } from '@/components/LichKyThuatList'
 import { LichKyThuatCalendar } from '@/components/LichKyThuatCalendar'
@@ -21,7 +21,7 @@ export default async function XemLichKyThuatPage({
 }: {
   searchParams: Promise<{ view?: string; tu?: string; den?: string; kt?: string; thang?: string; tuan?: string; loai?: string }>
 }) {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.ky_thuat.xep_lich', 'QUANLY')
   const { view = 'list', tu: tuRaw, den: denRaw, kt, thang: thangRaw, tuan: tuanRaw, loai } = await searchParams
   const laCalendar = view === 'calendar'
   const laBoard = view === 'board'

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 import { Suspense } from 'react'
 import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'

@@ -6,7 +6,7 @@ import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laQuanLy } from '@/lib/supabase'
+import { laQuanLy } from '@/lib/nen-tang/gac-cong'
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

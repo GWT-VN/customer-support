@@ -1,9 +1,9 @@
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { baoTriChuaMap } from '@/app/actions'
 import { BaoTriQuanLy } from '@/components/BaoTriQuanLy'
 
 export default async function MapKhachBaoTriPage() {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.bao_tri.tao_plan', 'QUANLY')
   const chuaMap = await baoTriChuaMap()
   return (
     <main className="min-h-screen bg-slate-50">

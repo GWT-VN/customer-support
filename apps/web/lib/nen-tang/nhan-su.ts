@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 import { authClient, dataClient } from './db'
-import { laAdmin } from './gac-cong'
 import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, toStaff, type Staff } from './nhan-su-luat'
 import { coQuyen } from './kiem-quyen'
 import { ghiAudit } from './nhat-ky'
