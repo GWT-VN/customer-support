@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ganKhachBaoTri, goGanKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
+import { ganKhachBaoTri, goGanKhachBaoTri, lenLichBaoTri, datSoLanBaoTri, taoPlanBaoTri, boiCanhKhach, khachDayDu, type PlanChuaMap, type PlanDaMap, type SapHetGoi, type BoiCanhKhach } from '@/app/actions'
 import { TimKhachChiTiet } from '@/components/TimKhachChiTiet'
+import { SoSanhHoSo } from '@/components/SoSanhHoSo'
+import { dangCo, type KhachDayDu } from '@/lib/gopKhach'
 import { sinhLichBaoTri, vungTheoTinh, macDinhTheoBoMay, type Vung } from '@/lib/lichBaoTri'
 import { tinCayThap } from '@/lib/khopPlanKhach'
 import { KhachPicker } from '@/components/KhachPicker'
@@ -59,6 +61,8 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
     setMoTao(false); setTKhach(''); setTBoMay(''); setTCtx(null); setTDates([]); setMsg(`Đã tạo lịch mới ${r.so_lan} lượt.`); router.refresh()
   }
   const [chonTay, setChonTay] = useState<string | null>(null)     // plan id đang chọn khách tay
+  // Ứng viên đang xem so sánh trước khi gán (null = chưa mở cái nào).
+  const [xem, setXem] = useState<{ planId: string; dangTai: boolean; khach: KhachDayDu | null } | null>(null)
   const [moLich, setMoLich] = useState<string | null>(null)       // plan id đang mở form lịch
   const [suaLan, setSuaLan] = useState<string | null>(null)       // plan id đang sửa số lần
   const [lanVal, setLanVal] = useState('')
@@ -87,22 +91,28 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
   }
 
   /**
-   * Gán khách cho plan. LUÔN hỏi lại trước khi ghi.
-   *
-   * Trước đây bấm phát là gán luôn — gợi ý xếp sát nhau, bấm trượt một ô là plan
-   * dính vào khách sai mà không có gì báo. Nay phải đọc đúng tên khách rồi mới
-   * xác nhận; lỡ sai thì còn nút "gỡ gán" ở danh sách đã map.
+   * Gán khách cho plan — chỉ gọi được SAU khi CS đã mở khối so sánh và nhìn đủ
+   * thông tin hai bên. Trước đây bấm gợi ý phát là gán luôn: các gợi ý xếp sát
+   * nhau, bấm trượt một ô là plan dính vào khách sai mà không có gì báo, lại
+   * không hoàn tác được.
    */
-  async function gan(planId: string, customerId: string, tenPlan: string, tenKhach: string) {
-    if (!window.confirm(
-      `Gán lịch bảo trì:\n  "${tenPlan}"\n\ncho khách:\n  "${tenKhach}"\n\nĐúng người chưa?`
-    )) return
+  async function gan(planId: string, customerId: string, tenKhach: string) {
     setBusy(planId); setErr(null); setMsg(null)
     const r = await ganKhachBaoTri(planId, customerId)
     setBusy(null)
     if (!r.ok) { setErr(r.error); return }
-    setChonTay(null); setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
+    setChonTay(null); setXem(null)
+    setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
     router.refresh()
+  }
+
+  /** Mở khối so sánh cho một ứng viên: nạp hồ sơ khách đủ trường rồi mới vẽ. */
+  async function moSoSanh(planId: string, customerId: string) {
+    setErr(null); setMsg(null)
+    setXem({ planId, dangTai: true, khach: null })
+    const k = await khachDayDu(customerId)
+    if (!k) { setXem(null); setErr('Không đọc được hồ sơ khách này.'); return }
+    setXem({ planId, dangTai: false, khach: k })
   }
 
   async function goGan(planId: string, tenKhach: string | null) {
@@ -179,12 +189,12 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                           const yeu = tinCayThap(g.diem)
                           return (
                             <button key={g.id} disabled={busy === p.id}
-                              onClick={() => gan(p.id, g.id, p.source_customer_name ?? '(không tên)', `${g.ten}${g.sdt ? ` (${g.sdt})` : ''}`)}
+                              onClick={() => moSoSanh(p.id, g.id)}
                               className={
                                 'rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 text-left ' +
                                 (yeu ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-emerald-600 text-white')
                               }>
-                              {yeu ? 'Có thể là: ' : 'Gán: '}{g.ten}{g.sdt ? ` (${g.sdt})` : ''}
+                              {yeu ? 'Có thể là: ' : 'Xem & gán: '}{g.ten}{g.sdt ? ` (${g.sdt})` : ''}
                               <span className={'block text-[10px] font-normal ' + (yeu ? 'text-amber-800' : 'opacity-80')}>
                                 {yeu ? 'gợi ý yếu, kiểm tra kỹ trước khi gán — ' : ''}{g.lyDo.join(' · ')}
                               </span>
@@ -201,15 +211,61 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                 </div>
                 {chonTay === p.id && (
                   <div className="pt-1">
-                    {/* Ô tìm hiện đủ tỉnh + địa chỉ: nhiều khách không có SĐT nên
-                        tên trơn không đủ để dám bấm gán. */}
-                    <TimKhachChiTiet
-                      onChon={(k) => gan(
-                        p.id, k.id,
-                        p.source_customer_name ?? '(không tên)',
-                        `${k.full_name}${k.primary_phone ? ` (${k.primary_phone})` : ''}${k.province ? ` — ${k.province}` : ''}`,
-                      )}
-                    />
+                    {/* Ô tìm hiện đủ tỉnh + địa chỉ; chọn xong vẫn đi qua khối so
+                        sánh chứ không gán thẳng — cùng một đường với nút gợi ý. */}
+                    <TimKhachChiTiet onChon={(k) => moSoSanh(p.id, k.id)} />
+                  </div>
+                )}
+
+                {/* Khối so sánh: plan bên trái, khách ứng viên bên phải. Nút gán
+                    nằm TRONG đây nên không thể gán mà chưa nhìn. */}
+                {xem?.planId === p.id && (
+                  <div className="pt-2">
+                    {xem.dangTai || !xem.khach ? (
+                      <p className="text-xs text-slate-400">Đang tải hồ sơ khách…</p>
+                    ) : (
+                      <SoSanhHoSo
+                        trai={{
+                          tieuDe: 'Lịch bảo trì (từ Asana)',
+                          dong: [
+                            { nhan: 'Tên', giaTri: p.source_customer_name ?? '' },
+                            { nhan: 'SĐT', giaTri: p.source_phone ?? '' },
+                            { nhan: 'Tỉnh/TP', giaTri: '' },
+                            { nhan: 'Địa chỉ', giaTri: '' },
+                            { nhan: 'Bộ máy', giaTri: p.bo_may ?? '' },
+                            { nhan: 'Số lần', giaTri: p.tong_lan ? String(p.tong_lan) : '' },
+                          ],
+                        }}
+                        phai={{
+                          tieuDe: 'Khách trong hệ thống',
+                          nhan: dangCo(xem.khach),
+                          href: `/khach/${xem.khach.id}`,
+                          dong: [
+                            { nhan: 'Tên', giaTri: xem.khach.full_name },
+                            { nhan: 'SĐT', giaTri: xem.khach.primary_phone ?? '' },
+                            { nhan: 'Tỉnh/TP', giaTri: xem.khach.province ?? '' },
+                            { nhan: 'Địa chỉ', giaTri: xem.khach.address ?? '' },
+                            { nhan: 'Bộ máy', giaTri: `${xem.khach.so_may} máy đã lắp` },
+                            { nhan: 'Số lần', giaTri: `${xem.khach.so_plan} lịch bảo trì đang có` },
+                          ],
+                        }}
+                        hanhDong={
+                          <>
+                            <button disabled={busy === p.id}
+                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name)}
+                              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                              {busy === p.id ? 'Đang gán…' : 'Đúng người, gán'}
+                            </button>
+                            <button onClick={() => setXem(null)} className="text-sm text-slate-500 underline">
+                              Không phải, đóng
+                            </button>
+                            <span className="text-xs text-slate-400">
+                              Gán nhầm vẫn gỡ được ở danh sách &ldquo;đã map&rdquo; bên dưới.
+                            </span>
+                          </>
+                        }
+                      />
+                    )}
                   </div>
                 )}
               </li>
