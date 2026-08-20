@@ -27,14 +27,18 @@ export default async function NhanVienPage() {
         <BangNhanVien ds={ds} toiId={toi?.id ?? ''} />
 
         <div className="bg-white rounded-xl border p-4 text-sm text-slate-600 space-y-1">
-          <p className="font-medium text-slate-900">Ba cấp quyền (một người giữ nhiều vai trò)</p>
-          <p>· <b>NV CSKH / NV Sales</b>: xem + xử lý khách, máy, ticket, lịch lõi như thường ngày.</p>
-          <p>· <b>Trưởng CSKH</b>: thêm quyền <i>duyệt</i> (serial, yêu cầu sửa, export, khách chờ) + nghiệp
+          <p className="font-medium text-slate-900">Cách gán vai trò</p>
+          <p>· Một người <b>kiêm nhiều bộ phận</b> thoải mái — CSKH + Sales, Trưởng CSKH + Trưởng Sales,
+            hay nhân viên mảng này kiêm trưởng mảng kia đều được.</p>
+          <p>· Trong <b>cùng một bộ phận</b> thì trưởng và nhân viên loại trừ nhau: tích Trưởng CSKH
+            là tự bỏ tích Nhân viên CSKH.</p>
+          <p>· <b>Trưởng CSKH</b> thêm quyền <i>duyệt</i> (serial, yêu cầu sửa, export, khách chờ) + nghiệp
             vụ nâng cao (ghi chi phí ticket, lắp/thu hồi/đổi máy, kho serial, nhóm lỗi, xuất báo cáo).</p>
-          <p>· <b>Quản trị</b>: toàn quyền — quản lý nhân viên, đồng bộ catalog, nhật ký, và <b>xoá thông tin
-            khách</b> (chỉ admin duyệt).</p>
+          <p>· <b>Quản trị hệ thống</b>: toàn quyền — quản lý nhân viên, đồng bộ catalog, nhật ký, và
+            <b> xoá thông tin khách</b>.</p>
           <p className="text-slate-500 pt-1">
-            Trưởng Sales / NV Sales chưa có nghiệp vụ riêng trong app CSKH này.
+            CEO, Giám đốc Kỹ thuật, CTV lắp đặt, Marketing, Kho, Kế toán, Tài chính mới được thêm vào
+            danh sách và <b>chưa có quyền riêng</b> trong app — sẽ cấp ở bước ma trận phân quyền.
           </p>
         </div>
       </div>

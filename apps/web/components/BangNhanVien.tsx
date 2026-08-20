@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { doiTenNhanVien, suaNhanVien } from '@/lib/nen-tang/nhan-su'
-import { NHAN_VAI_TRO, VAI_TRO } from '@/lib/quyen'
+import {
+  HO_SO_VAI_TRO, NHAN_BO_PHAN, NHAN_VAI_TRO, VAI_TRO,
+  apDungLoaiTruCapBac, type BoPhan, type VaiTro,
+} from '@/lib/nen-tang/vai-tro'
 
 export type DongNhanVien = {
   id: string
@@ -11,6 +14,13 @@ export type DongNhanVien = {
   email: string | null
   hoat_dong: boolean
 }
+
+/** Gom vai trò theo bộ phận để bảng đỡ thành một hàng 13 ô tick rối mắt. */
+const NHOM_THEO_BO_PHAN = VAI_TRO.reduce<Partial<Record<BoPhan, VaiTro[]>>>((acc, v) => {
+  const bp = HO_SO_VAI_TRO[v].boPhan
+  ;(acc[bp] ??= []).push(v)
+  return acc
+}, {})
 
 export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string }) {
   const [loi, setLoi] = useState<string | null>(null)
@@ -63,27 +73,34 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
                   </td>
 
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      {VAI_TRO.map((v) => {
-                        const co = nv.vai_tro.includes(v)
-                        return (
-                          <label key={v} className="inline-flex items-center gap-1.5 text-slate-800 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={co}
-                              disabled={dangChay}
-                              onChange={() => {
-                                const moi = co
-                                  ? nv.vai_tro.filter((x) => x !== v)
-                                  : [...nv.vai_tro, v]
-                                chay(() => suaNhanVien(nv.id, { vai_tro: moi }))
-                              }}
-                              className="rounded border-slate-300"
-                            />
-                            {NHAN_VAI_TRO[v]}
-                          </label>
-                        )
-                      })}
+                    <div className="space-y-1.5">
+                      {(Object.entries(NHOM_THEO_BO_PHAN) as [BoPhan, VaiTro[]][]).map(([bp, dsVaiTro]) => (
+                        <div key={bp} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span className="text-xs text-slate-400 w-20 shrink-0">{NHAN_BO_PHAN[bp]}</span>
+                          {dsVaiTro.map((v) => {
+                            const co = nv.vai_tro.includes(v)
+                            return (
+                              <label key={v} className="inline-flex items-center gap-1.5 text-slate-800 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={co}
+                                  disabled={dangChay}
+                                  onChange={() => {
+                                    // Tick trưởng thì tự bỏ nhân viên CÙNG bộ phận (luật CEO chốt).
+                                    // Khác bộ phận không đụng — cs + sales là kiêm nhiệm hợp lệ.
+                                    const moi = co
+                                      ? nv.vai_tro.filter((x) => x !== v)
+                                      : apDungLoaiTruCapBac([...(nv.vai_tro as VaiTro[]), v])
+                                    chay(() => suaNhanVien(nv.id, { vai_tro: moi }))
+                                  }}
+                                  className="rounded border-slate-300"
+                                />
+                                {NHAN_VAI_TRO[v]}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      ))}
                     </div>
                     {nv.vai_tro.length === 0 && (
                       <div className="text-xs text-amber-600 mt-1">chưa gán vai trò</div>
