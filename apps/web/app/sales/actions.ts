@@ -81,13 +81,19 @@ async function donTang(s: string, tu = '', den = ''): Promise<DonRow[]> {
   return s ? all.filter((g) => g.order_code.toLowerCase().includes(sl) || (g.customer_name ?? '').toLowerCase().includes(sl)) : all
 }
 
-/** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng; lọc tab + ngày + trạng thái. */
-export async function danhSachDon(q = '', tab = '', tu = '', den = '', tt = '', tp = ''): Promise<DonRow[]> {
+export type LocDon = { tu?: string; den?: string; tt?: string[]; tp?: string[]; ttEx?: boolean; tpEx?: boolean }
+
+/** Danh sách đơn: gộp mirror + đơn app + đơn tặng; lọc tab + ngày + trạng thái (nhiều giá trị, hoặc loại trừ). */
+export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<DonRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
+  const { tu = '', den = '', tt = [], tp = [], ttEx = false, tpEx = false } = loc
+  const sv = (v: string) => v.replace(/[,%()]/g, '').trim()
+  const ttC = tt.map(sv).filter(Boolean)
+  const tpC = tp.map(sv).filter(Boolean)
   const onlyTang = tab === 'DON_TANG'
-  const coLocTrangThai = !!(tt || tp)
+  const coLocTrangThai = ttC.length > 0 || tpC.length > 0
   const map = new Map<string, DonRow>()
 
   if (!onlyTang) {
@@ -99,8 +105,14 @@ export async function danhSachDon(q = '', tab = '', tu = '', den = '', tt = '', 
     if (tab) mq = mq.eq('source_tab', tab)
     if (tu) mq = mq.gte('order_date', tu)
     if (den) mq = mq.lte('order_date', den)
-    if (tt) mq = mq.ilike('fulfillment_status', `%${tt}%`)
-    if (tp) mq = mq.ilike('payment_status', `%${tp}%`)
+    if (ttC.length) {
+      if (ttEx) for (const v of ttC) mq = mq.not('fulfillment_status', 'ilike', `%${v}%`)
+      else mq = mq.or(ttC.map((v) => `fulfillment_status.ilike.%${v}%`).join(','))
+    }
+    if (tpC.length) {
+      if (tpEx) for (const v of tpC) mq = mq.not('payment_status', 'ilike', `%${v}%`)
+      else mq = mq.or(tpC.map((v) => `payment_status.ilike.%${v}%`).join(','))
+    }
     if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
     const { data: lines, error } = await mq
     if (error) throw error
@@ -135,8 +147,14 @@ export async function danhSachDon(q = '', tab = '', tu = '', den = '', tt = '', 
     if (tab) aq = aq.eq('source_tab', tab)
     if (tu) aq = aq.gte('order_date', tu)
     if (den) aq = aq.lte('order_date', den)
-    if (tt) aq = aq.ilike('status', `%${tt}%`)
-    if (tp) aq = aq.ilike('payment_status', `%${tp}%`)
+    if (ttC.length) {
+      if (ttEx) for (const v of ttC) aq = aq.not('status', 'ilike', `%${v}%`)
+      else aq = aq.or(ttC.map((v) => `status.ilike.%${v}%`).join(','))
+    }
+    if (tpC.length) {
+      if (tpEx) for (const v of tpC) aq = aq.not('payment_status', 'ilike', `%${v}%`)
+      else aq = aq.or(tpC.map((v) => `payment_status.ilike.%${v}%`).join(','))
+    }
     const { data: apps } = await aq
     const sl = s.toLowerCase()
     for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
