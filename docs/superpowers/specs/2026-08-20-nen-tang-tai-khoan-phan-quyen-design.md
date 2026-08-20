@@ -33,9 +33,10 @@ Khối lượng gác quyền hiện tại (đo bằng grep trên `apps/web`):
 
 ## 2. Yêu cầu từ CEO
 
-1. Danh sách vai trò thật của công ty (12 role, xem §3), thay 6 role hiện có.
+1. Danh sách vai trò thật của công ty (13 role, xem §3), thay 6 role hiện có.
 2. **Một người kiêm nhiều role** — đúng với DB hiện tại (`staff.vai_tro` là `text[]`).
 3. **Trong cùng bộ phận, cấp bậc loại trừ nhau** — không thể vừa `cs_manager` vừa `cs`.
+   Khác bộ phận thì kiêm thoải mái (`cs`+`sales`, `cs_manager`+`sales_manager`…) — xem §3.1.
 4. **Ma trận phân quyền tick được**: gán từng quyền cho từng role qua giao diện.
 5. Quyền theo **role**, không có ngoại lệ cho từng người. Cần ngoại lệ thì gán thêm role.
 6. Chia **3 giai đoạn**, merge dần, CEO check giữa các giai đoạn.
@@ -51,11 +52,31 @@ Khối lượng gác quyền hiện tại (đo bằng grep trên `apps/web`):
 | Sales | `sales_manager` · `sales` | có |
 | Marketing | `marketing` | — |
 | Kho | `kho` | — |
-| Kế toán / Tài chính | `ke_toan` | — |
+| Kế toán | `ke_toan` | — |
+| Tài chính | `tai_chinh` | — |
 
-6 role mới: `ceo`, `kt_giam_doc`, `ctv_lap_dat`, `marketing`, `kho`, `ke_toan`.
-GD1 chỉ **thêm vào danh sách** — chưa ai được gán, nên không ai đổi quyền cho tới khi
-admin tự tick ở `/nhan-vien`.
+7 role mới: `ceo`, `kt_giam_doc`, `ctv_lap_dat`, `marketing`, `kho`, `ke_toan`, `tai_chinh`
+→ tổng **13 role**. GD1 chỉ **thêm vào danh sách** — chưa ai được gán, nên không ai đổi
+quyền cho tới khi admin tự tick ở `/nhan-vien`.
+
+### 3.1 Luật loại trừ cấp bậc — chỉ trong CÙNG bộ phận
+
+Loại trừ áp **trong nội bộ một bộ phận**, KHÔNG cắt ngang bộ phận. Công ty nhỏ, kiêm nhiệm
+chéo mảng là chuyện bình thường; cái vô lý duy nhất là vừa là trưởng vừa là nhân viên của
+đúng mảng đó.
+
+| Tổ hợp | Kết quả |
+|---|---|
+| `cs` + `sales` | ✅ được (2 người thật đang như vậy) |
+| `cs_manager` + `sales_manager` | ✅ được — quản lý cả hai mảng |
+| `cs` + `sales_manager` | ✅ được — nhân viên mảng này, trưởng mảng kia |
+| `cs` + `cs_manager` | ❌ chặn — cùng bộ phận CS |
+| `ky_thuat` + `ctv_lap_dat` | ❌ chặn — cùng bộ phận Kỹ thuật |
+| `kt_giam_doc` + `ky_thuat` | ❌ chặn — cùng bộ phận Kỹ thuật |
+
+Cài đặt: mỗi role khai báo `boPhan` + `capBac`. Khi lưu, với mỗi bộ phận chỉ giữ **cấp cao
+nhất** người đó có. `admin`/`ceo`/`marketing`/`kho`/`ke_toan`/`tai_chinh` mỗi role một bộ
+phận riêng, không có cấp bậc → không bao giờ bị loại trừ.
 
 **Quyền của `ceo`:** mặc định tick sẵn MỌI quyền `*.xem` ở mọi khu; quyền ghi/xoá phải
 tick thủ công. CEO thấy toàn bộ công ty nhưng không lỡ tay xoá dữ liệu.
@@ -70,7 +91,10 @@ Ràng buộc: `CHECK (vai_tro <@ '{admin,cs_manager,cs,sales_manager,sales,ky_th
 → **bắt buộc có migration** nới danh sách, nếu không insert role mới sẽ lỗi.
 
 10 nhân sự đang hoạt động. **Hai người đang vi phạm luật loại trừ cấp bậc:**
-một người `[cs, cs_manager]`, một người `[cs, sales_manager, cs_manager, admin]`.
+một người `[cs, cs_manager]` → thành `[cs_manager]`; một người
+`[cs, sales_manager, cs_manager, admin]` → thành `[sales_manager, cs_manager, admin]`
+(giữ nguyên vai trưởng Sales — loại trừ không cắt ngang bộ phận, xem §3.1).
+Người giữ `[cs, sales]` và `[ky_thuat, sales]` **không bị đụng** — khác bộ phận.
 
 **Cách xử lý:** chuẩn hoá **khi admin bấm lưu**, KHÔNG migration hàng loạt.
 Bỏ role cấp dưới khi đã có role cấp trên trong cùng bộ phận là **không mất quyền nào**
@@ -83,7 +107,7 @@ Tạo `apps/web/lib/nen-tang/`:
 
 | File | Chứa gì | Lấy từ |
 |---|---|---|
-| `vai-tro.ts` | 12 role, bộ phận, cấp bậc, luật loại trừ, `chuanHoaVaiTro` | `lib/quyen.ts` (mở rộng) |
+| `vai-tro.ts` | 13 role, bộ phận, cấp bậc, luật loại trừ, `chuanHoaVaiTro` | `lib/quyen.ts` (mở rộng) |
 | `vao-cua.ts` | luật đăng nhập thuần — **một** hàm thay `xetLuatVaoCua`/`xetLuatVaoNenTang`, nhận tham số "khu" | `lib/auth.ts` |
 | `phien.ts` | `requireStaff` / `requireNhanSu` / `layNhanVien` | tách khỏi `lib/supabase.ts` |
 | `gac-cong.ts` | `chanNeuKhong…` cho trang, `doiQuyen()` cho action | rải rác |
@@ -100,7 +124,7 @@ một commit. Một chỗ sót = một trang không gác cổng.
 2. Thêm ô "mời người ngoài domain" ở `/nhan-vien` cho CTV lắp đặt.
 
 **Migration (chỉ local):** `db/cs/migrations/50_vai_tro_toan_cong_ty.sql` (46-49 đã bị các nhánh khác chiếm) — nới `chk_vai_tro`
-lên 12 role. Không đụng dữ liệu dòng nào.
+lên 13 role. Không đụng dữ liệu dòng nào.
 
 **Kiểm thử:** `lib/quyen.test.ts`, `lib/auth.test.ts`, `lib/auth-nentang.test.ts`,
 `lib/actions-guard.test.ts` giữ nguyên và **phải xanh y nguyên** — đây là refactor, không
@@ -160,7 +184,7 @@ Chỉ chạy khi tab "Lệch" **im lặng vài ngày trên dữ liệu dùng th�
 
 - Ngoại lệ quyền cho từng người (per-person override) — dùng thêm role.
 - Vai trò do admin tự khai báo trong DB — xem §6.
-- Phân cấp trong bộ phận Kho / Kế toán — CEO nói "chưa phân role".
+- Phân cấp trong bộ phận Kho / Kế toán / Tài chính — CEO nói "chưa phân role".
 - Đổi nhà cung cấp đăng nhập, thêm mật khẩu, 2FA.
 - Đụng RLS của Supabase — app vẫn đi qua `dataClient()` sau khi đã gác ở tầng app.
 
@@ -168,6 +192,6 @@ Chỉ chạy khi tab "Lệch" **im lặng vài ngày trên dữ liệu dùng th�
 
 | GD | CEO check gì |
 |---|---|
-| 1 | `/nhan-vien` thấy 12 role; tick `cs_manager` tự bỏ `cs`; mời được 1 email gmail thử; mọi trang CS/Sales/Work vẫn vào đúng như trước |
+| 1 | `/nhan-vien` thấy 13 role; gán được `cs`+`sales` cho một người (khác bộ phận thì không chặn); tick `cs_manager` tự bỏ `cs`; mời được 1 email gmail thử; mọi trang CS/Sales/Work vẫn vào đúng như trước |
 | 2 | `/nhan-vien/phan-quyen` tick được; tab "Lệch" trống khi chưa sửa gì; cố tình bỏ tick 1 quyền → thấy dòng lệch xuất hiện, nhưng thao tác thật VẪN chạy được |
 | 3 | Bỏ tick 1 quyền → thao tác đó bị chặn thật; đặt `MA_TRAN_QUYEN=off` → chạy lại được ngay |
