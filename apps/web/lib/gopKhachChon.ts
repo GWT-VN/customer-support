@@ -109,3 +109,22 @@ export function dungPChon(giu: KhachDayDu, gop: KhachDayDu, lc: LuaChon): PChon 
 
   return { truong, sdt_phu, dia_chi_them }
 }
+
+/**
+ * Trường mà giá trị KHÔNG được chọn sẽ chẳng có chỗ nào chứa — nằm lại hồ sơ bị
+ * ẩn, muốn lấy phải nhờ kỹ thuật. Phải chìa danh sách này ra trước khi CS bấm.
+ *
+ * Bốn trường vắng mặt ở đây vì đã có nhà: `primary_phone` xuống SĐT phụ, `address`
+ * xuống địa chỉ phụ, `full_name` và `notes` được RPC ghi nguyên văn vào ghi chú.
+ */
+const CO_CHO_CHUA = new Set<string>(['full_name', 'primary_phone', 'address', 'notes'])
+
+export function truongKhongCoChoChua(giu: KhachDayDu, gop: KhachDayDu): string[] {
+  return TRUONG_GOP.filter((t) => {
+    if (CO_CHO_CHUA.has(t.khoa)) return false
+    const a = giaTriTruong(giu, t.khoa)
+    const b = giaTriTruong(gop, t.khoa)
+    // Chỉ mất khi CẢ HAI đều có và khác nhau — một bên trống thì bên kia lấp vào.
+    return a !== '' && b !== '' && a !== b
+  }).map((t) => t.nhan)
+}

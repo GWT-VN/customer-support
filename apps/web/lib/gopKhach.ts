@@ -63,71 +63,22 @@ export type KhachDayDu = KhachGon & {
 }
 
 /**
- * Hồ sơ này từ đâu ra. Suy từ dữ liệu ĐANG CÓ, không đọc cột `source` — cột đó
- * là chữ tự do người nhập gõ, không tin được.
+ * Hồ sơ này ĐANG CÓ những gì — để chọn giữ bên nào.
+ *
+ * Cố ý KHÔNG gọi là "nguồn". CEO chỉ ra bản đầu đặt tên sai: nhãn "Bảo trì" nghe
+ * như hồ sơ đến từ khu bảo trì, trong khi lịch bảo trì chưa map không phải hồ sơ
+ * khách — nó chỉ là dòng `maintenance_plan` có tên + SĐT lấy từ Asana. Khách Sales
+ * cũng không phải hồ sơ riêng: Sales có bảng `customers` riêng, nối vào đây bằng
+ * `customer_code`. Nên đây là câu trả lời cho "hồ sơ này đang gánh gì", không phải
+ * "đến từ đâu".
+ *
+ * Cũng KHÔNG đọc cột `source` — cột đó là chữ tự do người nhập gõ, không tin được.
  */
-export function nguonKhach(k: KhachDayDu): string[] {
+export function dangCo(k: KhachDayDu): string[] {
   const ra: string[] = []
-  if (k.so_may > 0) ra.push('CS')
-  if (k.customer_code) ra.push('Sales')
-  if (k.so_plan > 0) ra.push('Bảo trì')
+  if (k.so_may > 0) ra.push('Máy (CS)')
+  if (k.customer_code) ra.push('Đơn Sales')
+  if (k.so_plan > 0) ra.push('Lịch bảo trì')
   if (k.so_ticket > 0) ra.push('Ticket')
   return ra.length ? ra : ['Chưa có dữ liệu']
-}
-
-export type DongSoSanh = {
-  nhan: string
-  giu: string
-  gop: string
-  khac: boolean
-  /** Giá trị bên GỘP sẽ đi đâu sau khi gộp. */
-  ketCuc: 'lap-cho-trong' | 'ghi-vao-ghi-chu' | 'o-lai-ho-so-an' | 'giong-nhau'
-}
-
-const hienThi = (v: string | number | null | undefined): string => {
-  const s = v === null || v === undefined ? '' : String(v).trim()
-  return s === '' ? '—' : s
-}
-
-/**
- * Bốn trường này được RPC gop_khach ghi NGUYÊN VĂN vào ghi chú của bản giữ, nên
- * dù không lên được cột thì vẫn đọc lại được ngay trên hồ sơ.
- */
-const GHI_VAO_GHI_CHU = new Set(['Tên', 'SĐT', 'Địa chỉ', 'Ghi chú'])
-
-/**
- * Bảng so sánh từng dòng. `ketCuc` trả lời đúng câu CS hay hỏi:
- * "bấm xong thì giá trị bên phải đi đâu?".
- */
-export function soSanhKhach(giu: KhachDayDu, gop: KhachDayDu): DongSoSanh[] {
-  const cap: [string, string, string][] = [
-    ['Tên', hienThi(giu.full_name), hienThi(gop.full_name)],
-    ['SĐT', hienThi(giu.primary_phone), hienThi(gop.primary_phone)],
-    ['Địa chỉ', hienThi(giu.address), hienThi(gop.address)],
-    ['Tỉnh/TP', hienThi(giu.province), hienThi(gop.province)],
-    ['Mã KH (nối Sales)', hienThi(giu.customer_code), hienThi(gop.customer_code)],
-    ['Kênh / đối tác', hienThi(giu.ten_kenh), hienThi(gop.ten_kenh)],
-    ['Nguồn', hienThi(giu.source), hienThi(gop.source)],
-    ['Mã đối tác', hienThi(giu.partner_ref), hienThi(gop.partner_ref)],
-    ['Ghi chú', hienThi(giu.notes), hienThi(gop.notes)],
-  ]
-
-  return cap.map(([nhan, a, b]) => {
-    const khac = a !== b
-    let ketCuc: DongSoSanh['ketCuc']
-    if (!khac || b === '—') ketCuc = 'giong-nhau'
-    else if (a === '—') ketCuc = 'lap-cho-trong'
-    else if (GHI_VAO_GHI_CHU.has(nhan)) ketCuc = 'ghi-vao-ghi-chu'
-    else ketCuc = 'o-lai-ho-so-an'
-    return { nhan, giu: a, gop: b, khac, ketCuc }
-  })
-}
-
-/**
- * Trường có giá trị ở bản GỘP nhưng KHÔNG lên được bản giữ và cũng không được ghi
- * vào ghi chú — nằm lại trên hồ sơ đã ẩn, muốn lấy phải chạy SQL. Đây là danh sách
- * phải chìa ra trước mặt CS TRƯỚC khi bấm.
- */
-export function truongOLai(giu: KhachDayDu, gop: KhachDayDu): string[] {
-  return soSanhKhach(giu, gop).filter((d) => d.ketCuc === 'o-lai-ho-so-an').map((d) => d.nhan)
 }

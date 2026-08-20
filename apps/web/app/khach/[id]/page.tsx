@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon, baoTriCuaKhach } from '@/app/actions'
+import { getCustomer, ticketsOfCustomer, machinesOfCustomer, kenhChon, baoTriCuaKhach, diaChiCuaKhach } from '@/app/actions'
+import { DiaChiKhachList } from '@/components/DiaChiKhachList'
 import { CustomerEditor } from '@/components/CustomerEditor'
 import { GopKhachButton } from '@/components/GopKhachButton'
 import { GanKenh } from '@/components/GanKenh'
@@ -14,8 +15,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines, kenh, baoTri, quanLy] = await Promise.all([
+  const [tickets, machines, kenh, baoTri, quanLy, diaChi] = await Promise.all([
     ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id), laQuanLy(),
+    diaChiCuaKhach(id),
   ])
   const btDaXong = baoTri.filter((v) => v.completed_at).length
 
@@ -99,6 +101,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <GanKenh customerId={customer.id} channelId={customer.channel_id} kenh={kenh} />
       </section>
       <CustomerEditor customer={customer} contacts={contacts} />
+      <DiaChiKhachList customerId={customer.id} items={diaChi} />
     </div>
   )
 

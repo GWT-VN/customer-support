@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { macDinhLuaChon, dungPChon, TRUONG_GOP } from './gopKhachChon'
+import { macDinhLuaChon, dungPChon, truongKhongCoChoChua, TRUONG_GOP } from './gopKhachChon'
 import type { KhachDayDu } from './gopKhach'
 
 // SĐT trong test là số GIẢ dải 090000000x.
@@ -111,5 +111,30 @@ describe('dungPChon — payload gửi xuống RPC', () => {
   it('mọi trường trong TRUONG_GOP đều có mặt trong lựa chọn mặc định', () => {
     const lc = macDinhLuaChon(giu, gop)
     for (const t of TRUONG_GOP) expect(lc.truong[t.khoa]).toBeDefined()
+  })
+})
+
+describe('truongKhongCoChoChua — cảnh báo phải chìa ra trước khi bấm', () => {
+  it('mã KH / tỉnh / nguồn đều có ở hai bên và khác nhau -> vào danh sách mất', () => {
+    const giu = kd({ id: 'a', customer_code: 'KH1', province: 'Hà Nội', source: 'Trực tiếp' })
+    const gop = kd({ id: 'b', customer_code: 'KA2', province: 'Hà Tĩnh', source: 'Shopee' })
+    expect(truongKhongCoChoChua(giu, gop)).toEqual(['Tỉnh/TP', 'Mã KH (nối Sales)', 'Nguồn'])
+  })
+
+  // Bốn trường này đã có nhà nên KHÔNG được báo là mất, kẻo CS hoảng vô cớ.
+  it('SĐT và địa chỉ KHÔNG bị tính là mất — chúng xuống số phụ / địa chỉ phụ', () => {
+    const giu = kd({ id: 'a', primary_phone: '0900000011', address: 'X' })
+    const gop = kd({ id: 'b', primary_phone: '0900000022', address: 'Y' })
+    expect(truongKhongCoChoChua(giu, gop)).toEqual([])
+  })
+
+  it('tên và ghi chú KHÔNG bị tính là mất — RPC ghi nguyên văn vào ghi chú', () => {
+    const giu = kd({ id: 'a', full_name: 'A', notes: 'ghi chú A' })
+    const gop = kd({ id: 'b', full_name: 'B', notes: 'ghi chú B' })
+    expect(truongKhongCoChoChua(giu, gop)).toEqual([])
+  })
+
+  it('một bên trống thì bên kia lấp vào, không mất gì', () => {
+    expect(truongKhongCoChoChua(kd({ id: 'a' }), kd({ id: 'b', province: 'Hà Nội' }))).toEqual([])
   })
 })

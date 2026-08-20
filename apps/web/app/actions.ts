@@ -10,6 +10,7 @@ import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
+import type { PChon } from '@/lib/gopKhachChon'
 import {
   MOI_TRANG, MOI_TRANG_LOI, COT_MAY, COT_TICKET, COT_LOI, COT_KHACH, COT_BAO_TRI,
   TINH_TRANG_BH, TOI_DA_CHON, XUAT_KHACH_COT, XUAT_TICKET_COT, SUA_HL_BANG,
@@ -379,7 +380,12 @@ async function apDungThayDoi(
     if (doiTuong !== 'cs_customers') return { error: { message: 'Chỉ gộp được hồ sơ khách.' } }
     const gopId = payload?.gop_id
     if (typeof gopId !== 'string' || !gopId) return { error: { message: 'Thiếu khách bị gộp.' } }
-    const { error } = await db.rpc('gop_khach', { p_giu: banGhiId, p_gop: gopId })
+    // `chon` chỉ có ở yêu cầu tạo từ màn /khach/gop. Yêu cầu cũ (payload chỉ có
+    // gop_id) truyền p_chon = null -> RPC chạy đúng luật trước migration 49.
+    const chon = payload?.chon ?? null
+    const { error } = await db.rpc('gop_khach', {
+      p_giu: banGhiId, p_gop: gopId, p_chon: chon,
+    })
     return { error: error ? { message: error.message } : null }
   }
   if (loai === 'xoa') {
@@ -510,12 +516,52 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
   }
 }
 
+export type DiaChiKhach = {
+  id: string; dia_chi: string; loai: string; ghi_chu: string | null; created_at: string
+}
+
+/** Địa chỉ phụ của khách (migration 48) — nhà / công ty / lắp đặt. */
+export async function diaChiCuaKhach(customerId: string): Promise<DiaChiKhach[]> {
+  await requireStaff()
+  const { data, error } = await dataClient().from('customer_addresses')
+    .select('id, dia_chi, loai, ghi_chu, created_at')
+    .eq('customer_id', customerId).order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DiaChiKhach[]
+}
+
+export async function themDiaChiKhach(
+  customerId: string, dia_chi: string, loai: string, ghi_chu?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  const dc = dia_chi.trim()
+  if (!dc) return { ok: false, error: 'Nhập địa chỉ đã.' }
+  const l = ['nha', 'cty', 'lap_dat', 'khac'].includes(loai) ? loai : 'khac'
+  const { error } = await dataClient().from('customer_addresses')
+    .insert({ customer_id: customerId, dia_chi: dc, loai: l, ghi_chu: ghi_chu?.trim() || null })
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('them_dia_chi_khach', `khach:${customerId}`, { loai: l })
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+export async function xoaDiaChiKhach(
+  id: string, customerId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  const { error } = await dataClient().from('customer_addresses').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_dia_chi_khach', `khach:${customerId}`, { dia_chi_id: id })
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
 /**
  * Đề xuất GỘP 2 hồ sơ khách trùng. NV bấm -> vào hàng chờ; admin bấm -> áp ngay.
  * `giuId` là bản giữ lại, `gopId` là bản bị gộp (sẽ bị ẩn mềm).
  */
 export async function deXuatGopKhach(
-  giuId: string, gopId: string, lyDo?: string
+  giuId: string, gopId: string, chon?: PChon | null, lyDo?: string
 ): Promise<{ ok: true; applied: boolean } | { ok: false; error: string }> {
   await requireStaff()
   if (!giuId || !gopId) return { ok: false, error: 'Chọn đủ 2 khách.' }
@@ -525,7 +571,10 @@ export async function deXuatGopKhach(
   if (!kt.ok) return { ok: false, error: kt.lyDo }
   return guiYeuCauThayDoi({
     doi_tuong: 'cs_customers', ban_ghi_id: giuId, loai: 'gop',
-    payload: { gop_id: gopId }, ly_do: lyDo?.trim() || moTaGop(giu, gop),
+    // `chon` đi kèm vào hàng chờ: nhân viên chọn trường nào thì lúc admin duyệt
+    // (có thể vài ngày sau) phải áp đúng lựa chọn đó, không phải luật mặc định.
+    payload: { gop_id: gopId, ...(chon ? { chon } : {}) },
+    ly_do: lyDo?.trim() || moTaGop(giu, gop),
   })
 }
 

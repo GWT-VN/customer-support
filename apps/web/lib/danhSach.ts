@@ -338,6 +338,15 @@ export const NHAN_DO_CHAC: Record<DoChacNgayLap, string> = {
  * Giá trị lạ (client cũ, gõ tay, dữ liệu bẩn) rơi về 'chinh_xac' thay vì ném lỗi —
  * ràng buộc CHECK ở DB chỉ nhận 3 giá trị, để lọt là cả lần kích hoạt BH đổ.
  */
+/**
+ * Nhãn loại địa chỉ phụ (migration 48). Đặt ở đây chứ KHÔNG ở `app/actions.ts`:
+ * file đó có `'use server'`, Next 16 chỉ cho export async function — `export const`
+ * một object làm vỡ `next build` (mà `tsc` và `eslint` đều KHÔNG bắt được).
+ */
+export const NHAN_LOAI_DIA_CHI: Record<string, string> = {
+  nha: 'Nhà', cty: 'Công ty', lap_dat: 'Lắp đặt', khac: 'Khác',
+}
+
 export function doChacHopLe(v: string | null | undefined): DoChacNgayLap {
   return (DO_CHAC_NGAY_LAP as readonly string[]).includes(v ?? '')
     ? (v as DoChacNgayLap)
