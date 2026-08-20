@@ -24,6 +24,17 @@
 -- gọi 2 tham số của app thành nhập nhằng -> lỗi ngay. Drop làm mất GRANT nên phải
 -- cấp lại ở cuối file (cả hai nằm trong 1 transaction, hỏng thì rollback sạch).
 
+-- Hàm dưới đây trộn cả 5 cột thông tin công ty (migration 50 mới thêm). Khai báo
+-- lại ở đây bằng `if not exists` để file 49 tự đủ: chạy 49 trước 50 trên một môi
+-- trường mới cũng không lỗi "column does not exist", và chạy sau 50 thì không làm
+-- gì. Không đặt comment/index ở đây — đó là việc của file 50.
+alter table cs_customers
+  add column if not exists ten_cty     text,
+  add column if not exists mst         text,
+  add column if not exists dia_chi_cty text,
+  add column if not exists sdt_cty     text,
+  add column if not exists email_cty   text;
+
 drop function if exists gop_khach(uuid, uuid);
 
 create or replace function gop_khach(p_giu uuid, p_gop uuid, p_chon jsonb default null)
@@ -123,6 +134,13 @@ begin
     channel_id    = coalesce((v_truong ->> 'channel_id')::int, v_giu.channel_id, v_gop.channel_id),
     source        = coalesce(nullif(v_truong ->> 'source', ''),      nullif(v_giu.source, ''),      nullif(v_gop.source, '')),
     partner_ref   = coalesce(nullif(v_truong ->> 'partner_ref', ''), nullif(v_giu.partner_ref, ''), nullif(v_gop.partner_ref, '')),
+    -- Thông tin công ty — cột do migration 50 thêm; khối `alter table` ở đầu file
+    -- này bảo đảm chúng tồn tại kể cả khi chạy 49 trước 50 trên môi trường mới.
+    ten_cty       = coalesce(nullif(v_truong ->> 'ten_cty', ''),     nullif(v_giu.ten_cty, ''),     nullif(v_gop.ten_cty, '')),
+    mst           = coalesce(nullif(v_truong ->> 'mst', ''),         nullif(v_giu.mst, ''),         nullif(v_gop.mst, '')),
+    dia_chi_cty   = coalesce(nullif(v_truong ->> 'dia_chi_cty', ''), nullif(v_giu.dia_chi_cty, ''), nullif(v_gop.dia_chi_cty, '')),
+    sdt_cty       = coalesce(nullif(v_truong ->> 'sdt_cty', ''),     nullif(v_giu.sdt_cty, ''),     nullif(v_gop.sdt_cty, '')),
+    email_cty     = coalesce(nullif(v_truong ->> 'email_cty', ''),   nullif(v_giu.email_cty, ''),   nullif(v_gop.email_cty, '')),
     notes = trim(both e'\n' from concat_ws(e'\n',
       coalesce(nullif(v_truong ->> 'notes', ''), nullif(v_giu.notes, '')),
       concat_ws(' · ',
