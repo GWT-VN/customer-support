@@ -99,7 +99,7 @@ một commit. Một chỗ sót = một trang không gác cổng.
 1. Tick `cs_manager` thì tự bỏ tick `cs` ở `/nhan-vien` (luật §3).
 2. Thêm ô "mời người ngoài domain" ở `/nhan-vien` cho CTV lắp đặt.
 
-**Migration (chỉ local):** `db/cs/migrations/48_vai_tro_toan_cong_ty.sql` — nới `chk_vai_tro`
+**Migration (chỉ local):** `db/cs/migrations/50_vai_tro_toan_cong_ty.sql` (46-49 đã bị các nhánh khác chiếm) — nới `chk_vai_tro`
 lên 12 role. Không đụng dữ liệu dòng nào.
 
 **Kiểm thử:** `lib/quyen.test.ts`, `lib/auth.test.ts`, `lib/auth-nentang.test.ts`,
