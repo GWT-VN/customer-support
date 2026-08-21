@@ -1,0 +1,156 @@
+/**
+ * Hàm THUẦN cho khuyến mãi + chiết khấu đại lý. Không đụng DB, không React — test được.
+ *
+ * Ba khái niệm tách bạch, đừng trộn:
+ *  · CHIẾT KHẤU ĐẠI LÝ — theo BẬC của đối tác (NPP / Đại lý / Giới thiệu), theo mã SP,
+ *    có hiệu lực theo thời gian.
+ *  · KHUYẾN MÃI KHÁCH LẺ — theo KÊNH của đơn, theo khoảng ngày.
+ *  · Khách đã có bậc thì KHÔNG ăn khuyến mãi khách lẻ (CEO chốt 21/08/2026).
+ */
+
+export type KieuGiam = 'PCT' | 'TIEN' | 'CON'
+export type Bac = 'NPP' | 'DAI_LY' | 'GIOI_THIEU'
+
+/**
+ * Giá bán sau khi áp một mức giảm.
+ *  · PCT  — giảm phần trăm; `giamToiDa` là TRẦN cho số tiền giảm (chỉ có nghĩa ở kiểu này).
+ *  · TIEN — trừ thẳng số tiền.
+ *  · CON  — "giảm còn": `muc` CHÍNH LÀ giá bán, không phụ thuộc giá niêm yết.
+ *
+ * Không bao giờ trả số âm. `muc` rỗng/không hợp lệ -> giữ nguyên giá niêm yết,
+ * KHÔNG đoán là giảm 0 hay giảm 100%.
+ */
+export function giaSauGiam(
+  kieu: KieuGiam,
+  niemYet: number | null | undefined,
+  muc: number | null | undefined,
+  giamToiDa?: number | null
+): number {
+  const ny = Math.round(Number(niemYet) || 0)
+  if (muc == null || !Number.isFinite(Number(muc))) return ny
+  const m = Number(muc)
+  if (kieu === 'CON') return Math.max(0, Math.round(m))
+  if (kieu === 'TIEN') return Math.max(0, ny - Math.round(m))
+  // PCT
+  let giam = Math.round((ny * m) / 100)
+  const tran = giamToiDa == null ? null : Number(giamToiDa)
+  if (tran != null && Number.isFinite(tran) && giam > tran) giam = Math.round(tran)
+  return Math.max(0, ny - giam)
+}
+
+/** Mức áp cho một mã: mức RIÊNG của mã thắng mức chung. `null` cả hai -> không giảm. */
+export function mucApDung(
+  mucRieng: number | null | undefined,
+  mucChung: number | null | undefined
+): number | null {
+  if (mucRieng != null && Number.isFinite(Number(mucRieng))) return Number(mucRieng)
+  if (mucChung != null && Number.isFinite(Number(mucChung))) return Number(mucChung)
+  return null
+}
+
+/** Một khoảng ngày có bao ngày `ngay` không. `den` rỗng = vô thời hạn. */
+export function conHieuLuc(ngay: string, tu: string, den: string | null | undefined): boolean {
+  if (!ngay || !tu) return false
+  if (ngay < tu) return false
+  if (den && ngay > den) return false
+  return true
+}
+
+export type Ctkm = {
+  id: string
+  ten: string
+  tu_ngay: string
+  den_ngay: string | null
+  kieu_giam: KieuGiam
+  muc_chung: number | null
+  giam_toi_da: number | null
+  trang_thai: string
+  /** channel_id được hưởng. Rỗng = không kênh nào -> chương trình không áp cho ai. */
+  kenh: number[]
+}
+
+/**
+ * Chương trình áp cho một đơn: đúng ngày, đúng kênh, và ĐÃ BAN HÀNH.
+ *
+ * Bản nháp KHÔNG bao giờ áp — đó là lý do có trạng thái nháp.
+ * Nhiều chương trình cùng khớp thì lấy cái GIẢM SÂU NHẤT cho khách, và trả về cả danh
+ * sách còn lại để giao diện nói rõ "còn N chương trình khác cũng khớp" thay vì im lặng.
+ */
+export function ctkmChoDon(
+  ds: Ctkm[],
+  ngay: string,
+  channelId: number | null | undefined,
+  niemYetThamChieu = 10_000_000
+): { chon: Ctkm | null; khac: Ctkm[] } {
+  const khop = ds.filter(
+    (c) =>
+      c.trang_thai === 'ban_hanh' &&
+      conHieuLuc(ngay, c.tu_ngay, c.den_ngay) &&
+      channelId != null &&
+      c.kenh.includes(channelId)
+  )
+  if (khop.length === 0) return { chon: null, khac: [] }
+  const xep = [...khop].sort(
+    (a, b) =>
+      giaSauGiam(a.kieu_giam, niemYetThamChieu, a.muc_chung, a.giam_toi_da) -
+      giaSauGiam(b.kieu_giam, niemYetThamChieu, b.muc_chung, b.giam_toi_da)
+  )
+  return { chon: xep[0], khac: xep.slice(1) }
+}
+
+export type ChinhSachGia = {
+  bac: Bac
+  internal_code: string
+  giam_pct: number | null
+  gia_ban: number | null
+  nhap_theo: 'PCT' | 'GIA'
+  hieu_luc_tu: string
+  hieu_luc_den: string | null
+  trang_thai: string
+}
+
+/**
+ * Giá cho một mã theo bậc đối tác, tại một ngày.
+ *
+ * Ưu tiên `gia_ban` khi người nhập gõ theo GIÁ — giữ đúng con số đã duyệt, không tính
+ * lại từ % rồi lệch vài đồng do làm tròn. Gõ theo % thì tính từ giá niêm yết.
+ * Không có chính sách khớp -> `null` (gọi bên ngoài tự quyết dùng giá niêm yết).
+ */
+export function giaTheoBac(
+  ds: ChinhSachGia[],
+  bac: Bac,
+  internalCode: string,
+  niemYet: number | null | undefined,
+  ngay: string
+): number | null {
+  const khop = ds
+    .filter(
+      (c) =>
+        c.bac === bac &&
+        c.internal_code === internalCode &&
+        c.trang_thai === 'ban_hanh' &&
+        conHieuLuc(ngay, c.hieu_luc_tu, c.hieu_luc_den)
+    )
+    // Nhiều bản cùng hiệu lực -> lấy bản MỚI NHẤT.
+    .sort((a, b) => b.hieu_luc_tu.localeCompare(a.hieu_luc_tu))
+  const c = khop[0]
+  if (!c) return null
+  if (c.nhap_theo === 'GIA' && c.gia_ban != null) return Math.max(0, Math.round(c.gia_ban))
+  if (c.giam_pct != null) return giaSauGiam('PCT', niemYet, c.giam_pct)
+  if (c.gia_ban != null) return Math.max(0, Math.round(c.gia_ban))
+  return null
+}
+
+/** Cặp %/₫ cho ô nhập: gõ ô nào thì tính ô kia. Trả về cặp đã làm tròn để hiển thị. */
+export function capGiaVaPct(
+  niemYet: number | null | undefined,
+  nhapTheo: 'PCT' | 'GIA',
+  giaTri: number | null | undefined
+): { pct: number | null; gia: number | null } {
+  const ny = Math.round(Number(niemYet) || 0)
+  if (giaTri == null || !Number.isFinite(Number(giaTri)) || ny <= 0) return { pct: null, gia: null }
+  const v = Number(giaTri)
+  if (nhapTheo === 'PCT') return { pct: v, gia: Math.round(ny * (1 - v / 100)) }
+  // Làm tròn 1 chữ số thập phân: 179.950.000 -> 112.000.000 ra 37,8% chứ không phải 37,76537…
+  return { pct: Math.round((1 - v / ny) * 1000) / 10, gia: Math.round(v) }
+}
