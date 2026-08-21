@@ -3,6 +3,9 @@
 **Một** Next.js app phục vụ nhiều module nghiệp vụ, chung đăng nhập / UI / deploy,
 chung 1 Postgres. Trước 19/08/2026 repo này tên `customer-support` và chỉ có CSKH.
 
+> 📄 **Phiên/dev mới: đọc [`HANDOFF.md`](HANDOFF.md) trước** — bàn giao toàn app: module, route,
+> phân quyền, DB, **bản đồ nhánh + worktree**, việc đang mở, bẫy đã trả giá.
+
 ## ⚠️ ĐỌC ĐẦU TIÊN — mỗi phiên Claude một worktree riêng
 
 Repo này thường có **nhiều phiên Claude chạy song song**. Hai phiên cùng mở một thư
