@@ -4,7 +4,7 @@ import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { chiTietDon } from '../../actions'
 import { OrderActions } from '../../OrderActions'
 import { Field, StatusBadge, TabBadge, fmtDate, fmtQty, fmtVnd } from '../../_ui'
-import { chuanVat } from '../../_calc'
+import { nhanVat } from '../../_types'
 
 export const metadata = { title: 'Chi tiết đơn · GWT Sales' }
 export const dynamic = 'force-dynamic'
@@ -116,7 +116,7 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                     {!laDonTang && <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>}
                     {!laDonTang && (
                       <td className="px-3 py-2.5 text-right text-slate-500">
-                        {chuanVat(l.vat_pct) == null ? '—' : `${Math.round((chuanVat(l.vat_pct) as number) * 100)}%`}
+                        {nhanVat(l.vat_pct, l.vat_loai)}
                       </td>
                     )}
                     {!laDonTang && <td className="px-3 py-2.5 text-right font-medium text-slate-900">{fmtVnd(l.amount_vat)}</td>}

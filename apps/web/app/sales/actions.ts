@@ -375,6 +375,8 @@ export type DonLine = {
   amount_net: number | null
   /** PHÂN SỐ: 0.08 = 8%. Xem tachVat() trong _calc.ts. */
   vat_pct: number | null
+  /** VAT = chịu thuế · KCT = không chịu thuế (muối) · KAD = không áp dụng (bình gas). */
+  vat_loai: 'VAT' | 'KCT' | 'KAD' | null
   /** Đơn bán từ Sheet luôn false — quà từ Sheet là cả một đơn DON_TANG riêng. */
   is_gift: boolean
   note: string | null
@@ -409,7 +411,7 @@ export type DonChiTiet = {
 }
 
 const MIRROR_COLS =
-  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, fulfillment_status, payment_status, note'
+  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, vat_loai, fulfillment_status, payment_status, note'
 
 /**
  * Chi tiết đơn TẶNG (`source_tab = 'DON_TANG'`) — chỉ tồn tại ở `customer_purchases`.
@@ -469,6 +471,7 @@ async function chiTietDonTang(
       unit_price_net: null,
       amount_net: null,
       vat_pct: null,
+      vat_loai: null,
       is_gift: !!r.is_gift, // đơn tặng: cờ quà CÓ THẬT ở bảng này
       note: null,
     })),
@@ -501,6 +504,7 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       unit_price_net: null, // sales_order_items không lưu giá trước VAT
       amount_net: null,     // -> tongDon() suy từ vat_pct
       vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
+      vat_loai: (it.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
       is_gift: !!it.is_gift,
       note: (it.note as string) ?? null,
     }))
@@ -555,6 +559,7 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     unit_price_net: (r.unit_price_net as number) ?? null,
     amount_net: (r.amount_net as number) ?? null,
     vat_pct: r.vat_pct == null ? null : Number(r.vat_pct),
+    vat_loai: (r.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
     is_gift: false, // đơn bán từ Sheet KHÔNG có dòng quà — quà là đơn DON_TANG riêng
     note: (r.note as string) ?? null,
   }))

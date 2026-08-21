@@ -7,6 +7,9 @@ export type CatalogPick = {
   category_l2: string | null
   ma_cu: string | null // mã cũ (search)
   ma_doitac: string | null // mã đối tác/kho (search)
+  /** VAT theo mã — form tự điền khi chọn sản phẩm. null = chưa xếp loại (mục chi phí). */
+  vat_pct: number | null
+  vat_loai: 'VAT' | 'KCT' | 'KAD' | null
 }
 
 export type ChannelOpt = {
@@ -24,6 +27,7 @@ export type NewOrderItem = {
   unit_price_vat: number
   is_gift: boolean
   vat_pct: number | null
+  vat_loai: 'VAT' | 'KCT' | 'KAD' | null
   note: string | null
 }
 
@@ -82,20 +86,42 @@ export const PAYMENT_OPTS = ['Chờ cọc', 'Đã cọc', 'Chờ đối soát', 
 export const PAYMETHOD_OPTS = ['', 'Chuyển khoản', 'COD', 'Tiền mặt'] as const
 
 /**
- * Thuế suất VAT lưu dạng PHÂN SỐ (0.08 = 8%) — khớp đúng cách Google Sheet lưu.
+ * Lựa chọn VAT. Mỗi mục mang HAI thứ: thuế suất (`pct`, dạng PHÂN SỐ) và LOẠI (`loai`).
  *
- * ⚠️ Đừng đổi sang phần trăm. Đo prod 21/08/2026: 810 dòng `sales_order_lines` đang là
- * phân số. Trước đây ô này là input số nhãn "VAT%" nên người dùng gõ 8 -> lưu 8, lệch
- * đúng 100 lần so với đơn từ Sheet. Dropdown chặn luôn lỗi gõ tay đó.
+ * Vì sao phải có `loai` riêng: `0%`, `KCT`, `KAD` đều ra tiền thuế **bằng 0** nhưng là
+ * BA nhóm khác nhau khi in hoá đơn và gom báo cáo — CEO chốt 21/08/2026:
+ *   VAT = chịu thuế (0 / 8 / 10%)
+ *   KCT = KHÔNG CHỊU THUẾ  — muối (MUOIAD, MUOIDUC, MUOIRE)
+ *   KAD = KHÔNG ÁP DỤNG    — bình gas sparkling (GASDEN*, GASXANH*)
+ * Cột `vat_pct` là SỐ nên không chứa được chữ; đó là lý do sinh ra cột `vat_loai`.
+ *
+ * ⚠️ Thuế suất lưu PHÂN SỐ (0.08), khớp Google Sheet. Không có mức 5%.
  */
-export const VAT_OPTS: { nhan: string; giaTri: number | null }[] = [
-  { nhan: '—', giaTri: null },
-  { nhan: '0%', giaTri: 0 },
-  { nhan: '8%', giaTri: 0.08 },
-  { nhan: '10%', giaTri: 0.1 },
+export type VatLoai = 'VAT' | 'KCT' | 'KAD'
+
+export type VatOpt = { ma: string; nhan: string; pct: number | null; loai: VatLoai | null }
+
+export const VAT_OPTS: VatOpt[] = [
+  { ma: '', nhan: '—', pct: null, loai: null },
+  { ma: 'VAT:0', nhan: '0%', pct: 0, loai: 'VAT' },
+  { ma: 'VAT:0.08', nhan: '8%', pct: 0.08, loai: 'VAT' },
+  { ma: 'VAT:0.1', nhan: '10%', pct: 0.1, loai: 'VAT' },
+  { ma: 'KCT', nhan: 'KCT', pct: 0, loai: 'KCT' },
+  { ma: 'KAD', nhan: 'KAD', pct: 0, loai: 'KAD' },
 ]
-// ⚠️ BẢN TẠM. CEO chốt 21/08: VAT phải lấy mặc định theo mã nội bộ (Masterdata
-// `catalog_item."Mức VAT"`) và có thêm hai mục KCT + Không VAT — là HAI thứ khác nhau,
-// không gộp như Apps Script đang làm. Hai mục đó cần cột `vat_loai` (text) vì `vat_pct`
-// là số, không chứa được chữ. Xem backlog Sales, mục "VAT lấy theo mã nội bộ".
-// Không có mức 5%: Apps Script chỉ dùng [0, 0.08, 0.10, 'Không VAT'] (Code.gs:123).
+
+/** Khoá dropdown từ cặp (pct, loai) đang lưu. */
+export function maVat(pct: number | null | undefined, loai: VatLoai | null | undefined): string {
+  if (loai === 'KCT' || loai === 'KAD') return loai
+  if (pct == null) return ''
+  const p = Number(pct) > 1 ? Number(pct) / 100 : Number(pct)
+  return VAT_OPTS.find((v) => v.loai === 'VAT' && v.pct === p)?.ma ?? ''
+}
+
+/** Nhãn hiển thị cho một dòng đơn: 'KCT' · 'KAD' · '8%' · '—'. */
+export function nhanVat(pct: number | null | undefined, loai: VatLoai | null | undefined): string {
+  if (loai === 'KCT' || loai === 'KAD') return loai
+  if (pct == null) return '—'
+  const p = Number(pct) > 1 ? Number(pct) / 100 : Number(pct)
+  return `${Math.round(p * 100)}%`
+}

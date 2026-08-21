@@ -16,6 +16,7 @@ import {
   PAYMENT_OPTS,
   PAYMETHOD_OPTS,
   VAT_OPTS,
+  maVat,
 } from './_types'
 
 type Line = NewOrderItem & { key: number }
@@ -29,9 +30,11 @@ const emptyLine = (key: number): Line => ({
   quantity: 1,
   unit_price_vat: 0,
   is_gift: false,
-  // Mặc định 8%: 300/328 mã trên Masterdata là 8%, và Apps Script cũng mặc định vậy
-  // (defaultVatFor_). Để trống là người nhập dễ quên -> tiền trước VAT tính sai.
+  // Mặc định 8%: 320/328 mã là 8%, và Apps Script cũng mặc định vậy (defaultVatFor_).
+  // Để trống là người nhập dễ quên -> tiền trước VAT tính sai. Chọn sản phẩm xong thì
+  // VAT tự điền lại theo đúng mã (xem onPick của ProductPicker).
   vat_pct: 0.08,
+  vat_loai: 'VAT' as const,
   note: null,
 })
 
@@ -200,6 +203,7 @@ export function OrderForm({
         unit_price_vat: Number(l.unit_price_vat) || 0,
         is_gift: l.is_gift,
         vat_pct: l.vat_pct == null || (l.vat_pct as unknown as string) === '' ? null : Number(l.vat_pct),
+        vat_loai: l.vat_loai ?? null,
         note: l.note?.trim() || null,
       })),
     }
@@ -295,19 +299,33 @@ export function OrderForm({
                     catalog={catalog}
                     code={l.internal_code}
                     name={l.product_name}
-                    onPick={(c) => setLine(l.key, { internal_code: c.internal_code, product_name: c.name, category_l1: c.category_l1, category_l2: c.category_l2 })}
+                    onPick={(c) =>
+                      setLine(l.key, {
+                        internal_code: c.internal_code,
+                        product_name: c.name,
+                        category_l1: c.category_l1,
+                        category_l2: c.category_l2,
+                        // VAT tự điền theo mã nội bộ (CEO chốt 21/08). Mã chưa xếp loại
+                        // (mục chi phí kế toán) thì để trống chứ không đoán 8%.
+                        vat_pct: c.vat_pct,
+                        vat_loai: c.vat_loai,
+                      })
+                    }
                   />
                 </div>
                 <input type="number" min={0} className={inp + ' col-span-3 sm:col-span-2 text-right'} value={l.quantity} onChange={(e) => setLine(l.key, { quantity: Number(e.target.value) })} title="Số lượng (DVBT = số lần)" />
                 <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá (gồm VAT)" disabled={l.is_gift} title="Đơn giá ĐÃ GỒM VAT — giống cột 'Đơn giá sau VAT' trong Google Sheet. Tiền trước VAT app tự tính ra." />
                 <select
                   className={inp + ' col-span-2 sm:col-span-1 text-right'}
-                  value={l.vat_pct ?? ''}
-                  onChange={(e) => setLine(l.key, { vat_pct: e.target.value === '' ? null : Number(e.target.value) })}
-                  title="Thuế suất VAT"
+                  value={maVat(l.vat_pct, l.vat_loai)}
+                  onChange={(e) => {
+                    const v = VAT_OPTS.find((x) => x.ma === e.target.value)
+                    setLine(l.key, { vat_pct: v?.pct ?? null, vat_loai: v?.loai ?? null })
+                  }}
+                  title="Thuế suất VAT — KCT: không chịu thuế (muối) · KAD: không áp dụng (bình gas)"
                 >
                   {VAT_OPTS.map((v) => (
-                    <option key={v.nhan} value={v.giaTri ?? ''}>{v.nhan}</option>
+                    <option key={v.ma} value={v.ma}>{v.nhan}</option>
                   ))}
                 </select>
                 <label className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1 text-xs text-slate-500" title="Hàng tặng"><input type="checkbox" checked={l.is_gift} onChange={(e) => setLine(l.key, { is_gift: e.target.checked })} />Quà</label>

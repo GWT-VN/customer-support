@@ -8,7 +8,7 @@ export async function listCatalogForPicker(): Promise<CatalogPick[]> {
   const db = dataClient()
   const { data, error } = await db
     .from('catalog_item')
-    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1","Danh mục cấp 2","Mã cũ","Mã đối tác/Kho"')
+    .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1","Danh mục cấp 2","Mã cũ","Mã đối tác/Kho",vat_pct,vat_loai')
   if (error) throw error
   return ((data ?? []) as Array<Record<string, string | null>>)
     .map((r) => ({
@@ -18,6 +18,8 @@ export async function listCatalogForPicker(): Promise<CatalogPick[]> {
       category_l2: r['Danh mục cấp 2'],
       ma_cu: r['Mã cũ'],
       ma_doitac: r['Mã đối tác/Kho'],
+      vat_pct: r.vat_pct == null ? null : Number(r.vat_pct),
+      vat_loai: (r.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
     }))
     .filter((r) => r.internal_code)
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
@@ -80,6 +82,7 @@ function buildItems(input: NewOrderInput, orderId?: string) {
       is_gift: !!it.is_gift,
       is_maintenance: isMaintenance(it.internal_code),
       vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
+      vat_loai: it.vat_loai ?? null,
       note: it.note || null,
     }
   })
@@ -225,6 +228,7 @@ export async function getOrderForEdit(orderCode: string): Promise<OrderFormIniti
       unit_price_vat: Number(it.unit_price_vat) || 0,
       is_gift: !!it.is_gift,
       vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
+      vat_loai: (it.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
       note: (it.note as string) ?? null,
     })),
   }
