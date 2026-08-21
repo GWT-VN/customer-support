@@ -15,11 +15,15 @@ export type GateCu = 'ADMIN' | 'QUANLY' | 'NHANVIEN'
 
 /**
  * Cầu dao GĐ3. Mặc định TẮT ⇒ ma trận chỉ được hỏi ý kiến, luật cũ quyết định.
- * Đặt MA_TRAN_QUYEN=on để ma trận làm luật thật; đặt lại off là quay về luật cũ
- * trong một phút, không cần deploy.
+ * Đặt MA_TRAN_QUYEN=on để ma trận làm luật thật; đặt lại off là quay về luật cũ.
+ *
+ * CHỊU ĐƯỢC hoa/thường và khoảng trắng thừa. Trước đây so đúng chuỗi 'on', nên gõ
+ * 'ON' trong bảng biến môi trường của Vercel là cầu dao KHÔNG bật mà cũng KHÔNG
+ * báo lỗi gì — người đặt tưởng đã bật, ngồi tìm mãi không hiểu vì sao ma trận
+ * không có tác dụng. Đã suýt dính đúng vậy khi đưa lên production 21/08.
  */
 export function maTranDangLamLuat(): boolean {
-  return process.env.MA_TRAN_QUYEN === 'on'
+  return (process.env.MA_TRAN_QUYEN ?? '').trim().toLowerCase() === 'on'
 }
 
 /**

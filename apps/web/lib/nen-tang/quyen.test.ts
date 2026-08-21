@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { VAI_TRO } from './vai-tro'
 import { HO_SO_QUYEN, MAC_DINH, QUYEN, laMaQuyenHopLe } from './quyen'
+import { maTranDangLamLuat } from './kiem-quyen'
 
 describe('kho quyền', () => {
   it('có đủ 52 quyền, không trùng mã', () => {
@@ -156,5 +157,28 @@ describe('sửa theo SỰ THẬT trong code (đọc lại 20/08 khi nối GĐ2-B
     expect(MAC_DINH.cs_manager).toContain('cs.yeu_cau.ap_thang')
     expect(MAC_DINH.cs).not.toContain('cs.yeu_cau.ap_thang')
     expect(MAC_DINH.cs).toContain('cs.yeu_cau.gui')
+  })
+})
+
+describe('cầu dao MA_TRAN_QUYEN — chịu được hoa/thường và khoảng trắng', () => {
+  const cu = process.env.MA_TRAN_QUYEN
+  afterEach(() => {
+    if (cu === undefined) delete process.env.MA_TRAN_QUYEN
+    else process.env.MA_TRAN_QUYEN = cu
+  })
+
+  it.each(['on', 'ON', 'On', ' on ', 'oN\n'])('%j -> BẬT', (v) => {
+    process.env.MA_TRAN_QUYEN = v
+    expect(maTranDangLamLuat()).toBe(true)
+  })
+
+  it.each(['off', 'OFF', '', 'true', '1', 'onn', 'o n'])('%j -> TẮT', (v) => {
+    process.env.MA_TRAN_QUYEN = v
+    expect(maTranDangLamLuat()).toBe(false)
+  })
+
+  it('không đặt biến -> TẮT (mặc định an toàn)', () => {
+    delete process.env.MA_TRAN_QUYEN
+    expect(maTranDangLamLuat()).toBe(false)
   })
 })
