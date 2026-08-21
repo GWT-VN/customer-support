@@ -70,3 +70,18 @@ export type CustomerHit = {
 export const FULFILL_OPTS = ['Mới', 'Xác nhận', 'Đang giao', 'Đã lắp đặt', 'Hoàn thành', 'Huỷ'] as const
 export const PAYMENT_OPTS = ['Chờ cọc', 'Chờ đối soát', 'Còn nợ', 'Đã thu đủ'] as const
 export const PAYMETHOD_OPTS = ['', 'Chuyển khoản', 'COD', 'Tiền mặt'] as const
+
+/**
+ * Thuế suất VAT lưu dạng PHÂN SỐ (0.08 = 8%) — khớp đúng cách Google Sheet lưu.
+ *
+ * ⚠️ Đừng đổi sang phần trăm. Đo prod 21/08/2026: 810 dòng `sales_order_lines` đang là
+ * phân số. Trước đây ô này là input số nhãn "VAT%" nên người dùng gõ 8 -> lưu 8, lệch
+ * đúng 100 lần so với đơn từ Sheet. Dropdown chặn luôn lỗi gõ tay đó.
+ */
+export const VAT_OPTS: { nhan: string; giaTri: number | null }[] = [
+  { nhan: '—', giaTri: null },
+  { nhan: '0%', giaTri: 0 },
+  { nhan: '5%', giaTri: 0.05 },
+  { nhan: '8%', giaTri: 0.08 },
+  { nhan: '10%', giaTri: 0.1 },
+]

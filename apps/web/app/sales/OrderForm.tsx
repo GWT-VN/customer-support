@@ -15,6 +15,7 @@ import {
   FULFILL_OPTS,
   PAYMENT_OPTS,
   PAYMETHOD_OPTS,
+  VAT_OPTS,
 } from './_types'
 
 type Line = NewOrderItem & { key: number }
@@ -288,7 +289,16 @@ export function OrderForm({
                 </div>
                 <input type="number" min={0} className={inp + ' col-span-3 sm:col-span-2 text-right'} value={l.quantity} onChange={(e) => setLine(l.key, { quantity: Number(e.target.value) })} title="Số lượng (DVBT = số lần)" />
                 <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá" disabled={l.is_gift} title="Đơn giá (sau VAT)" />
-                <input type="number" min={0} className={inp + ' col-span-2 sm:col-span-1 text-right'} value={l.vat_pct ?? ''} onChange={(e) => setLine(l.key, { vat_pct: e.target.value === '' ? null : Number(e.target.value) })} placeholder="VAT%" title="VAT %" />
+                <select
+                  className={inp + ' col-span-2 sm:col-span-1 text-right'}
+                  value={l.vat_pct ?? ''}
+                  onChange={(e) => setLine(l.key, { vat_pct: e.target.value === '' ? null : Number(e.target.value) })}
+                  title="Thuế suất VAT"
+                >
+                  {VAT_OPTS.map((v) => (
+                    <option key={v.nhan} value={v.giaTri ?? ''}>{v.nhan}</option>
+                  ))}
+                </select>
                 <label className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1 text-xs text-slate-500" title="Hàng tặng"><input type="checkbox" checked={l.is_gift} onChange={(e) => setLine(l.key, { is_gift: e.target.checked })} />Quà</label>
                 <button type="button" onClick={() => removeLine(l.key)} className="col-span-1 text-slate-400 hover:text-rose-600" title="Xoá dòng">✕</button>
               </div>

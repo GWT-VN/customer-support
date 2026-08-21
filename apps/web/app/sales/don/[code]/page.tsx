@@ -59,17 +59,17 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
             />
             <Field label="Tình trạng hàng" value={<StatusBadge value={don.fulfillment_status} />} />
             <Field label="Thanh toán" value={<StatusBadge value={don.payment_status} />} />
+            <Field label="Hình thức TT" value={don.payment_method} />
             <Field label="Số dòng" value={don.lines.length} />
-            <Field label="Tổng (VAT)" value={<span className="font-semibold">{fmtVnd(don.total_vat)}</span>} />
+            <Field label="Tổng sau VAT" value={<span className="font-semibold">{fmtVnd(don.total_vat)}</span>} />
           </dl>
         </section>
 
-        {don.is_app && (don.address || don.partner_order_code || don.payment_method || don.shipping_code || don.install_date) && (
+        {don.is_app && (don.address || don.partner_order_code || don.shipping_code || don.install_date) && (
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Field label="Địa chỉ" value={don.address} />
               <Field label="Mã đơn đối tác" value={don.partner_order_code} />
-              <Field label="Hình thức TT" value={don.payment_method} />
               <Field label="Mã vận đơn" value={don.shipping_code} />
               <Field label="Ngày lắp đặt" value={fmtDate(don.install_date)} />
             </dl>
@@ -86,26 +86,47 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   <th className="px-3 py-2.5 font-medium">Mã nội bộ</th>
                   <th className="px-3 py-2.5 font-medium">Danh mục</th>
                   <th className="px-3 py-2.5 text-right font-medium">SL</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Đơn giá (VAT)</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Thành tiền (VAT)</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Đơn giá</th>
+                  <th className="px-3 py-2.5 text-right font-medium">VAT</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Thành tiền</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {don.lines.map((l) => (
                   <tr key={l.key} className="hover:bg-slate-50">
-                    <td className="px-3 py-2.5 text-slate-800">{l.product_name || '—'}</td>
+                    <td className="px-3 py-2.5 text-slate-800">
+                      <span className="inline-flex items-center gap-2">
+                        {l.product_name || '—'}
+                        {l.is_gift && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">Tặng</span>
+                        )}
+                      </span>
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-500">{l.internal_code || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{[l.category_l1, l.category_l2].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-2.5 text-right text-slate-700">{fmtQty(l.quantity)}</td>
                     <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>
+                    <td className="px-3 py-2.5 text-right text-slate-500">
+                      {l.vat_pct == null ? '—' : `${Math.round(l.vat_pct * 100)}%`}
+                    </td>
                     <td className="px-3 py-2.5 text-right font-medium text-slate-900">{fmtVnd(l.amount_vat)}</td>
                   </tr>
                 ))}
               </tbody>
+              {/* colSpan=6 vì bảng có 7 cột: SP · Mã · Danh mục · SL · Đơn giá · VAT · Thành tiền.
+                  Thêm/bớt cột thì phải sửa số này, không thì bảng lệch. */}
               <tfoot className="border-t border-slate-200 bg-slate-50">
                 <tr>
-                  <td colSpan={5} className="px-3 py-2.5 text-right font-medium text-slate-600">Tổng cộng (VAT)</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-slate-900">{fmtVnd(don.total_vat)}</td>
+                  <td colSpan={6} className="px-3 py-2 text-right text-slate-600">Tổng trước VAT</td>
+                  <td className="px-3 py-2 text-right text-slate-700">{fmtVnd(don.total_net)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={6} className="px-3 py-2 text-right text-slate-600">Tiền VAT</td>
+                  <td className="px-3 py-2 text-right text-slate-700">{fmtVnd(don.total_vat_tien)}</td>
+                </tr>
+                <tr className="border-t border-slate-200">
+                  <td colSpan={6} className="px-3 py-2.5 text-right font-medium text-slate-700">Tổng sau VAT</td>
+                  <td className="px-3 py-2.5 text-right text-base font-semibold text-slate-900">{fmtVnd(don.total_vat)}</td>
                 </tr>
               </tfoot>
             </table>
