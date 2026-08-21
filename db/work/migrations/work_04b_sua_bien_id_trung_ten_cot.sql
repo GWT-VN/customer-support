@@ -1,0 +1,15 @@
+-- ============================================================================
+-- work_04b_sua_bien_id_trung_ten_cot.sql — sửa lỗi work_04 (2026-08-19)
+--
+-- work_04 khai biến PL/pgSQL tên `id`, trùng tên cột `work.task.id`, nên câu
+-- `where id = any(v_ids)` báo:
+--     42702: column reference "id" is ambiguous
+-- Đổi biến thành `v_id` và đặt alias cho mọi bảng trong UPDATE/DELETE để không
+-- bao giờ mơ hồ nữa. Bắt được ngay ở test end-to-end, chưa ai kịp dùng.
+--
+-- Bài học: trong plpgsql, ĐỪNG đặt tên biến trùng tên cột. Postgres không ưu
+-- tiên bên nào — nó từ chối chạy.
+--
+-- Bản hàm public.work_hang_loat(...) đang chạy trên production nằm ở migration
+-- cùng tên đã áp qua Supabase MCP; file này giữ phần GIẢI THÍCH.
+-- ============================================================================

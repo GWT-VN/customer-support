@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
@@ -21,9 +22,12 @@ export default async function SalesKhachPage({ searchParams }: { searchParams: P
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-[1100px] space-y-4 p-4 sm:p-6">
-        <header>
-          <h1 className="text-xl font-semibold text-slate-900">Khách hàng</h1>
-          <p className="text-sm text-slate-500">{rows.length} khách gần nhất</p>
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Khách hàng</h1>
+            <p className="text-sm text-slate-500">{rows.length} khách · <span className="font-mono">KH…</span> từ Sheet · <span className="font-mono">KA…</span> tạo trên app</p>
+          </div>
+          <Link href="/sales/khach/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Thêm khách</Link>
         </header>
 
         <form className="flex gap-2">
@@ -57,8 +61,16 @@ export default async function SalesKhachPage({ searchParams }: { searchParams: P
                 ) : (
                   rows.map((c) => (
                     <tr key={c.customer_code} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-teal-700">{c.customer_code}</td>
-                      <td className="px-3 py-2.5 font-medium text-slate-800">{c.name || '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">
+                        <Link href={`/sales/khach/${encodeURIComponent(c.customer_code)}`} className="text-teal-700 hover:underline">
+                          {c.customer_code}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 font-medium text-slate-800">
+                        <Link href={`/sales/khach/${encodeURIComponent(c.customer_code)}`} className="hover:text-teal-700 hover:underline">
+                          {c.name || '—'}
+                        </Link>
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{c.phone || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-600">{c.province || '—'}</td>
                       <td className="px-3 py-2.5 text-right text-slate-700">{c.total_orders ?? 0}</td>

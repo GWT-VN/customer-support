@@ -43,3 +43,80 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ===========================================================================
+ * Khu Việc (Work) — bảng màu lấy từ mockup "GWT Work — Mockup" (18/08/2026).
+ *
+ * Cố ý BỌC TRONG [data-khu="work"] chứ không đặt ở :root: khu CSKH và Sales
+ * đang dùng bảng slate-* của Tailwind, đổi toàn cục là đổi luôn giao diện hai
+ * khu kia mà không ai yêu cầu. Khi nào muốn áp cho cả nền tảng thì nhấc khối
+ * này lên :root — một chỗ, không phải đi sửa từng component.
+ *
+ * Trung tính lệch xanh-teal (không phải xám trung tính) để ăn với màu thương
+ * hiệu nước — đây là điểm khiến mockup nhìn "ấm" hơn slate-50 trơn.
+ * =========================================================================== */
+[data-khu="work"] {
+  --bg: #eef2f2;
+  --surface: #ffffff;
+  --surface-2: #f6f9f9;
+  --surface-3: #eff4f4;
+  --border: #dde5e6;
+  --border-strong: #c7d2d3;
+
+  --ink: #0e1c1f;
+  --ink-2: #38494c;
+  --muted: #6a7a7d;
+  --faint: #8fa0a2;
+
+  /* thương hiệu — teal "nước" */
+  --accent: #0e8c9a;
+  --accent-ink: #0a6771;
+  --accent-wash: #e2f1f2;
+  --accent-2: #12a3b4;
+
+  /* ngữ nghĩa — tách khỏi màu thương hiệu để P1 khẩn không lẫn với nút chính */
+  --red: #d7443e;      --red-wash: #fbe7e6;
+  --amber: #c67a12;    --amber-wash: #fbeed8;
+  --green: #2f8f5b;    --green-wash: #e2f1e8;
+  --indigo: #5560c9;   --indigo-wash: #e8eaf9;
+  --violet: #8a52b8;   --violet-wash: #f1e8f7;
+
+  --shadow: 0 1px 2px rgba(14, 28, 31, .05), 0 8px 24px -12px rgba(14, 28, 31, .18);
+  --shadow-lg: 0 24px 60px -20px rgba(14, 28, 31, .35);
+
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    system-ui, "Helvetica Neue", sans-serif;
+  font-feature-settings: "cv05", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mã việc, ngày giờ, số đếm: chữ số đều bề ngang nên cột không nhảy khi đổi số. */
+[data-khu="work"] .mono {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+[data-khu="work"] .so {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Viền mặc định trong khu Việc theo tông teal, không dùng slate-200 toàn cục. */
+[data-khu="work"] *,
+[data-khu="work"] ::after,
+[data-khu="work"] ::before {
+  border-color: var(--border);
+}
+
+[data-khu="work"] :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-khu="work"] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

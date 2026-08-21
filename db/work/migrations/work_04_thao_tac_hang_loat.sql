@@ -1,0 +1,28 @@
+-- ============================================================================
+-- work_04_thao_tac_hang_loat.sql — sửa nhiều việc một lượt (2026-08-19)
+--
+-- Chọn n việc rồi: đổi trạng thái · giao thêm người · bỏ người · đổi ưu tiên ·
+-- đổi hạn · đổi team. MỘT RPC nhận nhiều trường, trường nào NULL thì bỏ qua —
+-- gộp lại để một lần bấm là MỘT transaction, không phải n lượt gọi mạng (chọn
+-- 50 việc mà gọi 50 lần thì nửa chừng lỗi mạng là dữ liệu dở dang).
+--
+-- QUYỀN: lọc qua work.co_the_sua() cho TỪNG việc, không kiểm một lần rồi áp cho
+-- cả mớ. Việc không có quyền bị BỎ QUA im lặng và đếm vào `bo_qua`, app báo rõ
+-- "đã sửa 8, bỏ qua 2 vì không có quyền" — thà báo thiếu còn hơn sửa lén việc
+-- của người khác.
+--
+-- KHÔNG XOÁ HÀNG LOẠT: chỉ chuyển trạng thái sang 'cancelled'. Xoá thật một mớ
+-- việc kèm bình luận và nhật ký là thao tác không có đường lùi.
+--
+-- KHÔNG ĐỂ VIỆC MỒ CÔI: bỏ người hàng loạt mà việc nào hết sạch người thì trả
+-- lại người vừa bỏ. Kiểm từng việc chứ không kiểm chung.
+--
+-- Trần 200 việc/lượt — quá số đó là dấu hiệu chọn nhầm "tất cả", không phải ý định.
+--
+-- ĐÃ ÁP PRODUCTION 19/08/2026 (bản sửa lỗi ở work_04b).
+-- Kiểm chứng end-to-end: đổi 3 thứ cùng lúc trên 2 việc -> da_sua=2 bo_qua=0;
+-- bỏ nốt người cuối -> vẫn còn người; kèm 1 id không tồn tại -> bo_qua=1 không
+-- văng lỗi; đổi hạn + team OK; 12 dòng nhật ký đều đánh dấu hang_loat=true.
+-- ============================================================================
+
+-- Nội dung hàm: xem work_04b_sua_bien_id_trung_ten_cot.sql (bản đang chạy).

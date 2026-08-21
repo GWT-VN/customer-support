@@ -26,7 +26,10 @@ const laNhom = (m: MucTrang): m is Nhom => 'trang' in m
 
 // Trang chi tiết -> mục cha nào sáng (không map bằng tiền tố URL bừa).
 const CHA: ReadonlyArray<readonly [string, string]> = [
-  ['/may/', '/'], ['/ticket/', '/ticket'], ['/nhom-loi/', '/nhom-loi'], ['/khach/', '/khach-hang'],
+  ['/may/', '/'], ['/ticket/', '/ticket'], ['/nhom-loi/', '/nhom-loi'],
+  // '/khach/gop' phải đứng TRƯỚC '/khach/': find() lấy cái khớp đầu tiên, để sau
+  // thì màn gộp lại sáng đèn ở mục "Khách hàng".
+  ['/khach/gop', '/khach/gop'], ['/khach/', '/khach-hang'],
   ['/sales/don/', '/sales'], ['/sales/khach/', '/sales/khach'],
 ]
 function khopHref(pathname: string, href: string): boolean {
@@ -62,7 +65,7 @@ export function TopNavClient({
     key: 'viec', nhan: 'Việc', mau: '#0e8c9a', href: '/work', icon: 'check',
     trang: [
       { nhan: 'Việc của tôi', href: '/work' },
-      { nhan: 'Bảng team', href: '/work', soon: true },
+      { nhan: 'Bảng team', href: '/work/team' },
       { nhan: 'Lịch', href: '/work', soon: true },
       { nhan: 'Dự án', href: '/work', soon: true },
     ],
@@ -70,9 +73,11 @@ export function TopNavClient({
   const cskhTrang: MucTrang[] = chiKyThuat
     ? [{ nhan: 'Lịch của tôi', href: '/ky-thuat/cua-toi' }]
     : [
+        { nhan: 'Tổng quan', href: '/tong-quan' },
         { nhan: 'Máy & khách', trang: [
           { nhan: 'Máy đã lắp', href: '/' }, { nhan: 'Kho serial', href: '/serial' },
           { nhan: 'Khách hàng', href: '/khach-hang' }, { nhan: 'Khách cần dọn', href: '/khach' },
+          { nhan: 'Gộp khách trùng', href: '/khach/gop' },
           { nhan: 'Kênh / đối tác', href: '/kenh' },
         ] },
         { nhan: 'Ticket & lỗi', trang: [{ nhan: 'Ticket', href: '/ticket' }, { nhan: 'Nhóm lỗi', href: '/nhom-loi' }] },

@@ -3,14 +3,10 @@
 import { useEffect, useState } from 'react'
 import { searchCustomers, taoKhachChoDuyet, timKhachTheoSdt, type KhachTom, type KhachKhopSdt } from '@/app/actions'
 import { ChonTinh } from '@/components/ChonTinh'
+import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
 
-/** SĐT VN hợp lệ (chuẩn hoá 84/thiếu số 0 rồi kiểm) — khớp đúng rào ở server. */
-function sdtHopLe(raw: string): boolean {
-  let s = (raw ?? '').replace(/\D/g, '')
-  if (s.startsWith('84')) s = '0' + s.slice(2)
-  else if (s.length === 9) s = '0' + s
-  return /^0\d{9,10}$/.test(s)
-}
+/** SĐT VN lưu được (chuẩn hoá 84/thiếu số 0 rồi kiểm) — khớp đúng rào ở server. */
+const sdtHopLe = (raw: string): boolean => chuanHoaSdt(raw).hopLe
 
 /**
  * Chọn khách (tìm trong cs_customers) hoặc tạo mới -> chờ admin duyệt.
@@ -162,6 +158,10 @@ export function KhachPicker(
           {dangTra && <p className="text-xs text-slate-400">Đang kiểm tra SĐT…</p>}
           {f.primary_phone.trim() && !sdtHopLe(f.primary_phone) && (
             <p className="text-xs text-amber-700">SĐT chưa đúng định dạng (vd 0xxxxxxxxx).</p>
+          )}
+          {/* Cảnh báo mềm: lưu được nhưng chưa đúng chuẩn 10 số bắt đầu bằng 0. */}
+          {sdtHopLe(f.primary_phone) && canhBaoSdt(f.primary_phone) && (
+            <p className="text-xs text-amber-600">{canhBaoSdt(f.primary_phone)}</p>
           )}
 
           {khop?.nguon === 'cs' && khop.id && (

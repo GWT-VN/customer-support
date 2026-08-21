@@ -8,7 +8,9 @@ Việc/dự án của nhân sự GWT, gắn thẳng vào khách / đơn / ticket
 | Code | `apps/web/app/work/` (route-group trong app chung) |
 | DB | schema `work` trên `bwzmqfbcgouhvhoslmmm`; migration ở `db/work/migrations/` |
 | Kế hoạch CTO | [2026-08-18-gwt-work-cto-plan.md](2026-08-18-gwt-work-cto-plan.md) |
-| Spec GĐ0 | [2026-08-18-gd0-build-spec.md](2026-08-18-gd0-build-spec.md) |
+| Spec GĐ0 | [2026-08-18-gd0-build-spec.md](2026-08-18-gd0-build-spec.md) (xem §2b: khác spec gốc chỗ nào) |
+| RPC | `db/work/migrations/work_01_rpc_gd0.sql` + `work_02_rpc_gd0_day_du.sql` |
+| Logic thuần + test | `apps/web/lib/work.ts` · `lib/work.test.ts` |
 
 ## Trạng thái
 
@@ -16,7 +18,7 @@ Việc/dự án của nhân sự GWT, gắn thẳng vào khách / đơn / ticket
 |---|---|---|
 | Kế hoạch CTO | Định hướng, kiến trúc, lộ trình | ✅ |
 | Mockup | Việc của tôi + Bảng team | ✅ artifact |
-| **GĐ0** | Schema + RLS + khung app + Việc của tôi | 🚧 migration đã áp lên DB chung; UI mới có `app/work/page.tsx` khung |
+| **GĐ0** | Schema + RLS + Việc của tôi + Bảng team + panel chi tiết | ✅ code xong 19/08 — chờ người dùng thật kiểm |
 
 ## Luật riêng của module (BẮT BUỘC)
 
