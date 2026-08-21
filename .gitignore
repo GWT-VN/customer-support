@@ -86,6 +86,12 @@ tools/migrate/_out/
 # Obsidian editor config
 .obsidian/
 /BACKLOG.md
+# Backlog tách theo khu — cùng luật với BACKLOG.md: hàng đợi việc riêng CEO↔Claude,
+# có thể lỡ tay ghi tên khách. iCloud vẫn sync, không cần git.
+/backlog/
+
+# node_modules ở GỐC repo (apps/web/.gitignore lo cái bên trong apps/web)
+/node_modules/
 
 # Claude worktrees (không commit)
 .claude/worktrees/

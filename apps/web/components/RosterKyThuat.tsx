@@ -13,9 +13,11 @@ import {
  * Cấp quyền tạo mật khẩu tạm — hiện 1 lần để admin chuyển cho kỹ thuật.
  */
 export function RosterKyThuat({
-  dsKt, trangThai, laAdmin,
+  dsKt, trangThai, choTaiKhoanKT,
 }: {
-  dsKt: KyThuat[]; trangThai: Record<string, TrangThaiTaiKhoanKT>; laAdmin: boolean
+  dsKt: KyThuat[]; trangThai: Record<string, TrangThaiTaiKhoanKT>
+  /** Cấp / thu tài khoản đăng nhập cho kỹ thuật — cs.ky_thuat.tai_khoan */
+  choTaiKhoanKT: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
@@ -123,7 +125,7 @@ export function RosterKyThuat({
                     <div className="text-xs text-slate-500 mt-0.5">
                       {[k.sdt, k.vung, k.email].filter(Boolean).join(' · ') || '—'}
                     </div>
-                    {laAdmin && (
+                    {choTaiKhoanKT && (
                       <div className="mt-1 text-xs">
                         {tt?.hoat_dong
                           ? <span className="text-emerald-700">● Có tài khoản đăng nhập</span>
@@ -137,8 +139,8 @@ export function RosterKyThuat({
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-none">
-                    {laAdmin && k.email && !tt?.hoat_dong && <button onClick={() => cap(k.id)} disabled={busy === k.id} className="text-xs text-sky-700 underline">cấp đăng nhập</button>}
-                    {laAdmin && tt?.hoat_dong && <button onClick={() => thu(k.id)} disabled={busy === k.id} className="text-xs text-amber-700 underline">thu quyền</button>}
+                    {choTaiKhoanKT && k.email && !tt?.hoat_dong && <button onClick={() => cap(k.id)} disabled={busy === k.id} className="text-xs text-sky-700 underline">cấp đăng nhập</button>}
+                    {choTaiKhoanKT && tt?.hoat_dong && <button onClick={() => thu(k.id)} disabled={busy === k.id} className="text-xs text-amber-700 underline">thu quyền</button>}
                     <button onClick={() => moSua(k)} className="text-xs text-slate-600 underline">sửa</button>
                     <button onClick={() => xoa(k.id)} disabled={busy === k.id} className="text-xs text-red-600 underline">xoá</button>
                   </div>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
 import { issueReport, ticketsInGroup, nhomLoiChiTiet } from '@/app/actions'
-import { laAdmin } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { MucDoBadge, BaoHangBadge, NguonBadge } from '@/components/NhomLoiBadge'
 import { StateBadge, vnDateTime } from '@/components/TicketBadge'
 import { NhomLoiForm } from '@/components/NhomLoiForm'
@@ -13,8 +13,8 @@ export default async function NhomLoiDetail({
   params: Promise<{ code: string }>
 }) {
   const { code } = await params
-  const [all, tickets, chiTiet, admin] = await Promise.all([
-    issueReport(false), ticketsInGroup(code), nhomLoiChiTiet(code), laAdmin(),
+  const [all, tickets, chiTiet, quyen] = await Promise.all([
+    issueReport(false), ticketsInGroup(code), nhomLoiChiTiet(code), hoiQuyen({ cauHinh: ['cs.nhom_loi.cau_hinh', 'QUANLY'] }),
   ])
   const nhom = all.find((r) => r.code === code)
   if (!nhom) notFound()
@@ -129,7 +129,7 @@ export default async function NhomLoiDetail({
           </table>
         </div>
 
-        {admin && chiTiet && (
+        {quyen.cauHinh && chiTiet && (
           <details className="bg-white rounded-xl border p-4">
             <summary className="cursor-pointer font-medium text-slate-900">Sửa nhóm / mẫu gom / xoá</summary>
             <div className="pt-3">

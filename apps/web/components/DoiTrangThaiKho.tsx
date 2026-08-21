@@ -13,9 +13,12 @@ import { MAU_TRANG_THAI } from '@/lib/danhSach'
  * Danh mục `ds` do trang truyền vào (bảng serial_trang_thai).
  */
 export function DoiTrangThaiKho({
-  serial, trangThai, laAdmin, ds,
+  serial, trangThai, choDoiTrangThai, ds,
 }: {
-  serial: string; trangThai: string | null; laAdmin: boolean; ds: TrangThai[]
+  serial: string; trangThai: string | null
+  /** Đổi trạng thái serial trong kho — cs.serial.kho (đúng quyền datTrangThaiSerial đòi) */
+  choDoiTrangThai: boolean
+  ds: TrangThai[]
 }) {
   const router = useRouter()
   const [den, setDen] = useState('')
@@ -42,7 +45,7 @@ export function DoiTrangThaiKho({
       </div>
     )
   }
-  if (!laAdmin) return badge
+  if (!choDoiTrangThai) return badge
 
   async function dat() {
     if (!den || !ghiChu.trim()) return

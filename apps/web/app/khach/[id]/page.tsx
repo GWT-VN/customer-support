@@ -9,14 +9,17 @@ import { KhachTabs } from '@/components/KhachTabs'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines, kenh, baoTri, quanLy, diaChi] = await Promise.all([
-    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id), laQuanLy(),
+  const [tickets, machines, kenh, baoTri, quyen, diaChi] = await Promise.all([
+    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id),
+    // Link "Tạo lịch bảo trì" dẫn tới /bao-tri/len-lich, mà trang đó gác bằng
+    // cs.bao_tri.tao_plan. Hỏi đúng quyền đó thay vì cờ vai trò thô laQuanLy.
+    hoiQuyen({ taoPlan: ['cs.bao_tri.tao_plan', 'QUANLY'] }),
     diaChiCuaKhach(id),
   ])
   const btDaXong = baoTri.filter((v) => v.completed_at).length
@@ -56,7 +59,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3 mb-3">
         <p className="text-sm text-slate-500">{btDaXong}/{baoTri.length} lượt đã làm</p>
-        {quanLy && (
+        {quyen.taoPlan && (
           <Link href={`/bao-tri/len-lich?kh=${customer.id}`} prefetch={false} className="text-xs text-sky-700 underline whitespace-nowrap">
             ＋ Tạo lịch bảo trì
           </Link>

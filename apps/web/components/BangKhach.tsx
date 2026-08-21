@@ -34,7 +34,7 @@ function chuanHoa(cot: string[]): string[] {
 }
 
 /** Bảng khách với cột tuỳ chỉnh (bật/tắt + đổi thứ tự) + lưu/nạp view (cá nhân / chung). */
-export function BangKhach({ rows, admin, views }: { rows: Kh[]; admin: boolean; views: BangView[] }) {
+export function BangKhach({ rows, choViewChung, views }: { rows: Kh[]; choViewChung: boolean; views: BangView[] }) {
   const router = useRouter()
   const [hien, setHien] = useState<string[]>([...MAC_DINH])
   const [moCot, setMoCot] = useState(false)
@@ -115,7 +115,7 @@ export function BangKhach({ rows, admin, views }: { rows: Kh[]; admin: boolean; 
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
             <input value={tenView} onChange={(e) => setTenView(e.target.value)} placeholder="Tên view…"
               className="rounded border px-2 py-1 text-sm w-32 text-slate-900" />
-            {admin && <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" checked={chung} onChange={(e) => setChung(e.target.checked)} /> Chung (mọi người)</label>}
+            {choViewChung && <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" checked={chung} onChange={(e) => setChung(e.target.checked)} /> Chung (mọi người)</label>}
             <button onClick={luu} disabled={busy || !tenView.trim()}
               className="rounded-lg bg-slate-900 text-white px-3 py-1 text-sm disabled:opacity-50">Lưu view</button>
             {err && <span className="text-xs text-red-600">{err}</span>}

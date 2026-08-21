@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { searchTickets, currentStaff, ticketTypes, khoaTatCaTicket, listBangView, type Ticket } from '@/app/actions'
+import { searchTickets, ticketTypes, khoaTatCaTicket, listBangView, type Ticket } from '@/app/actions'
+import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import type { KetQuaTrang } from '@/bang'
 import { ExportTicketButton } from '@/components/ExportTicketButton'
 import { BangTicket } from '@/components/BangTicket'
 import { DauTrang } from '@/components/DauTrang'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
@@ -29,7 +30,7 @@ export default async function TicketsPage({
   const me = isMine ? await currentStaff() : null
   // Gõ nguyên hình dạng KetQuaTrang<Ticket> (kể cả `trang`) cho nhánh rỗng — thiếu field
   // không lộ lỗi build ngay bây giờ (chưa ai đọc `trang`) nhưng Task 4 destructure vào là vỡ.
-  const [ketQua, loaiList, admin] = await Promise.all([
+  const [ketQua, loaiList, quyen] = await Promise.all([
     (isMine && !me
       ? Promise.resolve<KetQuaTrang<Ticket>>({
           rows: [], tong: 0, trang: 1, soTrang: 1,
@@ -41,7 +42,11 @@ export default async function TicketsPage({
           trang, cot, chieu, loaiTicket: loai || undefined, ngtu, ngden,
         })),
     ticketTypes(),
-    laQuanLy(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+      xuat: ['cs.bao_cao.xuat', 'QUANLY'],
+    }),
   ])
   const views = await listBangView('tickets')
   const { rows: tickets, tong, soTrang, sapXep } = ketQua
@@ -149,13 +154,13 @@ export default async function TicketsPage({
         <KhungChon
           khoaTrang={tickets.map((t) => t.ticket_code)}
           tong={tong}
-          bat={admin}
+          bat={quyen.hangLoat}
           thamSo={{ q, state, khan, mine, loai, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaTicket}
         >
         <ThanhDaChon nhan="ticket" />
-        <BangTicket rows={tickets} admin={admin} views={views}
-          congCu={admin && <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} ngtu={ngtu} ngden={ngden} />} />
+        <BangTicket rows={tickets} choViewChung={quyen.viewChung} views={views}
+          congCu={quyen.xuat && <ExportTicketButton q={q} state={onlyKhan || isMine ? undefined : state || undefined} khan={onlyKhan} mine={isMine} ngtu={ngtu} ngden={ngden} />} />
         </KhungChon>
 
         <Suspense>

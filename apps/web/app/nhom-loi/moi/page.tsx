@@ -1,5 +1,5 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { NhomLoiForm } from '@/components/NhomLoiForm'
 
 export default async function TaoNhomLoiPage({
@@ -7,7 +7,7 @@ export default async function TaoNhomLoiPage({
 }: {
   searchParams: Promise<{ goi_y?: string; ten?: string; tickets?: string }>
 }) {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.nhom_loi.cau_hinh', 'QUANLY')
   const { goi_y, ten, tickets } = await searchParams
   const dsTicket = tickets ? tickets.split(',').filter(Boolean) : []
 

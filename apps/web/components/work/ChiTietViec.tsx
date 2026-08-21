@@ -7,11 +7,11 @@
 import { useEffect, useState, useTransition } from 'react'
 import {
   chiTietViec, suaViec, ganNguoi, boNguoi, themBinhLuan, doiTrangThai,
-  type ChiTietViec as Ct, type NenTang,
+  type ChiTietViec as Ct, type NenTang, type KQ,
 } from '@/app/work/actions'
 import {
   TRANG_THAI, VAI_TRO, NHAN_VAI_TRO, NHAN_UU_TIEN,
-  nhanHan, inputTuIso, isoTuOInput, moTaNhatKy,
+  nhanHan, inputTuIso, isoTuOInput, moTaNhatKy, mocThoiGian,
 } from '@/lib/work'
 import { Avatar, Chip, Nut, oNhap, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
 
@@ -61,25 +61,40 @@ export function ChiTietViec({
   const [themAi, setThemAi] = useState('')
   const [themVai, setThemVai] = useState('doer')
 
+  /*
+    Báo cho TRANG biết panel đang mở, để nó giãn ra nhường chỗ. Đặt class lên
+    <html> vì khung trang là server component nằm NGOÀI cây của panel — không
+    truyền prop xuống được.
+  */
+  useEffect(() => {
+    document.documentElement.classList.add('work-panel-mo')
+    return () => document.documentElement.classList.remove('work-panel-mo')
+  }, [])
+
+  // Esc để đóng — panel không có lớp phủ nên không bấm ra ngoài để đóng được.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDong() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDong])
+
   useEffect(() => {
     let huy = false
-    chiTietViec(taskId)
-      .then((d) => { if (!huy) { setCt(d); setLoi(null) } })
-      .catch((e: unknown) => { if (!huy) setLoi(e instanceof Error ? e.message : 'Không mở được việc này') })
+    chiTietViec(taskId).then((kq) => {
+      if (huy) return
+      if (kq.ok) { setCt(kq.duLieu); setLoi(null) } else setLoi(kq.loi)
+    })
     return () => { huy = true }
   }, [taskId])
 
   /** Bọc mọi thao tác ghi: hiện lỗi ngay tại panel, nạp lại, báo cho danh sách ngoài. */
-  function chay(fn: () => Promise<void>) {
+  function chay(fn: () => Promise<KQ<unknown>>) {
     start(async () => {
-      try {
-        await fn()
-        setCt(await chiTietViec(taskId))
-        setLoi(null)
-        onDoi()
-      } catch (e) {
-        setLoi(e instanceof Error ? e.message : 'Thao tác không thành công')
-      }
+      const kq = await fn()
+      if (!kq.ok) { setLoi(kq.loi); return }
+      const lai = await chiTietViec(taskId)
+      if (lai.ok) { setCt(lai.duLieu); setLoi(null) } else setLoi(lai.loi)
+      onDoi()
     })
   }
 
@@ -88,20 +103,25 @@ export function ChiTietViec({
   const conLai = nenTang.nhan_su.filter((s) => !daGan.has(s.id))
 
   return (
-    <div data-khu="work" className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Chi tiết việc">
-      <button
-        className="flex-1"
-        style={{ background: 'rgba(8,18,20,.42)' }}
-        onClick={onDong}
-        aria-label="Đóng"
-      />
-      <aside
-        className="w-full h-full overflow-y-auto"
-        style={{
-          maxWidth: 520, background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
-        }}
-      >
+    /*
+      Kiểu Asana: panel là một CỘT BÊN PHẢI, không phải lớp phủ. Bảng việc bên
+      trái vẫn thấy và vẫn bấm được — bấm việc khác là panel nhảy sang việc đó,
+      không phải đóng rồi mở lại.
+      `data-khu` ĐẶT INLINE background trong suốt: quy tắc [data-khu="work"] ở
+      globals.css có `background: var(--bg)`, không chặn thì nó sơn kín màn hình
+      và bên trái thành trắng trơn (đã dính đúng lỗi này).
+    */
+    <aside
+      data-khu="work"
+      className="fixed top-0 right-0 h-full w-full overflow-y-auto z-50"
+      style={{
+        maxWidth: 520, background: 'var(--surface)',
+        borderLeft: '1px solid var(--border-strong)', boxShadow: 'var(--shadow-lg)',
+      }}
+      role="complementary"
+      aria-label="Chi tiết việc"
+    >
+      <div>
         <header
           className="sticky top-0 flex items-center gap-2.5 px-[18px] py-3.5"
           style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
@@ -117,6 +137,19 @@ export function ChiTietViec({
             </span>
           )}
           <span className="flex-1" />
+          {t && (
+            <button
+              onClick={() => chay(() => doiTrangThai(t.id, t.status === 'done' ? 'todo' : 'done'))}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-lg"
+              style={{
+                fontSize: 12.5, fontWeight: 600, padding: '5px 11px',
+                border: `1px solid ${t.status === 'done' ? 'var(--green)' : 'var(--border-strong)'}`,
+                background: t.status === 'done' ? 'var(--green-wash)' : 'var(--surface)',
+                color: t.status === 'done' ? 'var(--green)' : 'var(--ink-2)',
+              }}
+            >✓ {t.status === 'done' ? 'Đã xong — bỏ đánh dấu' : 'Đánh dấu xong'}</button>
+          )}
           <button
             onClick={onDong}
             className="text-xl leading-none"
@@ -152,7 +185,7 @@ export function ChiTietViec({
                 aria-label="Tiêu đề"
               />
               <p className="mt-1.5" style={{ fontSize: 11.5, color: 'var(--faint)' }}>
-                {t.creator_ten ? `${t.creator_ten} tạo` : 'Tạo'} · {t.origin === 'manual' ? 'thủ công' : t.origin}
+                {t.creator_ten ? `${t.creator_ten} tạo` : 'Tạo'} {mocThoiGian(t.created_at)} · {t.origin === 'manual' ? 'thủ công' : 'tự sinh'}
                 {t.due_at && ` · ${nhanHan(t.due_at)}`}
               </p>
             </div>
@@ -314,7 +347,12 @@ export function ChiTietViec({
                   <li key={c.id} className="flex gap-2.5">
                     <Avatar ten={c.ten ?? '?'} co={26} />
                     <div className="min-w-0 flex-1">
-                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink-2)' }}>{c.ten}</p>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink-2)' }}>
+                        {c.ten}
+                        <span className="mono" style={{ fontWeight: 400, color: 'var(--faint)', marginLeft: 6 }}>
+                          {mocThoiGian(c.created_at)}
+                        </span>
+                      </p>
                       <p
                         className="whitespace-pre-wrap break-words mt-0.5 px-2.5 py-2"
                         style={{ fontSize: 13, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 9 }}
@@ -368,8 +406,11 @@ export function ChiTietViec({
                       )}
                     </span>
                     <span className="pt-0.5 pb-3" style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
-                      <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{a.ten ?? 'Ai đó'}</b>{' '}
+                      <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{a.ten ?? 'Hệ thống'}</b>{' '}
                       {moTaNhatKy(a.verb, a.payload)}
+                      <span className="mono block" style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>
+                        {mocThoiGian(a.created_at)}
+                      </span>
                     </span>
                   </li>
                 ))}
@@ -387,7 +428,7 @@ export function ChiTietViec({
             </p>
           </div>
         )}
-      </aside>
-    </div>
+      </div>
+    </aside>
   )
 }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { authClient, ghiNhanNhanVienMoi, kiemTraVaoCua } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { authClient } from '@/lib/nen-tang/db'
+import { ghiNhanNhanVienMoi, kiemTraVaoCua, kiemTraVaoNenTang } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 
 /**
  * Google (và magic link / đặt lại mật khẩu) gọi ngược về đây sau khi xác thực.
@@ -22,7 +23,10 @@ export async function GET(request: NextRequest) {
   if (error || !data.user) return NextResponse.redirect(`${origin}/login?loi=google`)
 
   const email = chuanHoaEmail(data.user.email)
-  const kq = await kiemTraVaoCua(email)
+  // Xét luật NỀN TẢNG, giống hệt đường mật khẩu — nếu không thì hai đường đăng
+  // nhập cho hai kết quả khác nhau, và người ngoài CSKH (CTV, Sales thuần, Kho…)
+  // lại không vào nổi khu Việc dù khu đó mở cho mọi nhân sự.
+  const kq = await kiemTraVaoNenTang(email)
 
   if (!kq.duocVao) {
     // Người @gwt.vn lần đầu -> tạo hồ sơ CHỜ DUYỆT (inactive) để admin thấy + bật.
@@ -33,5 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?loi=${kq.lyDo}`)
   }
 
-  return NextResponse.redirect(`${origin}/`)
+  // Người không thuộc CSKH vào thẳng khu Việc — vào '/' chỉ để bị đá tiếp.
+  const vaoDuocCS = (await kiemTraVaoCua(email)).duocVao
+  return NextResponse.redirect(`${origin}${vaoDuocCS ? '/' : '/work'}`)
 }

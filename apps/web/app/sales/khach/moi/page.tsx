@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { CustomerForm } from '../../CustomerForm'
 
 export const metadata = { title: 'Thêm khách · GWT Sales' }

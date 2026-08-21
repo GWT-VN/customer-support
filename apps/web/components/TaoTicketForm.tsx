@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createTicket, machinesOfCustomer, type Staff, type Machine } from '@/app/actions'
+import { createTicket, machinesOfCustomer, type Machine } from '@/app/actions'
+import type { Staff } from '@/lib/nen-tang/nhan-su-luat'
 import { KhachPicker } from '@/components/KhachPicker'
 
 const HOM_NAY = () => new Date().toISOString().slice(0, 10)

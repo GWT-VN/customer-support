@@ -1,4 +1,4 @@
-import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { doanhSoCskh } from '@/app/actions'
 
 function tien(n: number | null) {
@@ -10,7 +10,7 @@ function thangVN(s: string) {
 }
 
 export default async function DoanhSoPage() {
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuThieuQuyen('cs.bao_cao.doanh_so', 'ADMIN')
   const rows = await doanhSoCskh()
 
   // gom theo tháng

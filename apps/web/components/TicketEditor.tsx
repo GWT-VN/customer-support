@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateTicket, type Staff } from '@/app/actions'
+import { updateTicket } from '@/app/actions'
+import type { Staff } from '@/lib/nen-tang/nhan-su-luat'
 
 const STATES = [
   { key: 'Open', label: 'Đang mở' },

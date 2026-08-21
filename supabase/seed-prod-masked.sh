@@ -36,11 +36,27 @@ echo "▶ 2/4  Nạp vào local (tắt FK trigger do circular)…"
 echo "▶ 3/4  Che SĐT (giữ tên)…"
 docker exec -i "$DB" psql -U postgres -d postgres -q -v ON_ERROR_STOP=0 < supabase/mask-pii.sql >/dev/null 2>&1
 
-echo "▶ 4/4  Tạo user login local  dev.admin@gwt.vn / local12345 …"
-curl -s "http://127.0.0.1:54321/auth/v1/admin/users" \
-  -H "apikey: $SVC" -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
-  -d '{"email":"dev.admin@gwt.vn","password":"local12345","email_confirm":true}' \
-  -o /dev/null -w "        (HTTP %{http_code} — 200/422 đều OK, 422 = user đã có)\n"
+echo "▶ 4/4  Tạo/đặt lại 2 tài khoản dev local (mật khẩu CỐ ĐỊNH  gwtlocal123)…"
+# CEO chốt 21/08: hai tài khoản này là QUY ƯỚC, không phiên nào được đổi mật khẩu.
+# Trước đây chỉ POST tạo mới: user đã tồn tại thì trả 422 và mật khẩu cũ (có thể do
+# phiên khác đặt) GIỮ NGUYÊN — CEO gõ đúng mật khẩu trong tài liệu vẫn không vào được.
+# Nay: có rồi thì PUT đặt lại, chưa có thì POST tạo. Chạy bao nhiêu lần cũng ra một kết quả.
+for EMAIL in dev.admin@gwt.vn dev.sales@gwt.vn; do
+  UID_DEV=$(curl -s "http://127.0.0.1:54321/auth/v1/admin/users?per_page=100" \
+    -H "apikey: $SVC" -H "Authorization: Bearer $SVC" \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);us=d.get('users',d);m=[u['id'] for u in us if u.get('email')=='$EMAIL'];print(m[0] if m else '')")
+  if [ -n "$UID_DEV" ]; then
+    curl -s -X PUT "http://127.0.0.1:54321/auth/v1/admin/users/$UID_DEV" \
+      -H "apikey: $SVC" -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
+      -d '{"password":"gwtlocal123","email_confirm":true}' \
+      -o /dev/null -w "        $EMAIL — đặt lại mật khẩu (HTTP %{http_code})\n"
+  else
+    curl -s "http://127.0.0.1:54321/auth/v1/admin/users" \
+      -H "apikey: $SVC" -H "Authorization: Bearer $SVC" -H "Content-Type: application/json" \
+      -d "{\"email\":\"$EMAIL\",\"password\":\"gwtlocal123\",\"email_confirm\":true}" \
+      -o /dev/null -w "        $EMAIL — tạo mới (HTTP %{http_code})\n"
+  fi
+done
 
 docker exec "$DB" psql -U postgres -d postgres -tc \
   "select '✅ Xong — khách='||count(*)||' | có SĐT (đã che)='||count(*) filter(where phone is not null) from public.customers;"

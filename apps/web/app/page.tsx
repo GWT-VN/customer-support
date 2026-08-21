@@ -7,7 +7,8 @@ import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
 import { redirect } from 'next/navigation'
-import { laQuanLy, quyenNenTang } from '@/lib/supabase'
+import { coTheVaoCS, coTheVaoSales, laChiKyThuatVien } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
 import { BangMay } from '@/components/BangMay'
@@ -18,18 +19,31 @@ export default async function Home({
 }: {
   searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; sp?: string; bh?: string; ngtu?: string; ngden?: string }>
 }) {
-  // Định tuyến qua CỔNG NỀN TẢNG (requireNhanSu) — KHÔNG đá non-CS ra /login.
-  const { chiKyThuat, vaoCS, vaoSales } = await quyenNenTang()
+  // Định tuyến cho người KHÔNG thuộc khu CS — không đá ai ra /login.
+  //
+  // `main` từng phải thêm một bộ hàm song song (quyenNenTang) chỉ để tránh việc
+  // hỏi quyền ở đây làm văng người ngoài CS. Nhánh này vá tận gốc: layNhanVien()
+  // không còn tự gác cổng nữa, nên ba hàm dưới an toàn cho mọi nhân sự và không
+  // cần bộ song song. Giữ lại phần định tuyến của main vì nó đúng hơn bản cũ.
+  const [chiKyThuat, vaoCS, vaoSales] = await Promise.all([
+    laChiKyThuatVien(), coTheVaoCS(), coTheVaoSales(),
+  ])
   // Kỹ thuật hiện trường: không có nghiệp vụ ở trang máy — đưa thẳng về lịch của họ.
   if (chiKyThuat) redirect('/ky-thuat/cua-toi')
   // Ngoài khu CS: Sales thuần -> khu Sales; còn lại (Marketing…) -> khu Việc.
   if (!vaoCS) redirect(vaoSales ? '/sales' : '/work')
   const { q = '', trang: trangRaw, cot, chieu, sp, bh, ngtu, ngden } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([
+  // Mỗi nút hỏi ĐÚNG quyền gác Server Action của nó, không dùng chung một cờ
+  // laQuanLy như trước — cờ chung là lý do giao diện lệch khỏi rào thật.
+  const [{ rows: machines, tong, soTrang, sapXep }, models, quyen] = await Promise.all([
     searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }),
     machineModels(),
-    laQuanLy(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+      xuat: ['cs.bao_cao.xuat', 'QUANLY'],
+    }),
   ])
   const views = await listBangView('installed_base')
 
@@ -105,14 +119,14 @@ export default async function Home({
         <KhungChon
           khoaTrang={machines.map((m) => m.serial)}
           tong={tong}
-          bat={admin}
+          bat={quyen.hangLoat}
           // KHÔNG có `trang`: lật trang không được coi là đổi bộ lọc, xem ChonDong.tsx
           thamSo={{ q, sp, bh, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaMay}
         >
         <ThanhDaChon nhan="máy" />
-        <BangMay rows={machines} admin={admin} views={views}
-          congCu={admin && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />} />
+        <BangMay rows={machines} choViewChung={quyen.viewChung} views={views}
+          congCu={quyen.xuat && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />} />
         </KhungChon>
 
         <Suspense>

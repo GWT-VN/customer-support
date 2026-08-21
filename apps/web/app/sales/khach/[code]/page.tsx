@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { chiTietKhach } from '../../actions'
 import { isAppCustomer } from '../../_db'
 import { CustomerActions } from '../../CustomerActions'

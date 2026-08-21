@@ -1,5 +1,5 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import Link from 'next/link'
-import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
 import { auditLog } from '@/app/actions'
 
 const NHAN_BANG: Record<string, string> = {
@@ -36,7 +36,7 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ n?: string }>
 }) {
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuThieuQuyen('he_thong.nhat_ky', 'ADMIN')
   const { n } = await searchParams
   const soDong = Math.min(5000, Math.max(100, Number(n) || 300))
   const rows = await auditLog(soDong)

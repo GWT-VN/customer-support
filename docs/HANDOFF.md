@@ -1,5 +1,8 @@
 # HANDOFF — GWT Customer Care (CSKH)
 
+> ⚠️ **Đây là bàn giao RIÊNG module CSKH, bản 28/07/2026** (số liệu & việc treo đã cũ).
+> Bàn giao **toàn bộ GWT App** (mọi module, route, nhánh, worktree): [`../HANDOFF.md`](../HANDOFF.md).
+
 > Tài liệu bàn giao. Cập nhật: 2026-07-28. **Không chứa PII** (an toàn commit).
 > Nguồn chi tiết tiến độ: [CHECKLIST.md](CHECKLIST.md) — ⚠️ file đó CÓ tên khách (PII), **không commit**.
 

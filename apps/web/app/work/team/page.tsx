@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireNhanSu } from '@/lib/supabase'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { bangTeam, nenTang } from '../actions'
 import { BangTeam } from '@/components/work/BangTeam'
 
@@ -15,7 +15,7 @@ export default async function BangTeamPage() {
 
   return (
     <main data-khu="work" className="min-h-screen">
-      <div className="max-w-[1180px] mx-auto px-5 py-5 sm:px-6 space-y-5">
+      <div className="max-w-[1180px] mx-auto px-5 py-5 sm:px-6 space-y-5 khung-trang">
         <header>
           <nav className="flex gap-3 mb-2" style={{ fontSize: 12.5 }} aria-label="Khu Việc">
             <Link href="/work" style={{ color: "var(--accent-ink)" }}>Việc của tôi</Link>

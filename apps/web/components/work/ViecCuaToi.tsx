@@ -7,7 +7,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { doiTrangThai, type ViecRow, type NenTang } from '@/app/work/actions'
-import { gomTheoHan, nhomTheoHan } from '@/lib/work'
+import { gomTheoHan, nhomTheoHan, type NhomHan } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { FormTaoViec } from './FormTaoViec'
 import { ChiTietViec } from './ChiTietViec'
@@ -21,6 +21,8 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
   const [loi, setLoi] = useState<string | null>(null)
   const [chon, setChon] = useState<Set<number>>(new Set())
   const [thongBao, setThongBao] = useState<string | null>(null)
+  /** Bấm một ô thống kê = lọc danh sách xuống đúng nhóm đó. Bấm lại = bỏ lọc. */
+  const [loc, setLoc] = useState<NhomHan | 'nghiem_thu' | null>(null)
 
   function doiChon(id: number, c: boolean) {
     setChon((cu) => {
@@ -38,7 +40,18 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
     })
   }
 
-  const nhom = gomTheoHan(rowsBanDau)
+  const rows = loc === 'nghiem_thu'
+    ? rowsBanDau.filter((v) => v.my_role === 'reviewer' && v.status === 'review')
+    : rowsBanDau
+  const nhomTatCa = gomTheoHan(rows)
+  const nhom = loc && loc !== 'nghiem_thu'
+    ? nhomTatCa.filter((g) => g.nhom === loc)
+    : nhomTatCa
+
+  function bamLoc(k: NhomHan | 'nghiem_thu') {
+    setLoc((cu) => (cu === k ? null : k))
+    setChon(new Set())
+  }
 
   // Thống kê tính ngay từ danh sách đang có — không gọi thêm DB.
   const soQuaHan = rowsBanDau.filter((v) => nhomTheoHan(v.due_at) === 'qua_han').length
@@ -49,13 +62,10 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
 
   function doi(id: number, status: string) {
     start(async () => {
-      try {
-        await doiTrangThai(id, status)
-        setLoi(null)
-        router.refresh()
-      } catch (e) {
-        setLoi(e instanceof Error ? e.message : 'Không đổi được trạng thái')
-      }
+      const kq = await doiTrangThai(id, status)
+      if (!kq.ok) { setLoi(kq.loi); return }
+      setLoi(null)
+      router.refresh()
     })
   }
 
@@ -65,16 +75,20 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
         <OThongKe
           nhan="Quá hạn" so={soQuaHan} phu={soQuaHan ? 'cần xử lý ngay' : 'không có việc trễ'}
           mauCham="var(--red)" mauSo={soQuaHan ? 'var(--red)' : undefined}
+          onBam={() => bamLoc('qua_han')} dangLoc={loc === 'qua_han'}
         />
         <OThongKe
           nhan="Hôm nay" so={soHomNay} phu={soP1HomNay ? `${soP1HomNay} việc P1` : 'không có việc P1'}
           mauCham="var(--amber)" noiBat
+          onBam={() => bamLoc('hom_nay')} dangLoc={loc === 'hom_nay'}
         />
         <OThongKe
           nhan="Tuần này" so={soTuanNay} phu="trong 7 ngày tới" mauCham="var(--accent)"
+          onBam={() => bamLoc('tuan_nay')} dangLoc={loc === 'tuan_nay'}
         />
         <OThongKe
           nhan="Chờ tôi nghiệm thu" so={soChoDuyet} phu="việc người khác làm xong" mauCham="var(--green)"
+          onBam={() => bamLoc('nghiem_thu')} dangLoc={loc === 'nghiem_thu'}
         />
       </div>
 
@@ -93,6 +107,14 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
         >{thongBao}</p>
       )}
 
+      {loc && (
+        <button
+          onClick={() => setLoc(null)}
+          className="underline"
+          style={{ fontSize: 12.5, color: 'var(--accent-ink)' }}
+        >← Bỏ lọc, xem lại tất cả</button>
+      )}
+
       {nhom.length === 0 ? (
         <div
           className="p-8 text-center"
@@ -101,7 +123,7 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
             borderRadius: 11, boxShadow: 'var(--shadow)', color: 'var(--muted)', fontSize: 13.5,
           }}
         >
-          Chưa có việc nào. Thêm việc đầu tiên ở trên.
+          {loc ? 'Không có việc nào trong nhóm này.' : 'Chưa có việc nào. Thêm việc đầu tiên ở trên.'}
         </div>
       ) : (
         nhom.map((g) => (

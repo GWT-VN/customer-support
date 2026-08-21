@@ -10,8 +10,9 @@
  * rồi dùng dataClient() (service_role, chỉ chạy trên server). Email lấy từ session
  * đã xác minh — KHÔNG bao giờ nhận email từ tham số client.
  */
-import { requireNhanSu, dataClient } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { dataClient } from '@/lib/nen-tang/db'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 import { revalidatePath } from 'next/cache'
 
 export type NguoiLam = { staff_id: string; ten: string; email: string; role: string }
@@ -74,6 +75,26 @@ async function goi<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   return data as T
 }
 
+/**
+ * Kết quả của server action gọi từ trình duyệt.
+ *
+ * VÌ SAO TRẢ VỀ CHỨ KHÔNG NÉM: Next CHE mọi lỗi ném ra từ server action khi
+ * chạy production, thay bằng "An error occurred in the Server Components
+ * render. The specific message is omitted…". Người dùng đáng ra phải đọc được
+ * "Không có quyền xem việc này" hay "Việc phải còn ít nhất 1 người phụ trách"
+ * thì lại nhận một đoạn tiếng Anh vô nghĩa. Nên mọi thông điệp dành cho người
+ * dùng đi qua đường trả-về, không đi qua đường ném.
+ */
+export type KQ<T> = { ok: true; duLieu: T } | { ok: false; loi: string }
+
+async function boc<T>(fn: () => Promise<T>): Promise<KQ<T>> {
+  try {
+    return { ok: true, duLieu: await fn() }
+  } catch (e) {
+    return { ok: false, loi: e instanceof Error ? e.message : 'Thao tác không thành công' }
+  }
+}
+
 // ── Đọc ─────────────────────────────────────────────────────────────────────
 export async function nenTang(): Promise<NenTang> {
   return goi<NenTang>('work_nen_tang', {})
@@ -81,6 +102,11 @@ export async function nenTang(): Promise<NenTang> {
 
 export async function vieCcuaToi(): Promise<ViecRow[]> {
   return (await goi<ViecRow[]>('work_viec_cua_toi', {})) ?? []
+}
+
+/** Bản cho TRÌNH DUYỆT — trả lỗi thay vì ném (xem ghi chú ở KQ<T>). */
+export async function bangTeamKQ(loc: Parameters<typeof bangTeam>[0] = {}): Promise<KQ<ViecTeamRow[]>> {
+  return boc(() => bangTeam(loc))
 }
 
 export async function bangTeam(loc: {
@@ -97,8 +123,8 @@ export async function bangTeam(loc: {
   })) ?? []
 }
 
-export async function chiTietViec(id: number): Promise<ChiTietViec> {
-  return goi<ChiTietViec>('work_chi_tiet_viec', { p_task_id: id })
+export async function chiTietViec(id: number): Promise<KQ<ChiTietViec>> {
+  return boc(() => goi<ChiTietViec>('work_chi_tiet_viec', { p_task_id: id }))
 }
 
 // ── Ghi ─────────────────────────────────────────────────────────────────────
@@ -117,7 +143,8 @@ export async function taoViec(input: {
   parent_id?: number | null
   assignees?: { staff_id: string; role: string }[]
   visibility?: string
-}): Promise<{ id: number; ref: string }> {
+}): Promise<KQ<{ id: number; ref: string }>> {
+  return boc(async () => {
   const kq = await goi<{ id: number; ref: string }>('work_tao_viec', {
     p_title: input.title,
     p_priority: input.priority ?? 3,
@@ -131,11 +158,14 @@ export async function taoViec(input: {
   })
   lamMoi()
   return kq
+  })
 }
 
-export async function doiTrangThai(id: number, status: string): Promise<void> {
-  await goi<void>('work_doi_trang_thai', { p_task_id: id, p_status: status })
-  lamMoi()
+export async function doiTrangThai(id: number, status: string): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_doi_trang_thai', { p_task_id: id, p_status: status })
+    lamMoi()
+  })
 }
 
 export async function suaViec(id: number, input: {
@@ -147,7 +177,8 @@ export async function suaViec(id: number, input: {
   visibility?: string | null
   xoa_due?: boolean
   xoa_team?: boolean
-}): Promise<void> {
+}): Promise<KQ<void>> {
+  return boc(async () => {
   await goi<void>('work_sua_viec', {
     p_task_id: id,
     p_title: input.title ?? null,
@@ -160,21 +191,28 @@ export async function suaViec(id: number, input: {
     p_xoa_team: input.xoa_team ?? false,
   })
   lamMoi()
+  })
 }
 
-export async function ganNguoi(taskId: number, staffId: string, role = 'doer'): Promise<void> {
-  await goi<void>('work_gan_nguoi', { p_task_id: taskId, p_staff_id: staffId, p_role: role })
-  lamMoi()
+export async function ganNguoi(taskId: number, staffId: string, role = 'doer'): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_gan_nguoi', { p_task_id: taskId, p_staff_id: staffId, p_role: role })
+    lamMoi()
+  })
 }
 
-export async function boNguoi(taskId: number, staffId: string): Promise<void> {
-  await goi<void>('work_bo_nguoi', { p_task_id: taskId, p_staff_id: staffId })
-  lamMoi()
+export async function boNguoi(taskId: number, staffId: string): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_bo_nguoi', { p_task_id: taskId, p_staff_id: staffId })
+    lamMoi()
+  })
 }
 
-export async function themBinhLuan(taskId: number, body: string): Promise<void> {
-  await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
-  lamMoi()
+export async function themBinhLuan(taskId: number, body: string): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
+    lamMoi()
+  })
 }
 
 // ── Việc tự sinh từ ERP ─────────────────────────────────────────────────────
@@ -192,13 +230,22 @@ export type LuatTuSinh = {
   last_created: number
   nguoi_nhan: string | null
   nguoi_nhan_ten: string | null
+  /** Sự kiện phải cũ hơn bao nhiêu GIỜ mới sinh việc. null = không xét. */
+  nguong_gio: number | null
+  /** Chỉ nhìn sự kiện trong ±n NGÀY quanh hôm nay. null = không xét. */
+  cua_so_ngay: number | null
 }
+
+/** Một dòng "nếu chạy bây giờ thì sinh cái này" — chỉ xem, không ghi. */
+export type ThuLuat = { luat: string; se_sinh: { khoa: string; mo_ta: string; moc: string }[] }
 
 export type ManTuSinh = {
   luat: LuatTuSinh[]
   la_quan_ly: boolean
   nhan_su: { id: string; ten: string }[]
   gan_day: (ViecTeamRow & { origin_ref: string | null; created_at: string })[]
+  /** Tổng việc auto trong DB — để nói rõ "bạn thấy 8/20, phần còn lại của người khác". */
+  tong_auto: number
 }
 
 export async function manTuSinh(): Promise<ManTuSinh> {
@@ -206,21 +253,55 @@ export async function manTuSinh(): Promise<ManTuSinh> {
 }
 
 /** Chạy bộ quét ngay. Chỉ cấp quản lý — RPC tự chặn, đây chỉ là đường gọi. */
-export async function chayTuSinh(): Promise<{ luat: string; da_tao: number }[]> {
-  const kq = await goi<{ luat: string; da_tao: number }[]>('work_chay_tu_sinh', {})
-  lamMoi()
-  revalidatePath('/work/tu-sinh')
-  return kq ?? []
+export async function chayTuSinh(): Promise<KQ<{ luat: string; da_tao: number }[]>> {
+  return boc(async () => {
+    const kq = await goi<{ luat: string; da_tao: number }[]>('work_chay_tu_sinh', {})
+    lamMoi()
+    revalidatePath('/work/tu-sinh')
+    return kq ?? []
+  })
 }
 
-export async function batTatLuat(key: string, active: boolean): Promise<void> {
-  await goi<void>('work_bat_tat_luat', { p_key: key, p_active: active })
-  revalidatePath('/work/tu-sinh')
+export async function batTatLuat(key: string, active: boolean): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_bat_tat_luat', { p_key: key, p_active: active })
+    revalidatePath('/work/tu-sinh')
+  })
 }
 
-export async function doiNguoiNhan(key: string, staffId: string | null): Promise<void> {
-  await goi<void>('work_doi_nguoi_nhan', { p_key: key, p_staff_id: staffId })
-  revalidatePath('/work/tu-sinh')
+/** Sửa tham số một luật. Trường nào bỏ trống thì giữ nguyên. */
+export async function suaLuat(key: string, input: {
+  priority?: number | null
+  han_ngay?: number | null
+  max_moi_lan?: number | null
+  nguong_gio?: number | null
+  cua_so_ngay?: number | null
+  team_key?: string | null
+}): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_sua_luat', {
+      p_key: key,
+      p_priority: input.priority ?? null,
+      p_han_ngay: input.han_ngay ?? null,
+      p_max_moi_lan: input.max_moi_lan ?? null,
+      p_nguong_gio: input.nguong_gio ?? null,
+      p_cua_so_ngay: input.cua_so_ngay ?? null,
+      p_team_key: input.team_key ?? null,
+    })
+    revalidatePath('/work/tu-sinh')
+  })
+}
+
+/** Xem trước: nếu chạy luật này BÂY GIỜ thì nó sinh những gì. Không ghi gì cả. */
+export async function thuLuat(key: string): Promise<KQ<ThuLuat>> {
+  return boc(() => goi<ThuLuat>('work_thu_luat', { p_key: key }))
+}
+
+export async function doiNguoiNhan(key: string, staffId: string | null): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_doi_nguoi_nhan', { p_key: key, p_staff_id: staffId })
+    revalidatePath('/work/tu-sinh')
+  })
 }
 
 // ── Thao tác hàng loạt ──────────────────────────────────────────────────────
@@ -241,7 +322,8 @@ export async function hangLoat(ids: number[], input: {
   xoa_due?: boolean
   team_id?: number | null
   xoa_team?: boolean
-}): Promise<KetQuaHangLoat> {
+}): Promise<KQ<KetQuaHangLoat>> {
+  return boc(async () => {
   const kq = await goi<KetQuaHangLoat>('work_hang_loat', {
     p_ids: ids,
     p_status: input.status ?? null,
@@ -257,4 +339,5 @@ export async function hangLoat(ids: number[], input: {
   lamMoi()
   revalidatePath('/work/tu-sinh')
   return kq
+  })
 }
