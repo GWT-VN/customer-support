@@ -137,6 +137,19 @@ Xong một việc thì làm ĐÚNG thứ tự này:
 2. **Trỏ DB local** — `npm run env:local` (Supabase local 127.0.0.1, có ~425 khách data
    thật đã che PII từ `supabase/seed-prod-masked.sh`). **Tuyệt đối không** đưa CEO xem bản
    đang cắm `.env.local.prod`.
+
+   **Tài khoản đăng nhập local là QUY ƯỚC CỐ ĐỊNH — CEO chốt 21/08/2026, không phiên nào đổi:**
+
+   | Email | Mật khẩu | Thấy gì |
+   |---|---|---|
+   | `dev.admin@gwt.vn` | `gwtlocal123` | `admin` — mọi khu: Việc · CSKH · Sales |
+   | `dev.sales@gwt.vn` | `gwtlocal123` | `sales` — chỉ Sales (kèm khu Việc, mở cho mọi nhân viên) |
+
+   Mọi worktree cắm **chung một Supabase local**, nên mật khẩu cũng chung. Phiên nào tự đặt
+   mật khẩu riêng rồi ghi vào tài liệu của mình là **phiên khác gãy**: đã có lúc cùng một email
+   mang 3 mật khẩu, CEO gõ đúng tài liệu vẫn bị chặn. Lệch thì chạy lại
+   `bash supabase/seed-prod-masked.sh` (bước 4/4 đặt lại đúng bảng trên).
+   Cần vai trò khác để thử phân quyền → tạo email KHÁC trong Studio local, đừng đụng 2 dòng này.
 3. **Bật server local từ worktree, cổng riêng** — mỗi phiên một cổng để không đụng nhau:
    ```bash
    cd <worktree>/apps/web && npx next dev -p 3101   # dải cổng theo khu, xem mục 'Nhánh · cổng · sao lưu'
