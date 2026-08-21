@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
-import { coTheVaoCS, requireStaff } from '@/lib/supabase'
+import { coTheVaoCS } from '@/lib/nen-tang/gac-cong'
+import { requireStaff } from '@/lib/nen-tang/phien'
 import { kenhChon } from '@/app/actions'
 import { DauTrang } from '@/components/DauTrang'
 import { TaoKhachForm } from '@/components/TaoKhachForm'

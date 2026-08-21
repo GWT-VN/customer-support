@@ -606,6 +606,9 @@ export async function xoaDiaChiKhach(
  */
 export async function capKhachNghiTrung(): Promise<CapNghiTrung[]> {
   await requireStaff()
+  // Chỉ ĐỌC danh sách khách để gợi ý cặp trùng -> quyền xem khách là đủ.
+  // Phép GỘP thật vẫn gác riêng ở chỗ gọi RPC `gop_khach`.
+  await doQuyen('cs.khach.xem')
   const db = dataClient()
   const { data, error } = await db.from('cs_customers')
     .select('id, full_name, primary_phone, province, customer_code')
