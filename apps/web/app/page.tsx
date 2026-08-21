@@ -7,7 +7,8 @@ import { BoLocChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { NHAN_TINH_TRANG_BH, TINH_TRANG_BH, tenModel, moTaLocNgay, docLocNgay, type TinhTrangBH } from '@/lib/danhSach'
 import { redirect } from 'next/navigation'
-import { coTheVaoCS, laChiKyThuatVien, laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { coTheVaoCS, laChiKyThuatVien } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportMayButton } from '@/components/ExportMayButton'
 import { BangMay } from '@/components/BangMay'
@@ -23,10 +24,16 @@ export default async function Home({
   if (!(await coTheVaoCS())) redirect('/work')
   const { q = '', trang: trangRaw, cot, chieu, sp, bh, ngtu, ngden } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: machines, tong, soTrang, sapXep }, models, admin] = await Promise.all([
+  // Mỗi nút hỏi ĐÚNG quyền gác Server Action của nó, không dùng chung một cờ
+  // laQuanLy như trước — cờ chung là lý do giao diện lệch khỏi rào thật.
+  const [{ rows: machines, tong, soTrang, sapXep }, models, quyen] = await Promise.all([
     searchMachines(q, { trang, cot, chieu, maSanPham: sp, tinhTrangBH: bh, ngtu, ngden }),
     machineModels(),
-    laQuanLy(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+      xuat: ['cs.bao_cao.xuat', 'QUANLY'],
+    }),
   ])
   const views = await listBangView('installed_base')
 
@@ -101,14 +108,14 @@ export default async function Home({
         <KhungChon
           khoaTrang={machines.map((m) => m.serial)}
           tong={tong}
-          bat={admin}
+          bat={quyen.hangLoat}
           // KHÔNG có `trang`: lật trang không được coi là đổi bộ lọc, xem ChonDong.tsx
           thamSo={{ q, sp, bh, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaMay}
         >
         <ThanhDaChon nhan="máy" />
-        <BangMay rows={machines} admin={admin} views={views}
-          congCu={admin && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />} />
+        <BangMay rows={machines} choViewChung={quyen.viewChung} views={views}
+          congCu={quyen.xuat && <ExportMayButton q={q} sp={sp} bh={bh} ngtu={ngtu} ngden={ngden} />} />
         </KhungChon>
 
         <Suspense>

@@ -5,7 +5,7 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { LocNgay } from '@/bang'
-import { laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { ExportLoiButton } from '@/components/ExportLoiButton'
 import { BangLoi } from '@/components/BangLoi'
@@ -20,10 +20,14 @@ export default async function LoiPage({
   const { q = '', tt, trang: trangRaw, cot, chieu, ngtu, ngden } = await searchParams
   const tinhTrang = tt ?? SAP           // mặc định: danh sách gọi được NGAY
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows, tong, soTrang, sapXep }, counts, admin, views] = await Promise.all([
+  const [{ rows, tong, soTrang, sapXep }, counts, quyen, views] = await Promise.all([
     coreForecast(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     coreCounts(),
-    laQuanLy(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+      xuat: ['cs.bao_cao.xuat', 'QUANLY'],
+    }),
     listBangView('core'),
   ])
 
@@ -85,17 +89,17 @@ export default async function LoiPage({
         <KhungChon
           khoaTrang={rows.map((r) => `${r.serial}-${r.filter_code}`)}
           tong={tong}
-          bat={admin}
+          bat={quyen.hangLoat}
           // `tt` phải là tinhTrang ĐÃ GIẢI (mặc định SAP khi URL trống), không phải
           // `tt` thô — nếu không, "chọn tất cả" sẽ ôm cả tab khác tab đang xem.
           thamSo={{ q, tt: tinhTrang, cot, chieu, ngtu, ngden }}
           layTatCaKhoa={khoaTatCaLoi}
         >
         <ThanhDaChon nhan="dòng lõi" />
-        <BangLoi rows={rows} admin={admin} views={views} congCu={
+        <BangLoi rows={rows} choViewChung={quyen.viewChung} views={views} congCu={
           <>
             <Suspense><LocNgay nhan="Đến hạn" /></Suspense>
-            {admin && <ExportLoiButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
+            {quyen.xuat && <ExportLoiButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
           </>
         } />
         </KhungChon>

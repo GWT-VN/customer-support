@@ -6,14 +6,15 @@ import { GanKenh } from '@/components/GanKenh'
 import { TicketList } from '@/components/TicketList'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { customer, contacts } = await getCustomer(id)
   if (!customer) notFound()
-  const [tickets, machines, kenh, baoTri, quanLy] = await Promise.all([
-    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id), laQuanLy(),
+  const [tickets, machines, kenh, baoTri, quyen] = await Promise.all([
+    ticketsOfCustomer(id), machinesOfCustomer(id), kenhChon(), baoTriCuaKhach(id),
+    hoiQuyen({ taoPlan: ['cs.bao_tri.tao_plan', 'QUANLY'] }),
   ])
   const btDaXong = baoTri.filter((v) => v.completed_at).length
 
@@ -58,7 +59,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <section className="bg-white rounded-xl border p-5">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h2 className="font-medium text-slate-900">Lịch bảo trì ({btDaXong}/{baoTri.length} đã làm)</h2>
-            {quanLy && (
+            {quyen.taoPlan && (
               <Link href={`/bao-tri/len-lich?kh=${customer.id}`} prefetch={false} className="text-xs text-sky-700 underline whitespace-nowrap">
                 ＋ Tạo lịch bảo trì
               </Link>

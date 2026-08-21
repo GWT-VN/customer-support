@@ -6,7 +6,7 @@
  * DB là đẻ ra "quyền ma" — tick vào thấy yên tâm nhưng chẳng gác gì cả.
  * DB chỉ lưu Ô NÀO ĐƯỢC TICK (bảng quyen_vai_tro).
  *
- * 51 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
+ * 52 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
  * Spec: docs/superpowers/specs/2026-08-20-nen-tang-tai-khoan-phan-quyen-design.md §6.1
  */
 import { VAI_TRO, type VaiTro } from './vai-tro'
@@ -126,6 +126,10 @@ const BANG_QUYEN = {
   'he_thong.nhat_ky': { nhom: 'he_thong', nhan: 'Xem nhật ký thao tác', mucMacDinh: 'A', chiXem: true },
   'he_thong.catalog': { nhom: 'he_thong', nhan: 'Đồng bộ danh mục sản phẩm', mucMacDinh: 'A' },
   'he_thong.kenh': { nhom: 'he_thong', nhan: 'Quản lý kênh bán, gán kênh', mucMacDinh: 'CS' },
+  // Tách ĐỌC khỏi GHI có chủ đích. Gộp chung là khoá chết app: mọi trang danh sách
+  // đều gọi listBangView() lúc vẽ, nên nhân viên thường mở trang nào cũng bị đá ra
+  // "không đủ quyền" — đo được khi thử tay 21/08 với một tài khoản NV CSKH thật.
+  'he_thong.view_xem': { nhom: 'he_thong', nhan: 'Xem view bảng đã lưu', mucMacDinh: 'NS', chiXem: true },
   'he_thong.view_chung': { nhom: 'he_thong', nhan: 'Lưu / xoá view bảng dùng chung', mucMacDinh: 'TCS' },
 } as const satisfies Record<string, HoSo>
 
@@ -139,6 +143,14 @@ export type MaQuyen = keyof typeof BANG_QUYEN
 export const HO_SO_QUYEN: Record<MaQuyen, HoSo> = BANG_QUYEN
 
 export const QUYEN = Object.keys(HO_SO_QUYEN) as MaQuyen[]
+
+/**
+ * Bảng tra cho GIAO DIỆN: mã quyền -> được hay không.
+ *
+ * Khai báo ở file THUẦN này (không phải kiem-quyen.ts) để component client
+ * `import type` được mà không kéo theo dataClient/next-navigation.
+ */
+export type BangQuyen = Partial<Record<MaQuyen, boolean>>
 
 export function laMaQuyenHopLe(x: string): x is MaQuyen {
   return Object.prototype.hasOwnProperty.call(BANG_QUYEN, x)

@@ -2574,7 +2574,14 @@ export async function datSoLanBaoTri(
 /** Sửa MỐC NGÀY (và mô tả) của 1 sự kiện vòng đời đã ghi — để chỉnh mốc lịch sử. CHỈ ADMIN. */
 export async function suaSuKien(id: string, ngay: string, ghiChu?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
-  if (!(await coQuyen('cs.bao_tri.tao_plan', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
+  // Sửa NGÀY của một sự kiện vòng đời serial (serial_su_dung) — cùng họ với
+  // datTrangThaiSerial, nên quyền phải là cs.serial.kho.
+  //
+  // Trước đây gán nhầm sang cs.bao_tri.tao_plan (di sản đợt phân loại bằng grep,
+  // không đọc thân hàm). Hậu quả nếu để nguyên: người chỉ được "tạo plan bảo trì"
+  // lại sửa được ngày vòng đời máy, còn người phụ trách kho serial thì không.
+  // Luật cũ hai bên đều là QUANLY nên hành vi HÔM NAY không đổi.
+  if (!(await coQuyen('cs.serial.kho', 'QUANLY'))) return { ok: false, error: KHONG_DU_QUYEN }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ngay)) return { ok: false, error: 'Ngày không hợp lệ (YYYY-MM-DD).' }
   const db = dataClient()
   const { data: ev } = await db.from('serial_su_dung').select('serial').eq('id', id).maybeSingle()
@@ -3531,7 +3538,11 @@ const DUONG_DAN_BANG: Record<string, string> = {
 /** View của bảng: view CÁ NHÂN của mình + view CHUNG (mọi người). */
 export async function listBangView(bang: string): Promise<BangView[]> {
   const u = await requireStaff()
-  await doQuyen('he_thong.view_chung')
+  // ĐỌC danh sách view — mọi nhân sự. KHÔNG dùng he_thong.view_chung ở đây:
+  // quyền đó là quyền GHI view dùng chung (mức Trưởng CSKH), mà hàm này được gọi
+  // khi vẽ MỌI trang danh sách. Đòi quyền ghi để đọc = nhân viên thường mở trang
+  // nào cũng bị đá về "không đủ quyền". Đã dính thật khi thử tay 21/08.
+  await doQuyen('he_thong.view_xem')
   const email = u.email ?? ''
   const { data, error } = await dataClient().from('bang_view')
     .select('id, ten, chu, cot').eq('bang', bang)

@@ -1,5 +1,6 @@
 import { layNguoiDung } from '@/lib/nen-tang/phien'
-import { coTheVaoCS, laAdmin, laChiKyThuatVien, laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { coTheVaoCS, laChiKyThuatVien } from '@/lib/nen-tang/gac-cong'
+import { quyenChoMan } from '@/lib/nen-tang/kiem-quyen'
 import { SidebarNav } from './SidebarNav'
 
 /**
@@ -12,8 +13,18 @@ import { SidebarNav } from './SidebarNav'
 export async function Sidebar() {
   const user = await layNguoiDung()
   if (!user) return null
-  const [admin, quanLy, chiKyThuat, vaoCS] = await Promise.all([
-    laAdmin(), laQuanLy(), laChiKyThuatVien(), coTheVaoCS(),
+  const [quyen, chiKyThuat, vaoCS] = await Promise.all([
+    quyenChoMan([
+      ['cs.bao_tri.tao_plan', 'QUANLY'],
+      ['cs.ky_thuat.ho_so', 'QUANLY'],
+      ['cs.ky_thuat.xep_lich', 'QUANLY'],
+      ['cs.yeu_cau.xem', 'QUANLY'],
+      ['cs.bao_cao.doanh_so', 'ADMIN'],
+      ['he_thong.catalog', 'ADMIN'],
+      ['he_thong.nhat_ky', 'ADMIN'],
+      ['he_thong.nhan_su.xem', 'ADMIN'],
+    ]),
+    laChiKyThuatVien(), coTheVaoCS(),
   ])
-  return <SidebarNav laAdmin={admin} laQuanLy={quanLy} chiKyThuat={chiKyThuat} coTheVaoCS={vaoCS} />
+  return <SidebarNav quyen={quyen} chiKyThuat={chiKyThuat} coTheVaoCS={vaoCS} />
 }

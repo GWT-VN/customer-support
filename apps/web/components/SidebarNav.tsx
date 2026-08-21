@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import type { BangQuyen, MaQuyen } from '@/lib/nen-tang/quyen'
 
 /**
  * Menu dọc bên trái, gom theo nhóm nghiệp vụ (thay thanh ngang 12 mục cũ).
@@ -32,32 +33,39 @@ const NHOM: readonly Nhom[] = [
   ] },
 ] as const
 
-/** Nhóm "Bảo trì" — gom mọi mục liên quan. Mục quản lý chỉ hiện với cấp quản lý. */
-function nhomBaoTri(laQuanLy: boolean): Nhom {
+/**
+ * Nhóm "Bảo trì" — mỗi mục hiện đúng khi CÓ quyền vào trang nó dẫn tới, không
+ * gom vào một cờ laQuanLy như trước. Cặp (mã quyền, luật cũ) khớp lời gọi
+ * chanNeuThieuQuyen() ở trang tương ứng.
+ */
+function nhomBaoTri(co: (ma: MaQuyen) => boolean): Nhom {
   return { ten: 'Bảo trì', muc: [
     { href: '/bao-tri', nhan: 'Lịch bảo trì' },
     { href: '/loi', nhan: 'Lịch thay lõi' },
-    ...(laQuanLy ? [
+    ...(co('cs.bao_tri.tao_plan') ? [
       { href: '/bao-tri/map', nhan: 'Map khách' },
       { href: '/bao-tri/len-lich', nhan: 'Lên lịch & gói' },
-      { href: '/ky-thuat', nhan: 'Gán lịch kỹ thuật' },
-      { href: '/ky-thuat/lich', nhan: 'Xem lịch kỹ thuật' },
-      { href: '/ky-thuat/nhan-su', nhan: 'Danh sách kỹ thuật' },
     ] : []),
+    ...(co('cs.ky_thuat.ho_so') ? [{ href: '/ky-thuat', nhan: 'Gán lịch kỹ thuật' }] : []),
+    ...(co('cs.ky_thuat.xep_lich') ? [{ href: '/ky-thuat/lich', nhan: 'Xem lịch kỹ thuật' }] : []),
+    ...(co('cs.ky_thuat.ho_so') ? [{ href: '/ky-thuat/nhan-su', nhan: 'Danh sách kỹ thuật' }] : []),
   ] }
 }
 
-// Cấp QUẢN LÝ (admin | cs_manager): duyệt.
-const NHOM_QUANLY: Nhom = { ten: 'Quản lý', muc: [
-  { href: '/duyet', nhan: 'Chờ duyệt' },
-] }
-// CHỈ admin: doanh số, catalog, nhật ký, nhân viên.
-const NHOM_ADMIN: Nhom = { ten: 'Quản trị', muc: [
-  { href: '/doanh-so', nhan: 'Doanh số' },
-  { href: '/dong-bo-catalog', nhan: 'Đồng bộ catalog' },
-  { href: '/audit', nhan: 'Nhật ký thao tác' },
-  { href: '/nhan-vien', nhan: 'Nhân viên' },
-] }
+/** Mục quản lý / quản trị — mỗi mục một quyền riêng, xem chú thích nhomBaoTri(). */
+function nhomQuanTri(co: (ma: MaQuyen) => boolean): Nhom[] {
+  const duyet = co('cs.yeu_cau.xem') ? [{ href: '/duyet', nhan: 'Chờ duyệt' }] : []
+  const qt = [
+    ...(co('cs.bao_cao.doanh_so') ? [{ href: '/doanh-so', nhan: 'Doanh số' }] : []),
+    ...(co('he_thong.catalog') ? [{ href: '/dong-bo-catalog', nhan: 'Đồng bộ catalog' }] : []),
+    ...(co('he_thong.nhat_ky') ? [{ href: '/audit', nhan: 'Nhật ký thao tác' }] : []),
+    ...(co('he_thong.nhan_su.xem') ? [{ href: '/nhan-vien', nhan: 'Nhân viên' }] : []),
+  ]
+  return [
+    ...(duyet.length ? [{ ten: 'Quản lý', muc: duyet }] : []),
+    ...(qt.length ? [{ ten: 'Quản trị', muc: qt }] : []),
+  ]
+}
 
 // Trang chi tiết -> mục cha nào sáng. Không map bằng tiền tố URL bừa (xem DieuHuong cũ).
 const CHA: ReadonlyArray<readonly [string, string]> = [
@@ -79,17 +87,16 @@ const NHOM_WORK: Nhom = { ten: 'Công việc', muc: [
   { href: '/work', nhan: 'Việc của tôi' },
 ] }
 
-export function SidebarNav({ laAdmin, laQuanLy, chiKyThuat = false, coTheVaoCS = true }: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat?: boolean; coTheVaoCS?: boolean }) {
+export function SidebarNav({ quyen, chiKyThuat = false, coTheVaoCS = true }: {
+  quyen: BangQuyen; chiKyThuat?: boolean; coTheVaoCS?: boolean
+}) {
+  // Thiếu khoá = chưa hỏi = coi như không có: hỏng theo hướng ẨN, không hở.
+  const co = (ma: MaQuyen) => quyen[ma] === true
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   // Khu Công việc luôn hiện. Nhóm CS chỉ hiện với người vào được khu CS (Sales thuần
   // không thấy menu khách/ticket). Chỉ kỹ thuật -> menu rút gọn (chỉ lịch + việc).
-  const nhomCS = coTheVaoCS ? [
-    ...NHOM,
-    nhomBaoTri(laQuanLy),
-    ...(laQuanLy ? [NHOM_QUANLY] : []),
-    ...(laAdmin ? [NHOM_ADMIN] : []),
-  ] : []
+  const nhomCS = coTheVaoCS ? [...NHOM, nhomBaoTri(co), ...nhomQuanTri(co)] : []
   const nhom = chiKyThuat ? [NHOM_WORK, NHOM_KY_THUAT] : [NHOM_WORK, ...nhomCS]
   const dangMo = mucDangMo(pathname, nhom.flatMap((n) => n.muc.map((m) => m.href)))
 

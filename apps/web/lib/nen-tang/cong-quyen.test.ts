@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { laMaQuyenHopLe } from './quyen'
 
@@ -69,5 +69,63 @@ describe('mọi chỗ gác đều đi qua ma trận', () => {
       0,
     )
     expect(tong).toBeGreaterThanOrEqual(140)
+  })
+})
+
+/**
+ * Lưới an toàn cho GIAO DIỆN (việc 24).
+ *
+ * Rào thật đã đi qua ma trận từ GĐ3, nhưng giao diện thì vẫn ẩn/hiện nút bằng
+ * cờ vai trò thô. Hai bên nói khác nhau ngay khi CEO tick khác luật cũ: nút vẫn
+ * hiện mà bấm vào bị chặn, hoặc nút bị ẩn dù đã cấp quyền — người dùng không có
+ * cách nào biết mình đang thiếu quyền hay app hỏng.
+ *
+ * Kiểm tĩnh trên mã nguồn cho rẻ. Cố tình KHÔNG cấm coTheVaoCS/coTheVaoSales/
+ * laChiKyThuatVien: chúng trả lời "vào được KHU nào" — luật vào cửa, không phải
+ * ma trận quyền.
+ */
+const GOC = fileURLToPath(new URL('../../', import.meta.url))
+
+function moiFileTsx(thuMuc: string): string[] {
+  const ra: string[] = []
+  for (const m of readdirSync(GOC + thuMuc, { withFileTypes: true, recursive: true })) {
+    if (!m.isFile() || !m.name.endsWith('.tsx')) continue
+    ra.push(`${m.parentPath ?? m.path}/${m.name}`)
+  }
+  return ra
+}
+
+const FILE_GIAO_DIEN = ['app', 'components', 'bang'].flatMap(moiFileTsx)
+
+describe('giao diện ẩn/hiện nút theo MA TRẬN, không theo vai trò', () => {
+  it('quét được file để kiểm — nếu 0 file thì bài kiểm này vô nghĩa', () => {
+    expect(FILE_GIAO_DIEN.length).toBeGreaterThan(30)
+  })
+
+  it('không còn chỗ nào ẩn/hiện bằng laAdmin / laQuanLy', () => {
+    const viPham: string[] = []
+    for (const f of FILE_GIAO_DIEN) {
+      // Bỏ chú thích trước khi soi: nhiều file KỂ LẠI lịch sử "trước đây gọi
+      // laAdmin()" và đó là ghi chép có ích, không phải vi phạm.
+      const src = readFileSync(f, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/.*$/gm, '$1')
+      // Khớp TÊN ở bất kỳ đâu trong code, kể cả dòng import: file giao diện thì
+      // không nên biết tới hai hàm này. Bản hẹp hơn (chỉ khớp `laAdmin(` hoặc
+      // `laAdmin=`) đã ĐỂ LỌT một file thử cố tình vi phạm — đo được, nên bỏ.
+      if (/\b(laAdmin|laQuanLy)\b/.test(src)) viPham.push(f.replace(GOC, ''))
+    }
+    expect(viPham, `còn ${viPham.length} file ẩn/hiện theo vai trò thô`).toEqual([])
+  })
+
+  it('mọi mã quyền dùng để vẽ giao diện đều CÓ THẬT và khai đúng luật cũ', () => {
+    // Gõ sai mã ở đây thì nút biến mất vĩnh viễn mà không ai báo lỗi.
+    for (const f of FILE_GIAO_DIEN) {
+      const src = readFileSync(f, 'utf8')
+      for (const m of src.matchAll(/\[\s*'((?:cs|work|sales|he_thong)\.[a-z_.]+)',\s*'([A-Z]+)'\s*\]/g)) {
+        expect(laMaQuyenHopLe(m[1]), `${f.replace(GOC, '')} dùng mã lạ: ${m[1]}`).toBe(true)
+        expect(['ADMIN', 'QUANLY', 'NHANVIEN'], `${f.replace(GOC, '')}: gate lạ ${m[2]}`).toContain(m[2])
+      }
+    }
   })
 })

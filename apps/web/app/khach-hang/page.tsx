@@ -6,7 +6,7 @@ import { BangKhach } from '@/components/BangKhach'
 import { SUA_HL_KHACH } from '@/lib/danhSach'
 import { OTimKiem, ThanhDangLoc, PhanTrang } from '@/bang'
 import { KhungChon, ThanhDaChon } from '@/bang'
-import { laAdmin, laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 
 export default async function KhachHangPage({
   searchParams,
@@ -15,11 +15,15 @@ export default async function KhachHangPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  // quanLy (admin|cs_manager): xem/sửa hàng loạt + nút nâng cao. chiAdmin: riêng XOÁ khách.
-  const [{ rows: list, tong, soTrang, sapXep }, quanLy, chiAdmin, exportDuyet, views] = await Promise.all([
+  // Ba nút, ba quyền khác nhau — trước đây gom vào laQuanLy/laAdmin nên tick lại
+  // ma trận là nút hiện sai. Cặp (mã quyền, luật cũ) khớp y hệt Server Action.
+  const [{ rows: list, tong, soTrang, sapXep }, quyen, exportDuyet, views] = await Promise.all([
     listKhachHang(q, { trang, cot, chieu }),
-    laQuanLy(),
-    laAdmin(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      xoaHangLoat: ['cs.khach.xoa_hang_loat', 'ADMIN'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+    }),
     exportCuaToi(),
     listBangView('cs_customers'),
   ])
@@ -48,15 +52,15 @@ export default async function KhachHangPage({
         <KhungChon
           khoaTrang={list.map((c) => c.id)}
           tong={tong}
-          bat={quanLy}
+          bat={quyen.hangLoat}
           thamSo={{ q, cot, chieu }}
           layTatCaKhoa={khoaTatCaKhachHang}
         >
           <ThanhDaChon nhan="khách">
-            <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} choPhepXoa={chiAdmin} />
+            <ThaoTacHangLoat bang="cs_customers" truong={SUA_HL_KHACH} choPhepXoa={quyen.xoaHangLoat} />
           </ThanhDaChon>
           <Suspense>
-            <BangKhach rows={list} admin={quanLy} views={views} />
+            <BangKhach rows={list} choViewChung={quyen.viewChung} views={views} />
           </Suspense>
         </KhungChon>
 

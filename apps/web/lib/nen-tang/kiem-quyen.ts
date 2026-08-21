@@ -3,7 +3,7 @@ import { cache } from 'react'
 import { dataClient } from './db'
 import { laAdmin, laQuanLy } from './gac-cong'
 import { layNhanVien } from './phien'
-import { laMaQuyenHopLe, type MaQuyen } from './quyen'
+import { laMaQuyenHopLe, type BangQuyen, type MaQuyen } from './quyen'
 
 /**
  * Luật CŨ đang gác chỗ gọi này — người gọi phải nói ra, vì hàm không tự đoán được.
@@ -70,16 +70,53 @@ async function ghiLech(ma: MaQuyen, luatCu: boolean, maTran: boolean) {
  * Hai luật cứng chống khoá chết hệ thống (không tự khoá mình, phải còn ít nhất
  * một admin) KHÔNG BAO GIỜ đi qua đây — chúng nằm trong vai-tro.ts:kiemTraSuaNhanVien.
  */
-export async function coQuyen(ma: MaQuyen, gateCu: GateCu): Promise<boolean> {
+async function tinhQuyen(ma: MaQuyen, gateCu: GateCu): Promise<{ cu: boolean; moi: boolean }> {
   const cu =
     gateCu === 'ADMIN' ? await laAdmin()
     : gateCu === 'QUANLY' ? await laQuanLy()
     : true
+  return { cu, moi: (await quyenCuaToi()).has(ma) }
+}
 
-  const moi = (await quyenCuaToi()).has(ma)
+export async function coQuyen(ma: MaQuyen, gateCu: GateCu): Promise<boolean> {
+  const { cu, moi } = await tinhQuyen(ma, gateCu)
   if (moi !== cu) await ghiLech(ma, cu, moi)
 
   return maTranDangLamLuat() ? moi : cu
+}
+
+/**
+ * Bản dùng cho GIAO DIỆN (ẩn/hiện nút) — trả lời y hệt coQuyen() nhưng KHÔNG ghi lệch.
+ *
+ * Vì sao không ghi: mục "Lệch" ở /nhan-vien/phan-quyen sinh ra để CEO thấy
+ * "việc hôm nay họ LÀM được mà ma trận sẽ chặn". Một lượt vẽ trang hỏi cả chục
+ * quyền chỉ để biết có vẽ nút hay không — người dùng chưa bấm gì cả. Ghi hết
+ * vào đó là màn Lệch ngập dòng vô nghĩa, đúng thứ làm CEO không đọc nổi nó nữa.
+ *
+ * Vẫn đi qua cùng một phép tính và cùng cầu dao, nên nút hiện ra và Server Action
+ * phía sau LUÔN đồng ý với nhau — kể cả lúc bật/tắt MA_TRAN_QUYEN.
+ */
+export async function coQuyenHienNut(ma: MaQuyen, gateCu: GateCu): Promise<boolean> {
+  const { cu, moi } = await tinhQuyen(ma, gateCu)
+  return maTranDangLamLuat() ? moi : cu
+}
+
+/**
+ * Hỏi NHIỀU quyền một lượt rồi truyền xuống component client.
+ *
+ * Đây là thứ thay cho lối cũ "truyền một cờ laQuanLy/laAdmin rồi gác chục nút
+ * bằng nó". Cờ thô là lý do giao diện và rào thật lệch nhau ngay khi CEO tick
+ * khác đi: nút vẫn hiện mà bấm vào bị chặn, hoặc nút bị ẩn dù đã cấp quyền.
+ *
+ * Rẻ: quyenCuaToi() và layNhanVien() đều cache() theo request, nên dù hỏi 10
+ * quyền cũng chỉ một lượt đọc database.
+ */
+export async function quyenChoMan(
+  ds: readonly (readonly [MaQuyen, GateCu])[]
+): Promise<BangQuyen> {
+  const ra: BangQuyen = {}
+  for (const [ma, gateCu] of ds) ra[ma] = await coQuyenHienNut(ma, gateCu)
+  return ra
 }
 
 /**
@@ -114,4 +151,27 @@ export async function doQuyen(ma: MaQuyen): Promise<void> {
  */
 export async function chanNeuThieuQuyen(ma: MaQuyen, gateCu: GateCu) {
   if (!(await coQuyen(ma, gateCu))) redirect('/?loi=khong_du_quyen')
+}
+
+/**
+ * Hỏi nhiều quyền một lượt, đặt TÊN cho từng cái — dạng dùng trong trang.
+ *
+ *   const q = await hoiQuyen({
+ *     hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+ *     xuat:     ['cs.bao_cao.xuat', 'QUANLY'],
+ *   })
+ *   <KhungChon bat={q.hangLoat}> … {q.xuat && <NutXuat/>}
+ *
+ * Cặp (mã quyền, luật cũ) phải KHỚP y hệt lời gọi bên Server Action tương ứng.
+ * Lệch cặp là giao diện và rào thật trả lời khác nhau ngay khi cầu dao còn tắt.
+ */
+export async function hoiQuyen<K extends string>(
+  bang: Record<K, readonly [MaQuyen, GateCu]>
+): Promise<Record<K, boolean>> {
+  const ra = {} as Record<K, boolean>
+  for (const khoa of Object.keys(bang) as K[]) {
+    const [ma, gateCu] = bang[khoa]
+    ra[khoa] = await coQuyenHienNut(ma, gateCu)
+  }
+  return ra
 }

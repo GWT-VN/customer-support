@@ -1,10 +1,15 @@
-import { laQuanLy } from '@/lib/nen-tang/gac-cong'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { listKhachChoDuyet } from '@/app/actions'
 import { ChonKieuLap } from '@/components/ChonKieuLap'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 
 export default async function DangKyBHPage() {
-  const [quanLy, choDuyet] = await Promise.all([laQuanLy(), listKhachChoDuyet()])
+  // Hỏi quyền TRƯỚC rồi mới đọc hàng chờ: listKhachChoDuyet() tự gác bằng
+  // cs.khach.duyet_cho và ĐÁ VỀ TRANG CHỦ nếu thiếu — gọi vô điều kiện là nhân
+  // viên thường mở trang này liền bị văng, dù phần đăng ký bảo hành phía trên
+  // vốn dành cho họ.
+  const quyen = await hoiQuyen({ duyetKhach: ['cs.khach.duyet_cho', 'QUANLY'] })
+  const choDuyet = quyen.duyetKhach ? await listKhachChoDuyet() : []
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
@@ -18,7 +23,7 @@ export default async function DangKyBHPage() {
         </p>
         <ChonKieuLap />
 
-        {quanLy && (
+        {quyen.duyetKhach && (
           <section className="bg-white rounded-xl border p-5 max-w-2xl">
             <h2 className="font-medium text-slate-900 mb-3">Khách chờ duyệt ({choDuyet.length})</h2>
             <KhachChoDuyetList items={choDuyet} />

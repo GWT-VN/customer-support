@@ -38,12 +38,12 @@ const COT: CotDef<MaintenanceDue>[] = [
 ]
 const MAC_DINH = ['khach', 'bo_may', 'lan', 'due_date', 'ghi']
 
-export function BangBaoTri({ rows, admin, views, congCu }: { rows: MaintenanceDue[]; admin: boolean; views: BangView[]; congCu?: React.ReactNode }) {
+export function BangBaoTri({ rows, choViewChung, views, congCu }: { rows: MaintenanceDue[]; choViewChung: boolean; views: BangView[]; congCu?: React.ReactNode }) {
   return (
     <BangTuyChinh
       rows={rows} keyOf={(r) => r.visit_id}
       moTaOf={(r) => `lượt bảo trì của ${r.customer_name ?? r.section ?? 'khách chưa khớp'}`} nhan="lượt bảo trì"
-      bang="maintenance" cot={COT} macDinh={MAC_DINH} sapMacDinh="due_date" views={views} admin={admin} congCu={congCu}
+      bang="maintenance" cot={COT} macDinh={MAC_DINH} sapMacDinh="due_date" views={views} choViewChung={choViewChung} congCu={congCu}
     />
   )
 }

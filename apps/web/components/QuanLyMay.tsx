@@ -20,10 +20,17 @@ type Panel = '' | 'doi_may' | 'doi_serial' | 'doi_khach' | 'go' | 'lap'
  *  · Nhật ký: admin sửa được MỐC NGÀY từng sự kiện (backfill/chỉnh lịch sử).
  */
 export function QuanLyMay({
-  serial, internalCode, trangThai, suKien, dangLap, laAdmin, ds,
+  serial, internalCode, trangThai, suKien, dangLap, choLapThuDoi, choSuaKhach, choKhoSerial, ds,
 }: {
   serial: string; internalCode: string | null; trangThai: string | null
-  suKien: SuDungSerial[]; dangLap: boolean; laAdmin: boolean; ds: TrangThai[]
+  suKien: SuDungSerial[]; dangLap: boolean
+  /** Đổi máy cho khách (thu hồi/lắp thay) — cs.may.lap_thu_doi */
+  choLapThuDoi: boolean
+  /** Sửa serial gõ nhầm · đổi khách · gỡ khỏi khách — cs.khach.xin_xoa */
+  choSuaKhach: boolean
+  /** Đổi trạng thái kho + sửa ngày sự kiện vòng đời — cs.serial.kho */
+  choKhoSerial: boolean
+  ds: TrangThai[]
 }) {
   const router = useRouter()
   const [panel, setPanel] = useState<Panel>('')
@@ -88,14 +95,20 @@ export function QuanLyMay({
         <span className={`px-2 py-0.5 rounded-full text-xs ${mauClass(trangThai)}`}>{nhan(trangThai)}</span>
       </div>
 
-      {laAdmin && dangLap && (
+      {/*
+        Bốn nút này TRƯỚC ĐÂY chung một cờ laAdmin, nhưng phía sau chúng là HAI
+        quyền khác nhau: "Đổi máy cho khách" gọi doiMayChoKhach (cs.may.lap_thu_doi),
+        ba nút còn lại gọi doiSerialMay/doiKhachMay/xoaMayDaLap (cs.khach.xin_xoa).
+        Gộp lại thì giao diện nói dối theo cả hai chiều — nay tách theo đúng quyền.
+      */}
+      {(choLapThuDoi || choSuaKhach) && dangLap && (
         <div className="rounded-lg border p-3 space-y-2 bg-slate-50">
           <p className="text-xs font-medium text-slate-600">Máy đang ở khách — thao tác:</p>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => mo(panel === 'doi_may' ? '' : 'doi_may')} className={`${nut} border-slate-300 text-slate-800`}>Đổi máy cho khách (máy lỗi)</button>
-            <button onClick={() => mo(panel === 'doi_serial' ? '' : 'doi_serial')} className={`${nut} text-slate-700`}>Sửa serial gõ nhầm</button>
-            <button onClick={() => mo(panel === 'doi_khach' ? '' : 'doi_khach')} className={`${nut} text-slate-700`}>Đổi khách</button>
-            <button onClick={() => mo(panel === 'go' ? '' : 'go')} className={`${nut} border-red-200 text-red-600`}>Gỡ khỏi khách (về kho)</button>
+            {choLapThuDoi && <button onClick={() => mo(panel === 'doi_may' ? '' : 'doi_may')} className={`${nut} border-slate-300 text-slate-800`}>Đổi máy cho khách (máy lỗi)</button>}
+            {choSuaKhach && <button onClick={() => mo(panel === 'doi_serial' ? '' : 'doi_serial')} className={`${nut} text-slate-700`}>Sửa serial gõ nhầm</button>}
+            {choSuaKhach && <button onClick={() => mo(panel === 'doi_khach' ? '' : 'doi_khach')} className={`${nut} text-slate-700`}>Đổi khách</button>}
+            {choSuaKhach && <button onClick={() => mo(panel === 'go' ? '' : 'go')} className={`${nut} border-red-200 text-red-600`}>Gỡ khỏi khách (về kho)</button>}
           </div>
 
           {panel === 'doi_may' && (
@@ -132,7 +145,7 @@ export function QuanLyMay({
         </div>
       )}
 
-      {laAdmin && !dangLap && (
+      {choKhoSerial && !dangLap && (
         <div className="rounded-lg border p-3 space-y-3 bg-slate-50">
           <div className="space-y-2">
             <p className="text-xs font-medium text-slate-600">Máy ở kho — đổi trạng thái (bắt buộc mô tả + được chỉnh ngày):</p>
@@ -192,7 +205,7 @@ export function QuanLyMay({
                       </span>
                       <span className="flex items-center gap-2 flex-none">
                         <span className="text-[11px] text-slate-400">{vnDateTime(s.luc)}</span>
-                        {laAdmin && (
+                        {choKhoSerial && (
                           <button onClick={() => { setSuaId(s.id); setSNgay(s.luc.slice(0, 10)); setSGhi(s.ghi_chu ?? ''); setErr(null) }}
                             className="text-[11px] text-slate-500 underline">sửa ngày</button>
                         )}

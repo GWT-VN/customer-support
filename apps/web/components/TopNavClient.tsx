@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import type { BangQuyen, MaQuyen } from '@/lib/nen-tang/quyen'
 import { dangXuat } from '@/app/auth/actions'
 
 /**
@@ -44,8 +45,14 @@ function Ic({ name, cls = 'w-4 h-4' }: { name: keyof typeof ICON; cls?: string }
 }
 
 export function TopNavClient({
-  laAdmin, laQuanLy, chiKyThuat, coTheVaoCS, coTheVaoSales, email,
-}: { laAdmin: boolean; laQuanLy: boolean; chiKyThuat: boolean; coTheVaoCS: boolean; coTheVaoSales: boolean; email: string | null }) {
+  quyen, chiKyThuat, coTheVaoCS, coTheVaoSales, email,
+}: {
+  quyen: BangQuyen; chiKyThuat: boolean; coTheVaoCS: boolean
+  coTheVaoSales: boolean; email: string | null
+}) {
+  // Mục menu hiện đúng khi CÓ quyền vào trang nó dẫn tới. Thiếu khoá trong bảng
+  // = chưa hỏi = coi như không có, tức là hỏng theo hướng ẨN chứ không hở.
+  const co = (ma: MaQuyen) => quyen[ma] === true
   const pathname = usePathname()
   const [moOpen, setMoOpen] = useState<string | null>(null) // 'launch' | 'gear' | 'g<idx>' | null
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
@@ -72,11 +79,12 @@ export function TopNavClient({
         { nhan: 'Bảo hành', trang: [{ nhan: 'Đăng ký BH', href: '/dang-ky-bh' }, { nhan: 'Chờ kích hoạt BH', href: '/bh-cho-kich-hoat' }] },
         { nhan: 'Bảo trì', trang: [
           { nhan: 'Lịch bảo trì', href: '/bao-tri' }, { nhan: 'Lịch thay lõi', href: '/loi' },
-          ...(laQuanLy ? [
+          ...(co('cs.bao_tri.tao_plan') ? [
             { nhan: 'Map khách', href: '/bao-tri/map' }, { nhan: 'Lên lịch & gói', href: '/bao-tri/len-lich' },
-            { nhan: 'Gán lịch kỹ thuật', href: '/ky-thuat' }, { nhan: 'Xem lịch kỹ thuật', href: '/ky-thuat/lich' },
-            { nhan: 'Danh sách kỹ thuật', href: '/ky-thuat/nhan-su' },
           ] : []),
+          ...(co('cs.ky_thuat.ho_so') ? [{ nhan: 'Gán lịch kỹ thuật', href: '/ky-thuat' }] : []),
+          ...(co('cs.ky_thuat.xep_lich') ? [{ nhan: 'Xem lịch kỹ thuật', href: '/ky-thuat/lich' }] : []),
+          ...(co('cs.ky_thuat.ho_so') ? [{ nhan: 'Danh sách kỹ thuật', href: '/ky-thuat/nhan-su' }] : []),
         ] },
       ]
   const cskh: Module = { key: 'cskh', nhan: 'CSKH', mau: '#b5642a', href: chiKyThuat ? '/ky-thuat/cua-toi' : '/', icon: 'headset', trang: cskhTrang }
@@ -104,11 +112,11 @@ export function TopNavClient({
   const mod = MODULES.find((m) => m.key === moduleActive) ?? viec
 
   const gearItems: Trang[] = [
-    ...(laQuanLy ? [{ nhan: 'Chờ duyệt', href: '/duyet' }] : []),
-    ...(laAdmin ? [
-      { nhan: 'Doanh số', href: '/doanh-so' }, { nhan: 'Đồng bộ catalog', href: '/dong-bo-catalog' },
-      { nhan: 'Nhật ký thao tác', href: '/audit' }, { nhan: 'Nhân viên', href: '/nhan-vien' },
-    ] : []),
+    ...(co('cs.yeu_cau.xem') ? [{ nhan: 'Chờ duyệt', href: '/duyet' }] : []),
+    ...(co('cs.bao_cao.doanh_so') ? [{ nhan: 'Doanh số', href: '/doanh-so' }] : []),
+    ...(co('he_thong.catalog') ? [{ nhan: 'Đồng bộ catalog', href: '/dong-bo-catalog' }] : []),
+    ...(co('he_thong.nhat_ky') ? [{ nhan: 'Nhật ký thao tác', href: '/audit' }] : []),
+    ...(co('he_thong.nhan_su.xem') ? [{ nhan: 'Nhân viên', href: '/nhan-vien' }] : []),
   ]
 
   type App = { nhan: string; mau: string; href?: string; live: boolean; icon?: keyof typeof ICON }
