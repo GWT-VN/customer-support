@@ -161,6 +161,7 @@ export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null
   const p = payload ?? {}
   switch (verb) {
     case 'created': return 'tạo việc'
+    case 'auto_created': return 'việc được sinh tự động từ ERP'
     case 'status_changed': return `đổi trạng thái → ${NHAN_TRANG_THAI[String(p.status)] ?? p.status}`
     case 'assigned': return `gán ${p.ten ?? 'ai đó'} · ${NHAN_VAI_TRO[String(p.role)] ?? p.role}`
     case 'unassigned': return 'bỏ một người khỏi việc'

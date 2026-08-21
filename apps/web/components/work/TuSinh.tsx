@@ -8,29 +8,13 @@
  */
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  chayTuSinh, batTatLuat, doiNguoiNhan, hangLoat, type ManTuSinh, type NenTang,
-} from '@/app/work/actions'
-import { NHAN_UU_TIEN, nhanHan, ngayThang } from '@/lib/work'
+import { chayTuSinh, hangLoat, type ManTuSinh, type NenTang } from '@/app/work/actions'
+import { nhanHan, ngayThang } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { ChiTietViec } from './ChiTietViec'
 import { ThanhHangLoat } from './ThanhHangLoat'
-import { Chip, Nut, oNhap, MAU_UT_VAR } from './ui'
-
-/** Nguồn sự kiện → màu chip, khớp màu module ở nav. */
-const MAU_NGUON: Record<string, string> = {
-  CSKH: '#b5642a', Sales: '#2f7d8a', 'Kỹ thuật': '#5560c9', Marketing: '#b0518f',
-}
-
-function gioChay(iso: string | null): string {
-  if (!iso) return 'chưa chạy lần nào'
-  const d = new Date(iso)
-  const phut = Math.round((Date.now() - d.getTime()) / 60000)
-  if (phut < 1) return 'vừa xong'
-  if (phut < 60) return `${phut} phút trước`
-  if (phut < 60 * 24) return `${Math.round(phut / 60)} giờ trước`
-  return ngayThang(d)
-}
+import { LuatTuSinh } from './LuatTuSinh'
+import { Nut } from './ui'
 
 export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTang }) {
   const router = useRouter()
@@ -114,55 +98,13 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
         <ul className="list-none p-0 m-0 overflow-hidden"
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 11, boxShadow: 'var(--shadow)' }}>
           {duLieu.luat.map((l, i) => (
-            <li key={l.key} className="flex items-start gap-3 p-3.5"
-                style={{ borderBottom: i === duLieu.luat.length - 1 ? 'none' : '1px solid var(--border)' }}>
-              <span className="w-[3px] self-stretch rounded-full flex-none"
-                    style={{ background: l.active ? (MAU_UT_VAR[l.priority] ?? 'var(--border-strong)') : 'var(--border)' }} aria-hidden />
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: l.active ? 'var(--ink)' : 'var(--muted)' }}>{l.name}</span>
-                  <Chip chamMau={MAU_NGUON[l.nguon] ?? 'var(--faint)'}>{l.nguon}</Chip>
-                  <Chip>{NHAN_UU_TIEN[l.priority] ?? `P${l.priority}`}</Chip>
-                  <Chip>hạn +{l.han_ngay} ngày</Chip>
-                </div>
-                {l.mo_ta && <p className="mt-1 m-0" style={{ fontSize: 12.5, color: 'var(--muted)' }}>{l.mo_ta}</p>}
-
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <label style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                    Giao cho{' '}
-                    <select
-                      value={l.nguoi_nhan ?? ''}
-                      disabled={!duLieu.la_quan_ly || pending}
-                      onChange={(e) => chay(() => doiNguoiNhan(l.key, e.target.value || null))}
-                      style={{ ...oNhap, fontSize: 12, padding: '3px 8px' }}
-                      aria-label={`Người nhận việc của luật ${l.name}`}
-                    >
-                      <option value="">Quản lý CSKH (mặc định)</option>
-                      {duLieu.nhan_su.map((s) => <option key={s.id} value={s.id}>{s.ten}</option>)}
-                    </select>
-                  </label>
-                  <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>
-                    · quét {gioChay(l.last_run_at)}
-                    {l.last_created > 0 && `, sinh ${l.last_created} việc`}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => chay(() => batTatLuat(l.key, !l.active))}
-                disabled={!duLieu.la_quan_ly || pending}
-                aria-pressed={l.active}
-                className="flex-none"
-                style={{
-                  fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20,
-                  border: `1px solid ${l.active ? 'var(--green)' : 'var(--border-strong)'}`,
-                  background: l.active ? 'var(--green-wash)' : 'var(--surface-2)',
-                  color: l.active ? 'var(--green)' : 'var(--muted)',
-                  opacity: duLieu.la_quan_ly ? 1 : .6,
-                }}
-              >{l.active ? 'Bật' : 'Tắt'}</button>
-            </li>
+            <LuatTuSinh
+              key={l.key} l={l} nenTang={nenTang}
+              laQuanLy={duLieu.la_quan_ly}
+              cuoi={i === duLieu.luat.length - 1}
+              onXong={() => router.refresh()}
+              onLoi={setLoi}
+            />
           ))}
         </ul>
 

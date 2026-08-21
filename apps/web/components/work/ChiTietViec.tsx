@@ -61,6 +61,23 @@ export function ChiTietViec({
   const [themAi, setThemAi] = useState('')
   const [themVai, setThemVai] = useState('doer')
 
+  /*
+    Báo cho TRANG biết panel đang mở, để nó giãn ra nhường chỗ. Đặt class lên
+    <html> vì khung trang là server component nằm NGOÀI cây của panel — không
+    truyền prop xuống được.
+  */
+  useEffect(() => {
+    document.documentElement.classList.add('work-panel-mo')
+    return () => document.documentElement.classList.remove('work-panel-mo')
+  }, [])
+
+  // Esc để đóng — panel không có lớp phủ nên không bấm ra ngoài để đóng được.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDong() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDong])
+
   useEffect(() => {
     let huy = false
     chiTietViec(taskId).then((kq) => {
@@ -86,25 +103,25 @@ export function ChiTietViec({
   const conLai = nenTang.nhan_su.filter((s) => !daGan.has(s.id))
 
   return (
-    <div data-khu="work" className="fixed inset-0 z-50 flex pointer-events-none" role="dialog" aria-label="Chi tiết việc">
-      {/*
-        KHÔNG phủ lớp tối lên danh sách: người dùng cần vẫn nhìn thấy bảng việc
-        bên trái trong lúc đọc chi tiết bên phải. Vùng trái chỉ bắt click để
-        đóng, hoàn toàn trong suốt.
-      */}
-      <button
-        className="flex-1 pointer-events-auto"
-        style={{ background: 'transparent' }}
-        onClick={onDong}
-        aria-label="Đóng bảng chi tiết"
-      />
-      <aside
-        className="w-full h-full overflow-y-auto pointer-events-auto"
-        style={{
-          maxWidth: 520, background: 'var(--surface)',
-          borderLeft: '1px solid var(--border-strong)', boxShadow: 'var(--shadow-lg)',
-        }}
-      >
+    /*
+      Kiểu Asana: panel là một CỘT BÊN PHẢI, không phải lớp phủ. Bảng việc bên
+      trái vẫn thấy và vẫn bấm được — bấm việc khác là panel nhảy sang việc đó,
+      không phải đóng rồi mở lại.
+      `data-khu` ĐẶT INLINE background trong suốt: quy tắc [data-khu="work"] ở
+      globals.css có `background: var(--bg)`, không chặn thì nó sơn kín màn hình
+      và bên trái thành trắng trơn (đã dính đúng lỗi này).
+    */
+    <aside
+      data-khu="work"
+      className="fixed top-0 right-0 h-full w-full overflow-y-auto z-50"
+      style={{
+        maxWidth: 520, background: 'var(--surface)',
+        borderLeft: '1px solid var(--border-strong)', boxShadow: 'var(--shadow-lg)',
+      }}
+      role="complementary"
+      aria-label="Chi tiết việc"
+    >
+      <div>
         <header
           className="sticky top-0 flex items-center gap-2.5 px-[18px] py-3.5"
           style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
@@ -389,7 +406,7 @@ export function ChiTietViec({
                       )}
                     </span>
                     <span className="pt-0.5 pb-3" style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
-                      <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{a.ten ?? 'Ai đó'}</b>{' '}
+                      <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{a.ten ?? 'Hệ thống'}</b>{' '}
                       {moTaNhatKy(a.verb, a.payload)}
                       <span className="mono block" style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>
                         {mocThoiGian(a.created_at)}
@@ -411,7 +428,7 @@ export function ChiTietViec({
             </p>
           </div>
         )}
-      </aside>
-    </div>
+      </div>
+    </aside>
   )
 }

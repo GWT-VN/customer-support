@@ -15,7 +15,7 @@ export default async function WorkPage() {
 
   return (
     <main data-khu="work" className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-5 py-5 sm:px-6 space-y-5">
+      <div className="max-w-5xl mx-auto px-5 py-5 sm:px-6 space-y-5 khung-trang">
         <header>
           <nav className="flex gap-3 mb-2" style={{ fontSize: 12.5 }} aria-label="Khu Việc">
             <span style={{ color: "var(--faint)" }}>Việc của tôi</span>

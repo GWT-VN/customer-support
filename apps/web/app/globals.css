@@ -120,3 +120,26 @@ body {
     transition: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Panel chi tiết việc — kiểu Asana.
+ *
+ * Trang vốn bị kẹp `max-w-5xl mx-auto`, nên nếu chỉ thêm padding-right thì nội
+ * dung bị BÓP vào giữa cột đã hẹp sẵn — nhìn rất chật (CEO báo 20/08).
+ * Cách đúng: khi panel mở thì BỎ trần rộng, cho nội dung giãn ra dùng hết phần
+ * còn lại của màn hình, chỉ chừa đúng chỗ panel. Màn càng rộng càng thoáng,
+ * thay vì càng bóp.
+ *
+ * Dưới 1024px không đủ chỗ hai cột — panel phủ toàn màn hình như cũ.
+ * --------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  html.work-panel-mo [data-khu="work"] .khung-trang {
+    max-width: none;
+    margin-left: clamp(16px, 3vw, 34px);
+    margin-right: 552px;          /* 520 panel + 32 thở */
+    transition: margin-right .2s ease, max-width .2s ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.work-panel-mo [data-khu="work"] .khung-trang { transition: none; }
+}

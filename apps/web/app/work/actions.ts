@@ -229,7 +229,14 @@ export type LuatTuSinh = {
   last_created: number
   nguoi_nhan: string | null
   nguoi_nhan_ten: string | null
+  /** Sự kiện phải cũ hơn bao nhiêu GIỜ mới sinh việc. null = không xét. */
+  nguong_gio: number | null
+  /** Chỉ nhìn sự kiện trong ±n NGÀY quanh hôm nay. null = không xét. */
+  cua_so_ngay: number | null
 }
+
+/** Một dòng "nếu chạy bây giờ thì sinh cái này" — chỉ xem, không ghi. */
+export type ThuLuat = { luat: string; se_sinh: { khoa: string; mo_ta: string; moc: string }[] }
 
 export type ManTuSinh = {
   luat: LuatTuSinh[]
@@ -259,6 +266,34 @@ export async function batTatLuat(key: string, active: boolean): Promise<KQ<void>
     await goi<void>('work_bat_tat_luat', { p_key: key, p_active: active })
     revalidatePath('/work/tu-sinh')
   })
+}
+
+/** Sửa tham số một luật. Trường nào bỏ trống thì giữ nguyên. */
+export async function suaLuat(key: string, input: {
+  priority?: number | null
+  han_ngay?: number | null
+  max_moi_lan?: number | null
+  nguong_gio?: number | null
+  cua_so_ngay?: number | null
+  team_key?: string | null
+}): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_sua_luat', {
+      p_key: key,
+      p_priority: input.priority ?? null,
+      p_han_ngay: input.han_ngay ?? null,
+      p_max_moi_lan: input.max_moi_lan ?? null,
+      p_nguong_gio: input.nguong_gio ?? null,
+      p_cua_so_ngay: input.cua_so_ngay ?? null,
+      p_team_key: input.team_key ?? null,
+    })
+    revalidatePath('/work/tu-sinh')
+  })
+}
+
+/** Xem trước: nếu chạy luật này BÂY GIỜ thì nó sinh những gì. Không ghi gì cả. */
+export async function thuLuat(key: string): Promise<KQ<ThuLuat>> {
+  return boc(() => goi<ThuLuat>('work_thu_luat', { p_key: key }))
 }
 
 export async function doiNguoiNhan(key: string, staffId: string | null): Promise<KQ<void>> {
