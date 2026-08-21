@@ -32,17 +32,15 @@ export function macDinhTheoBoMay(boMay: string | null | undefined): { soLan: num
 /**
  * Suy LOẠI MÁY (POU máy uống / POE lọc tổng) từ tên BỘ MÁY của lịch bảo trì.
  *
- * Vì sao cần: đường suy chính là `plan.serial` → kho serial → danh mục cấp 2. Đo prod
- * 21/08/2026 thì đường đó **đứt ngay mắt xích đầu — 0/79 plan có `serial`**, nên 471/471
- * lượt rơi vào nhánh dự phòng và form luôn hiện đủ 4 chỉ số: phân loại chưa chạy lần nào.
- * Trong khi **63/79 plan CÓ `bo_may`** (WH30A 37 · WH15A 20 · WH30A ECO 4 · WH15A ECO 2).
+ * ⚠️ **HIỆN KHÔNG DÙNG — CEO chốt 21/08/2026 KHÔNG suy loại máy từ ô này.** Đừng bật lại mà
+ * chưa hỏi. Lý do CEO đưa, đúng và quan trọng: tên bộ máy trong lịch bảo trì (WH15A/WH30A) chỉ
+ * nói về **hệ lọc tổng** khách lắp — nó **không cho biết khách có thêm máy lọc nước UỐNG hay
+ * không**. Suy ra POE rồi ẩn TDS/pH là **giấu mất chỉ tiêu kỹ thuật cần ghi** ở những khách có
+ * cả hai loại máy.
+ * ⇒ Chừng nào chưa map được lượt bảo trì tới đúng con máy thì form **hiện đủ 4 chỉ số**.
  *
- * WH15A / WH30A (kể cả bản ECO) là **hệ lọc tổng ⇒ POE** — CEO chốt 21/08/2026.
- * Tên khác / trống -> null, form hiện đủ 4 chỉ số. KHÔNG đoán bừa: thà hỏi thừa còn hơn
- * giấu mất một chỉ tiêu mà kỹ thuật cần ghi.
- *
- * Nhận dạng giống hệt `macDinhTheoBoMay()` ngay trên (bỏ khoảng trắng + HOA hết) để
- * "WH30A ECO", "wh30a eco", "WH 30A" đều khớp — hai hàm đọc cùng một ô dữ liệu.
+ * Giữ hàm + test lại vì phép nhận dạng vẫn đúng và sẽ dùng được khi có map máy↔khách; xoá đi
+ * thì phiên sau lại phải dò lại từ đầu.
  */
 export function loaiMayTheoBoMay(boMay: string | null | undefined): 'POU' | 'POE' | null {
   if (!boMay) return null

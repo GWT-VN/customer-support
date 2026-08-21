@@ -13,7 +13,7 @@ import { coQuyen, doQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
-import { sinhLichBaoTri, vungTheoTinh, loaiMayTheoBoMay, type Vung } from '@/lib/lichBaoTri'
+import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
 import type { PChon } from '@/lib/gopKhachChon'
@@ -1801,10 +1801,9 @@ async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> 
   const visits = (vs ?? []) as { id: string; plan_id: string | null }[]
   const planIds = [...new Set(visits.map((v) => v.plan_id).filter(Boolean))] as string[]
   if (!planIds.length) return out
-  const { data: ps } = await db.from('maintenance_plan').select('id, serial, bo_may').in('id', planIds)
-  const plans = (ps ?? []) as { id: string; serial: string | null; bo_may: string | null }[]
+  const { data: ps } = await db.from('maintenance_plan').select('id, serial').in('id', planIds)
+  const plans = (ps ?? []) as { id: string; serial: string | null }[]
   const planSerial = new Map(plans.map((p) => [p.id, (p.serial ?? '').trim()]))
-  const planBoMay = new Map(plans.map((p) => [p.id, p.bo_may]))
 
   // Đường CHÍNH: serial -> kho serial -> danh mục cấp 2. Chính xác nhất vì bám đúng con máy.
   const serials = [...new Set([...planSerial.values()].filter(Boolean))]
@@ -1824,11 +1823,13 @@ async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> 
   for (const v of visits) {
     const serial = v.plan_id ? planSerial.get(v.plan_id) : ''
     const ic = serial ? serialIc.get(serial) : null
-    const theoSerial = chuan(ic ? icLoai.get(ic) : null)
-    // Đường DỰ PHÒNG: suy từ tên BỘ MÁY. Đo prod 21/08/2026: 0/79 plan có `serial` nên đường
-    // chính không bao giờ ra kết quả, trong khi 63/79 plan có `bo_may`. Không có nhánh này thì
-    // tính năng phân loại POU/POE coi như không tồn tại.
-    out.set(v.id, theoSerial ?? loaiMayTheoBoMay(v.plan_id ? planBoMay.get(v.plan_id) : null))
+    // CHỈ suy từ SERIAL. KHÔNG suy từ `plan.bo_may` — CEO chốt 21/08/2026 sau khi thử thật:
+    // tên bộ máy trong lịch bảo trì (WH15A/WH30A) chỉ nói về HỆ LỌC TỔNG mà khách lắp. Nó KHÔNG
+    // cho biết khách có thêm máy lọc nước UỐNG hay không. Suy ra POE rồi ẩn TDS/pH là **giấu mất
+    // chỉ tiêu kỹ thuật cần ghi** cho những khách có cả hai loại máy.
+    // ⇒ Chưa map được lượt bảo trì tới đúng con máy thì HIỆN ĐỦ 4 CHỈ SỐ. Thà hỏi thừa còn hơn
+    // thiếu. Chỉ bật phân loại lại khi `plan.serial` được điền (đo 21/08: 0/79 plan có serial).
+    out.set(v.id, chuan(ic ? icLoai.get(ic) : null))
   }
   return out
 }

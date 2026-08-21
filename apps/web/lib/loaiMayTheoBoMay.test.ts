@@ -1,8 +1,11 @@
 /**
- * Suy loại máy POU/POE từ tên bộ máy — nhánh dự phòng khi plan không có serial.
+ * Suy loại máy POU/POE từ tên bộ máy.
  *
- * Lý do có nhánh này: đo prod 21/08/2026, 0/79 plan bảo trì có `serial` nên đường suy chính
- * (serial → kho → danh mục cấp 2) chưa ra kết quả lần nào; 63/79 plan lại CÓ `bo_may`.
+ * ⚠️ Hàm này **hiện không được gọi ở đâu** — CEO chốt 21/08/2026 KHÔNG suy loại máy từ ô bộ máy,
+ * vì tên WH15A/WH30A chỉ nói về hệ lọc tổng, không cho biết khách có máy lọc nước uống hay không;
+ * ẩn TDS/pH theo nó là giấu mất chỉ tiêu cần ghi. Form hiện đủ 4 chỉ số cho tới khi map được
+ * lượt bảo trì tới đúng con máy.
+ * Test giữ lại để phép nhận dạng không bị làm hỏng trong lúc nằm chờ.
  */
 import { describe, expect, it } from 'vitest'
 import { loaiMayTheoBoMay } from './lichBaoTri'
