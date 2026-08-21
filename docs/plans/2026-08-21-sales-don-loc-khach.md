@@ -788,9 +788,9 @@ git commit -m "feat(sales/khach): lọc Kênh + Tỉnh theo chuẩn bang/"
 -- Bộ cột khách chung CS ⇄ Sales — CEO chốt 21/08/2026.
 -- Cột MỚI đặt tên GIỐNG HỆT ở cả customers và cs_customers.
 -- CS tự chạy phần cs_customers; file này chỉ đụng bảng Sales làm chủ.
-alter table public.customers add column if not exists channel_id   integer references public.dim_channel(id);
+alter table public.customers add column if not exists channel_id   integer references public.dim_channel(id) on delete set null;
 alter table public.customers add column if not exists phone2       text;  -- ⛔ CHỜ CEO CHỐT, xem ghi chú dưới
-alter table public.customers add column if not exists sales_owner  uuid    references public.staff(id);
+alter table public.customers add column if not exists sales_owner  uuid    references public.staff(id) on delete set null;
 alter table public.customers add column if not exists email        text;
 alter table public.customers add column if not exists ngay_sinh    date;
 alter table public.customers add column if not exists dia_chi_cty  text;
@@ -801,6 +801,14 @@ alter table public.customers add column if not exists source       text;
 comment on column public.customers.sales_owner is 'Nhân sự Sales chăm sóc khách này -> staff.id. Cùng tên/ý nghĩa với cs_customers.sales_owner.';
 comment on column public.customers.phone2 is 'SĐT phụ. Cùng tên/ý nghĩa với cs_customers.phone2.';
 comment on column public.customers.channel_id is 'Kênh khách đến từ -> dim_channel.id. Khoá kênh dùng chung, xem SYSTEM.md §4.';
+
+> ⚠️ **`on delete set null` là bắt buộc, KHÔNG được đổi thành `cascade`** — yêu cầu của khu Nền tảng
+> (21/08). `staff.id` đã có 5 khoá ngoại cascade và nút "xoá nhân sự" phải rào chặt vì thế; thêm một
+> cascade nữa mà là dữ liệu khách hàng thì xoá nhầm một nhân sự có thể cuốn theo dữ liệu Sales.
+> Để trần (NO ACTION) cũng không nên: nó **chặn** xoá nhân sự đang chăm khách, làm nút xoá báo lỗi
+> khó hiểu. Nhân sự nghỉ thì khách mất người chăm, chứ khách không biến mất.
+> Hàm `nen_tang_dem_tham_chieu_staff(uuid)` đọc `pg_constraint` nên tự thấy khoá ngoại mới — không
+> phải đăng ký thêm ở đâu.
 
 create index if not exists customers_channel_id_idx on public.customers(channel_id);
 create index if not exists customers_sales_owner_idx on public.customers(sales_owner);

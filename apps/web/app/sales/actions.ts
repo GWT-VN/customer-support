@@ -13,6 +13,7 @@ import {
   updateCustomer,
   deleteCustomer,
 } from './_db'
+import { tongDon } from './_calc'
 import type { NewOrderInput, CustomerInput } from './_types'
 
 /** Gác khu Sales: nền tảng (mọi nhân sự) + phải có vai trò Sales. */
@@ -195,6 +196,13 @@ export type DonLine = {
   quantity: number | null
   unit_price_vat: number | null
   amount_vat: number | null
+  /** Giá/tiền TRƯỚC VAT. Chỉ đơn từ Sheet có sẵn; đơn app = null -> suy từ vat_pct. */
+  unit_price_net: number | null
+  amount_net: number | null
+  /** PHÂN SỐ: 0.08 = 8%. Xem tachVat() trong _calc.ts. */
+  vat_pct: number | null
+  /** Đơn bán từ Sheet luôn false — quà từ Sheet là cả một đơn DON_TANG riêng. */
+  is_gift: boolean
   note: string | null
 }
 
@@ -214,7 +222,12 @@ export type DonChiTiet = {
   partner_order_code: string | null
   shipping_code: string | null
   install_date: string | null
+  /** Tổng SAU VAT. */
   total_vat: number
+  /** Tổng TRƯỚC VAT. */
+  total_net: number
+  /** Tiền VAT = total_vat - total_net. */
+  total_vat_tien: number
   note: string | null
   created_by: string | null
   is_app: boolean
@@ -222,7 +235,7 @@ export type DonChiTiet = {
 }
 
 const MIRROR_COLS =
-  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, fulfillment_status, payment_status, note'
+  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, fulfillment_status, payment_status, note'
 
 /** Chi tiết 1 đơn: ưu tiên đơn app (sales_orders + items), fallback mirror (sales_order_lines). */
 export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> {
@@ -247,8 +260,13 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       quantity: (it.quantity as number) ?? null,
       unit_price_vat: (it.unit_price_vat as number) ?? null,
       amount_vat: (it.amount_vat as number) ?? null,
+      unit_price_net: null, // sales_order_items không lưu giá trước VAT
+      amount_net: null,     // -> tongDon() suy từ vat_pct
+      vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
+      is_gift: !!it.is_gift,
       note: (it.note as string) ?? null,
     }))
+    const tong = tongDon(lines)
     return {
       order_code: header.order_code as string,
       order_date: (header.order_date as string) ?? null,
@@ -265,7 +283,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       partner_order_code: (header.partner_order_code as string) ?? null,
       shipping_code: (header.shipping_code as string) ?? null,
       install_date: (header.install_date as string) ?? null,
-      total_vat: Number(header.total_vat) || 0,
+      total_vat: tong.sauVat, // lấy từ dòng đang hiện, không từ header — lệch thì phải thấy
+      total_net: tong.net,
+      total_vat_tien: tong.vat,
       note: (header.note as string) ?? null,
       created_by: (header.created_by as string) ?? null,
       is_app: true,
@@ -292,8 +312,13 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     quantity: (r.quantity as number) ?? null,
     unit_price_vat: (r.unit_price_vat as number) ?? null,
     amount_vat: (r.amount_vat as number) ?? null,
+    unit_price_net: (r.unit_price_net as number) ?? null,
+    amount_net: (r.amount_net as number) ?? null,
+    vat_pct: r.vat_pct == null ? null : Number(r.vat_pct),
+    is_gift: false, // đơn bán từ Sheet KHÔNG có dòng quà — quà là đơn DON_TANG riêng
     note: (r.note as string) ?? null,
   }))
+  const tong = tongDon(lines)
   return {
     order_code: (f.order_code as string) || orderCode,
     order_date: (f.order_date as string) ?? null,
@@ -310,7 +335,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     partner_order_code: (f.partner_order_code as string) ?? null,
     shipping_code: null,
     install_date: null,
-    total_vat: lr.reduce((s, r) => s + (Number(r.amount_vat) || 0), 0),
+    total_vat: tong.sauVat,
+    total_net: tong.net,
+    total_vat_tien: tong.vat,
     note: null,
     created_by: null,
     is_app: false,
