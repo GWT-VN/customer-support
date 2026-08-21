@@ -15,6 +15,9 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
   const orderCode = decodeURIComponent(code)
   const don = await chiTietDon(orderCode)
   if (!don) notFound()
+  // Đơn TẶNG chỉ có ở customer_purchases — bảng đó KHÔNG có cột tiền. Ẩn hẳn các cột
+  // tiền thay vì hiện '0 ₫', vì 0 đ trông như "đã bán giá 0" chứ không phải "không có dữ liệu".
+  const laDonTang = don.source_tab === 'DON_TANG'
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -61,7 +64,11 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
             <Field label="Thanh toán" value={<StatusBadge value={don.payment_status} />} />
             <Field label="Hình thức TT" value={don.payment_method} />
             <Field label="Số dòng" value={don.lines.length} />
-            <Field label="Tổng sau VAT" value={<span className="font-semibold">{fmtVnd(don.total_vat)}</span>} />
+            {laDonTang ? (
+              <Field label="Tổng sau VAT" value={<span className="text-slate-400">không có dữ liệu tiền</span>} />
+            ) : (
+              <Field label="Tổng sau VAT" value={<span className="font-semibold">{fmtVnd(don.total_vat)}</span>} />
+            )}
           </dl>
         </section>
 
@@ -86,9 +93,9 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   <th className="px-3 py-2.5 font-medium">Mã nội bộ</th>
                   <th className="px-3 py-2.5 font-medium">Danh mục</th>
                   <th className="px-3 py-2.5 text-right font-medium">SL</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Đơn giá</th>
-                  <th className="px-3 py-2.5 text-right font-medium">VAT</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Thành tiền</th>
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">Đơn giá</th>}
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">VAT</th>}
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">Thành tiền</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -105,16 +112,19 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-500">{l.internal_code || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-600">{[l.category_l1, l.category_l2].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-2.5 text-right text-slate-700">{fmtQty(l.quantity)}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-500">
-                      {l.vat_pct == null ? '—' : `${Math.round(l.vat_pct * 100)}%`}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-slate-900">{fmtVnd(l.amount_vat)}</td>
+                    {!laDonTang && <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>}
+                    {!laDonTang && (
+                      <td className="px-3 py-2.5 text-right text-slate-500">
+                        {l.vat_pct == null ? '—' : `${Math.round(l.vat_pct * 100)}%`}
+                      </td>
+                    )}
+                    {!laDonTang && <td className="px-3 py-2.5 text-right font-medium text-slate-900">{fmtVnd(l.amount_vat)}</td>}
                   </tr>
                 ))}
               </tbody>
               {/* colSpan=6 vì bảng có 7 cột: SP · Mã · Danh mục · SL · Đơn giá · VAT · Thành tiền.
                   Thêm/bớt cột thì phải sửa số này, không thì bảng lệch. */}
+              {!laDonTang && (
               <tfoot className="border-t border-slate-200 bg-slate-50">
                 <tr>
                   <td colSpan={6} className="px-3 py-2 text-right text-slate-600">Tổng trước VAT</td>
@@ -129,9 +139,17 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   <td className="px-3 py-2.5 text-right text-base font-semibold text-slate-900">{fmtVnd(don.total_vat)}</td>
                 </tr>
               </tfoot>
+              )}
             </table>
           </div>
         </section>
+
+        {laDonTang && (
+          <p className="text-xs text-slate-500">
+            Đơn tặng lấy từ bảng lịch sử mua (<code>customer_purchases</code>) — bảng này không lưu giá,
+            nên đơn tặng không có số tiền. Không phải lỗi hiển thị.
+          </p>
+        )}
 
         {(don.note || don.lines.some((l) => l.note)) && (
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

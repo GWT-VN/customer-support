@@ -237,7 +237,71 @@ export type DonChiTiet = {
 const MIRROR_COLS =
   'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, fulfillment_status, payment_status, note'
 
-/** Chi tiết 1 đơn: ưu tiên đơn app (sales_orders + items), fallback mirror (sales_order_lines). */
+/**
+ * Chi tiết đơn TẶNG (`source_tab = 'DON_TANG'`) — chỉ tồn tại ở `customer_purchases`.
+ * Bảng đó KHÔNG có cột tiền, nên mọi số tiền để 0 và giao diện không bịa ra giá.
+ */
+async function chiTietDonTang(
+  db: ReturnType<typeof dataClient>,
+  orderCode: string
+): Promise<DonChiTiet | null> {
+  const { data } = await db
+    .from('customer_purchases')
+    .select('id, order_code, order_date, source_tab, customer_code, is_gift, internal_code, product_name, category_l1, category_l2, quantity')
+    .eq('order_code', orderCode)
+    .order('id', { ascending: true })
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  if (rows.length === 0) return null
+  const f = rows[0]
+
+  let customer_name: string | null = null
+  const cc = (f.customer_code as string) ?? null
+  if (cc) {
+    const { data: kh } = await db.from('customers').select('name').eq('customer_code', cc).maybeSingle()
+    customer_name = ((kh as { name: string } | null)?.name) ?? null
+  }
+
+  return {
+    order_code: (f.order_code as string) || orderCode,
+    order_date: (f.order_date as string) ?? null,
+    source_tab: (f.source_tab as string) ?? 'DON_TANG',
+    customer_code: cc,
+    customer_name,
+    province: null,
+    address: null,
+    channel: null,
+    channel_detail: null,
+    fulfillment_status: null,
+    payment_status: null,
+    payment_method: null,
+    partner_order_code: null,
+    shipping_code: null,
+    install_date: null,
+    total_vat: 0,
+    total_net: 0,
+    total_vat_tien: 0,
+    note: null,
+    created_by: null,
+    is_app: false,
+    lines: rows.map((r, i) => ({
+      key: String(r.id ?? `t${i}`),
+      product_name: (r.product_name as string) ?? null,
+      internal_code: (r.internal_code as string) ?? null,
+      category_l1: (r.category_l1 as string) ?? null,
+      category_l2: (r.category_l2 as string) ?? null,
+      quantity: (r.quantity as number) ?? null,
+      unit_price_vat: null,
+      amount_vat: null,
+      unit_price_net: null,
+      amount_net: null,
+      vat_pct: null,
+      is_gift: !!r.is_gift, // đơn tặng: cờ quà CÓ THẬT ở bảng này
+      note: null,
+    })),
+  }
+}
+
+/** Chi tiết 1 đơn: đơn app (sales_orders) -> mirror Sheet (sales_order_lines) -> đơn tặng (customer_purchases). */
 export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> {
   await chanSales()
   const db = dataClient()
@@ -301,7 +365,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     .order('id', { ascending: true })
   if (error) throw error
   const lr = (rows ?? []) as Array<Record<string, unknown>>
-  if (lr.length === 0) return null
+  // Nhánh 3: đơn TẶNG. Danh sách dựng tab Tặng từ `customer_purchases`, nhưng đơn tặng
+  // KHÔNG có trong sales_orders lẫn sales_order_lines -> bấm vào là 404. Lỗi CEO báo 21/08.
+  if (lr.length === 0) return chiTietDonTang(db, orderCode)
   const f = lr[0]
   const lines: DonLine[] = lr.map((r, i) => ({
     key: (r.id as string) || `l${i}`,

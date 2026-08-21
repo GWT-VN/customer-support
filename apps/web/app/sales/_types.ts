@@ -66,9 +66,19 @@ export type CustomerHit = {
   province_moi: string | null
 }
 
-/** Lựa chọn dropdown — chốt theo mockup đã duyệt. */
-export const FULFILL_OPTS = ['Mới', 'Xác nhận', 'Đang giao', 'Đã lắp đặt', 'Hoàn thành', 'Huỷ'] as const
-export const PAYMENT_OPTS = ['Chờ cọc', 'Chờ đối soát', 'Còn nợ', 'Đã thu đủ'] as const
+/**
+ * Lựa chọn dropdown — CHÉP ĐÚNG hằng `TTHANG` / `TTTIEN` trong
+ * `Sales Tracking/apps-script/Code.gs:120-122`, là nguồn chân lý của Google Sheet.
+ *
+ * ⚠️ Lệch hai danh sách này là lọc ra thiếu đơn mà không ai biết. Bản cũ (6 tình trạng
+ * hàng / 4 thanh toán) thiếu 'Chuẩn bị hàng', 'Đã giao chờ lắp', 'Hoàn hàng', 'Đã cọc',
+ * và ghi 'Hoàn thành' trong khi dữ liệu thật là 'Hoàn thành (Không lắp)'.
+ * Đo prod 21/08: 'Hoàn thành (Không lắp)' 280 dòng · 'Đã giao chờ lắp' 53 · 'Đã cọc' 61.
+ * Sửa danh mục ở Sheet thì phải sửa cả ở đây.
+ */
+export const FULFILL_OPTS = ['Mới', 'Xác nhận', 'Chuẩn bị hàng', 'Đang giao', 'Đã giao chờ lắp',
+  'Đã lắp đặt', 'Hoàn thành (Không lắp)', 'Hoàn hàng', 'Huỷ'] as const
+export const PAYMENT_OPTS = ['Chờ cọc', 'Đã cọc', 'Chờ đối soát', 'Còn nợ', 'Đã thu đủ'] as const
 export const PAYMETHOD_OPTS = ['', 'Chuyển khoản', 'COD', 'Tiền mặt'] as const
 
 /**
