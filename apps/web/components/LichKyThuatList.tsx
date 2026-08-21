@@ -22,7 +22,9 @@ export function LichKyThuatList({ rows }: { rows: LichKyThuatRow[] }) {
     setBusy(id); setMsg(null)
     const r = await datTrangThaiLichKT(id, tt)
     setBusy(null)
-    if (r.ok && tt === 'xong' && r.cap_nhat > 0) setMsg(`Đã hoàn thành + cập nhật ${r.cap_nhat} việc (bảo trì/thay lõi/ticket).`)
+    // Trước đây lỗi bị nuốt sạch: hàm trả về !ok mà màn hình không hiện gì, quản lý tưởng xong.
+    if (!r.ok) setMsg(`⚠️ ${r.error}`)
+    else if (tt === 'xong' && r.cap_nhat > 0) setMsg(`Đã hoàn thành + cập nhật ${r.cap_nhat} việc (bảo trì/thay lõi/ticket).`)
     router.refresh()
   }
   async function xoa(id: string) {

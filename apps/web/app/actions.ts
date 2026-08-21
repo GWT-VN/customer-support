@@ -8,11 +8,12 @@ import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
+import { themSdtPhu, themDiaChiPhu, xoaDiaChiPhu } from '@/lib/khach-lien-he'
 import { coQuyen, doQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
-import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
+import { sinhLichBaoTri, vungTheoTinh, loaiMayTheoBoMay, type Vung } from '@/lib/lichBaoTri'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
 import type { PChon } from '@/lib/gopKhachChon'
@@ -259,15 +260,15 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
 export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
   await requireStaff()
   await doQuyen('cs.khach.sua')
-  const { error } = await dataClient().from('customer_contacts').insert({
+  // Phần ghi nằm ở `lib/khach-lien-he.ts` — dùng chung với Sales để `role`/`is_primary`/
+  // nhật ký không mỗi khu một kiểu. Rào quyền vẫn ở ĐÂY: khu nào gác bằng quyền khu ấy.
+  const kq = await themSdtPhu({
     customer_id: customerId,
-    phone: c.phone || null,
-    contact_name: c.contact_name || null,
-    role: c.role || null,
-    is_primary: c.is_primary,
-    zalo_ok: c.zalo_ok,
+    phone: c.phone, contact_name: c.contact_name, role: c.role,
+    is_primary: c.is_primary, zalo_ok: c.zalo_ok,
+    nguon: 'cskh',
   })
-  if (error) return { ok: false as const, error: error.message }
+  if (!kq.ok) return { ok: false as const, error: kq.error }
   revalidatePath(`/khach/${customerId}`)
   return { ok: true as const }
 }
@@ -569,13 +570,10 @@ export async function themDiaChiKhach(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
   await doQuyen('cs.khach.sua')
-  const dc = dia_chi.trim()
-  if (!dc) return { ok: false, error: 'Nhập địa chỉ đã.' }
-  const l = ['nha', 'cty', 'lap_dat', 'khac'].includes(loai) ? loai : 'khac'
-  const { error } = await dataClient().from('customer_addresses')
-    .insert({ customer_id: customerId, dia_chi: dc, loai: l, ghi_chu: ghi_chu?.trim() || null })
-  if (error) return { ok: false, error: error.message }
-  await ghiAudit('them_dia_chi_khach', `khach:${customerId}`, { loai: l })
+  const kq = await themDiaChiPhu({
+    customer_id: customerId, dia_chi, loai, ghi_chu, nguon: 'cskh',
+  })
+  if (!kq.ok) return { ok: false, error: kq.error }
   revalidatePath(`/khach/${customerId}`)
   return { ok: true }
 }
@@ -585,9 +583,8 @@ export async function xoaDiaChiKhach(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
   await doQuyen('cs.khach.sua')
-  const { error } = await dataClient().from('customer_addresses').delete().eq('id', id)
-  if (error) return { ok: false, error: error.message }
-  await ghiAudit('xoa_dia_chi_khach', `khach:${customerId}`, { dia_chi_id: id })
+  const kq = await xoaDiaChiPhu({ id, customer_id: customerId, nguon: 'cskh' })
+  if (!kq.ok) return { ok: false, error: kq.error }
   revalidatePath(`/khach/${customerId}`)
   return { ok: true }
 }
@@ -1724,18 +1721,44 @@ export async function datTrangThaiLichKT(id: string, trangThai: 'hen' | 'xong' |
     const { data: lich } = await db.from('lich_ky_thuat').select('ngay').eq('id', id).maybeSingle()
     const ngay = (lich as { ngay: string } | null)?.ngay ?? new Date().toISOString().slice(0, 10)
     const { data: viec } = await db.from('lich_ky_thuat_viec').select('loai_viec, ref, mo_ta').eq('lich_id', id)
+    // Gom lỗi thay vì nuốt: ghi hỏng mà vẫn báo "đã hoàn thành" là đúng vết lỗi #11 cũ
+    // (tạo lịch thất bại IM LẶNG). Chuyến vẫn được đánh dấu xong — việc đó đã ghi ở trên và
+    // đúng ý kỹ thuật — nhưng người bấm phải BIẾT có phần nào không cập nhật được.
+    const loi: string[] = []
     for (const v of (viec ?? []) as { loai_viec: string; ref: string | null; mo_ta: string | null }[]) {
       if (v.loai_viec === 'bao_tri' && v.ref) {
-        await db.from('maintenance_visit').update({ completed_at: ngay }).eq('id', v.ref).is('completed_at', null); capNhat++
+        // `count` = số dòng THẬT SỰ đổi. Rào `.is('completed_at', null)` khiến lượt đã xong
+        // rồi thì không đổi gì — trước đây vẫn cộng vào "đã cập nhật N việc" nên câu báo sai.
+        const { error: e, count } = await db.from('maintenance_visit')
+          .update({ completed_at: ngay }, { count: 'exact' })
+          .eq('id', v.ref).is('completed_at', null)
+        if (e) loi.push(`lượt bảo trì: ${e.message}`); else capNhat += count ?? 0
       } else if (v.loai_viec === 'thay_loi' && v.ref) {
         const code = v.mo_ta?.match(/\(([^)]+)\)\s*$/)?.[1] ?? v.mo_ta ?? 'lõi'
-        await db.from('filter_replacement').insert({ serial: v.ref, filter_code: code, replaced_at: ngay, note: 'Kỹ thuật thay khi đi hiện trường' }); capNhat++
+        // CHỐNG TRÙNG: hai nhánh kia có rào sẵn nên bấm lại vô hại, riêng nhánh này là insert
+        // trần. Giao diện có nút "mở lại" ngay cạnh nút hoàn thành ⇒ xong → mở lại → xong chỉ
+        // là hai cú bấm, mỗi vòng đẻ thêm một dòng lịch sử thay lõi ma. Bảng cũng không có
+        // ràng buộc duy nhất nào chặn (đo prod 21/08: chỉ có khoá chính).
+        const { data: daCo, error: eTra } = await db.from('filter_replacement')
+          .select('id').eq('serial', v.ref).eq('filter_code', code).eq('replaced_at', ngay).limit(1)
+        if (eTra) { loi.push(`thay lõi: ${eTra.message}`); continue }
+        if (daCo && daCo.length) continue   // đã ghi rồi -> bỏ qua, KHÔNG cộng vào số cập nhật
+        const { error: e } = await db.from('filter_replacement')
+          .insert({ serial: v.ref, filter_code: code, replaced_at: ngay, note: 'Kỹ thuật thay khi đi hiện trường' })
+        if (e) loi.push(`thay lõi: ${e.message}`); else capNhat++
       } else if (v.loai_viec === 'ticket' && v.ref) {
-        await db.from('tickets').update({ state: 'Done' }).eq('ticket_code', v.ref).eq('state', 'Open'); capNhat++
+        const { error: e, count } = await db.from('tickets')
+          .update({ state: 'Done' }, { count: 'exact' })
+          .eq('ticket_code', v.ref).eq('state', 'Open')
+        if (e) loi.push(`ticket ${v.ref}: ${e.message}`); else capNhat += count ?? 0
       }
     }
     revalidatePath('/bao-tri'); revalidatePath('/ticket'); revalidatePath('/loi')
-    await ghiAudit('hoan_thanh_lich_kt', `lich:${id}`, { ngay, cap_nhat: capNhat })
+    await ghiAudit('hoan_thanh_lich_kt', `lich:${id}`, { ngay, cap_nhat: capNhat, loi }, loi.length ? 'loi' : 'ok')
+    if (loi.length) {
+      revalidatePath('/ky-thuat')
+      return { ok: false, error: `Chuyến đã đánh dấu xong, nhưng ${loi.length} việc không cập nhật được: ${loi.join(' · ')}` }
+    }
   }
   revalidatePath('/ky-thuat'); return { ok: true, cap_nhat: capNhat }
 }
@@ -1778,21 +1801,34 @@ async function phanLoaiVisit(visitIds: string[]): Promise<Map<string, LoaiMay>> 
   const visits = (vs ?? []) as { id: string; plan_id: string | null }[]
   const planIds = [...new Set(visits.map((v) => v.plan_id).filter(Boolean))] as string[]
   if (!planIds.length) return out
-  const { data: ps } = await db.from('maintenance_plan').select('id, serial').in('id', planIds)
-  const planSerial = new Map(((ps ?? []) as { id: string; serial: string | null }[]).map((p) => [p.id, (p.serial ?? '').trim()]))
+  const { data: ps } = await db.from('maintenance_plan').select('id, serial, bo_may').in('id', planIds)
+  const plans = (ps ?? []) as { id: string; serial: string | null; bo_may: string | null }[]
+  const planSerial = new Map(plans.map((p) => [p.id, (p.serial ?? '').trim()]))
+  const planBoMay = new Map(plans.map((p) => [p.id, p.bo_may]))
+
+  // Đường CHÍNH: serial -> kho serial -> danh mục cấp 2. Chính xác nhất vì bám đúng con máy.
   const serials = [...new Set([...planSerial.values()].filter(Boolean))]
-  if (!serials.length) return out
-  const { data: sr } = await db.from('serial_registry').select('serial, internal_code').in('serial', serials)
-  const serialIc = new Map(((sr ?? []) as { serial: string; internal_code: string | null }[]).map((s) => [s.serial, s.internal_code]))
-  const ics = [...new Set([...serialIc.values()].filter(Boolean))] as string[]
-  if (!ics.length) return out
-  const { data: ci } = await db.from('catalog_item').select('"Mã nội bộ", "Danh mục cấp 2"').in('Mã nội bộ', ics)
-  const icLoai = new Map(((ci ?? []) as Record<string, string | null>[]).map((c) => [c['Mã nội bộ'], c['Danh mục cấp 2']]))
+  const serialIc = new Map<string, string | null>()
+  const icLoai = new Map<string, string | null>()
+  if (serials.length) {
+    const { data: sr } = await db.from('serial_registry').select('serial, internal_code').in('serial', serials)
+    for (const s of (sr ?? []) as { serial: string; internal_code: string | null }[]) serialIc.set(s.serial, s.internal_code)
+    const ics = [...new Set([...serialIc.values()].filter(Boolean))] as string[]
+    if (ics.length) {
+      const { data: ci } = await db.from('catalog_item').select('"Mã nội bộ", "Danh mục cấp 2"').in('Mã nội bộ', ics)
+      for (const c of (ci ?? []) as Record<string, string | null>[]) icLoai.set(c['Mã nội bộ'] as string, c['Danh mục cấp 2'])
+    }
+  }
+
   const chuan = (x: string | null | undefined): LoaiMay => (x === 'POU' ? 'POU' : x === 'POE' ? 'POE' : null)
   for (const v of visits) {
     const serial = v.plan_id ? planSerial.get(v.plan_id) : ''
     const ic = serial ? serialIc.get(serial) : null
-    out.set(v.id, chuan(ic ? icLoai.get(ic) : null))
+    const theoSerial = chuan(ic ? icLoai.get(ic) : null)
+    // Đường DỰ PHÒNG: suy từ tên BỘ MÁY. Đo prod 21/08/2026: 0/79 plan có `serial` nên đường
+    // chính không bao giờ ra kết quả, trong khi 63/79 plan có `bo_may`. Không có nhánh này thì
+    // tính năng phân loại POU/POE coi như không tồn tại.
+    out.set(v.id, theoSerial ?? loaiMayTheoBoMay(v.plan_id ? planBoMay.get(v.plan_id) : null))
   }
   return out
 }
@@ -3118,15 +3154,23 @@ export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
   }
 
   // 2) Khách chung với Sales (bảng mirror `customers`) — khớp phone_no0 (9 số).
+  //
+  // Đọc `province`, KHÔNG đọc `province_moi` nữa (chốt với phiên Sales 21/08/2026, SYSTEM.md §8):
+  //  · Sales sắp BỎ cột `province_moi`. Còn giữ nó trong `.select()` là hôm đó PostgREST ném
+  //    lỗi và nút tra khách theo SĐT ở màn tạo khách chết.
+  //  · Apps Script đã thôi ghi `province_moi` nên cột đó ĐÓNG BĂNG, còn `province` mới là cột
+  //    được cập nhật. Code cũ ưu tiên cột đóng băng ⇒ sửa tỉnh một khách xong CS vẫn hiện giá
+  //    trị cũ, không lỗi gì để lần ra.
+  // Quy ước tỉnh nay lấy theo chuẩn CS: `province` = tỉnh MỚI, `province_truoc_sap_nhap` = tỉnh cũ.
   const { data: sa } = await db.from('customers')
-    .select('name, phone_chuan, address, province, province_moi, customer_code')
+    .select('name, phone_chuan, address, province, customer_code')
     .eq('phone_no0', cuoi9).limit(1)
   if (sa && sa.length) {
     const k = sa[0] as Record<string, unknown>
     return {
       nguon: 'sales', full_name: (k.name as string) ?? undefined,
       primary_phone: (k.phone_chuan as string) ?? null, address: (k.address as string) ?? null,
-      province: (k.province_moi as string) || (k.province as string) || null,
+      province: (k.province as string) || null,
       customer_code: (k.customer_code as string) ?? null,
     }
   }
@@ -3362,9 +3406,21 @@ export type CatalogItem = { code: string; ten: string | null; danh_muc: string |
 export async function listCatalogItems(): Promise<CatalogItem[]> {
   await requireStaff()
   await doQuyen('cs.ticket.chi_phi')
+  // Bỏ mã `cp.*` — đó là DANH MỤC CHI PHÍ KẾ TOÁN nội bộ (cp.qc quảng cáo, cp.thuekho,
+  // cp.bank phí ngân hàng, cp.tiepkhach…), không phải thứ thu tiền của khách. Trước đây
+  // hàm này trả về TOÀN BỘ catalog_item nên 20 mã chi phí nằm lẫn trong ô chọn hạng mục
+  // lúc CS thu phí/vật tư trên ticket — bấm nhầm là ghi một khoản chi phí công ty vào
+  // hoá đơn của khách.
+  //
+  // Lọc theo TIỀN TỐ MÃ chứ không theo cột `"Trạng thái"`: `'Không KD'` nghe như "không
+  // phải hàng" nhưng thực tế nghĩa là "hàng NGỪNG BÁN" — 45 mã mang trạng thái đó thì 25
+  // là hàng thật (lõi lọc LLK20/LLK35, PIN18V, vỏ lọc, giá treo…) và đều có thuế suất 8%.
+  // Phiên Sales đã lọc nhầm theo cột đó ngày 21/08/2026 và xoá mất thuế suất của 25 mã ấy.
+  // Cùng một định nghĩa "mục chi phí" với Sales, để hai khu không lệch nhau (SYSTEM.md §8).
   const { data, error } = await dataClient()
     .from('catalog_item')
     .select('"Mã nội bộ","Tên ngắn gọn (đề xuất)","Danh mục cấp 1"')
+    .not('Mã nội bộ', 'like', 'cp.%')
   if (error) throw new Error(error.message)
   const rows = (data ?? []).map((r) => {
     const o = r as Record<string, string | null>

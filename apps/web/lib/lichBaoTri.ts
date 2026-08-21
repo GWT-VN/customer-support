@@ -29,6 +29,27 @@ export function macDinhTheoBoMay(boMay: string | null | undefined): { soLan: num
   return s.includes('ECO') ? { soLan: 2, chuKy: 3 } : { soLan: 4, chuKy: 3 }
 }
 
+/**
+ * Suy LOẠI MÁY (POU máy uống / POE lọc tổng) từ tên BỘ MÁY của lịch bảo trì.
+ *
+ * Vì sao cần: đường suy chính là `plan.serial` → kho serial → danh mục cấp 2. Đo prod
+ * 21/08/2026 thì đường đó **đứt ngay mắt xích đầu — 0/79 plan có `serial`**, nên 471/471
+ * lượt rơi vào nhánh dự phòng và form luôn hiện đủ 4 chỉ số: phân loại chưa chạy lần nào.
+ * Trong khi **63/79 plan CÓ `bo_may`** (WH30A 37 · WH15A 20 · WH30A ECO 4 · WH15A ECO 2).
+ *
+ * WH15A / WH30A (kể cả bản ECO) là **hệ lọc tổng ⇒ POE** — CEO chốt 21/08/2026.
+ * Tên khác / trống -> null, form hiện đủ 4 chỉ số. KHÔNG đoán bừa: thà hỏi thừa còn hơn
+ * giấu mất một chỉ tiêu mà kỹ thuật cần ghi.
+ *
+ * Nhận dạng giống hệt `macDinhTheoBoMay()` ngay trên (bỏ khoảng trắng + HOA hết) để
+ * "WH30A ECO", "wh30a eco", "WH 30A" đều khớp — hai hàm đọc cùng một ô dữ liệu.
+ */
+export function loaiMayTheoBoMay(boMay: string | null | undefined): 'POU' | 'POE' | null {
+  if (!boMay) return null
+  const s = boMay.toUpperCase().replace(/\s+/g, '')
+  return s.includes('WH15A') || s.includes('WH30A') ? 'POE' : null
+}
+
 /** Bỏ dấu + thường hoá để so tên tỉnh. */
 function boDau(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim()
