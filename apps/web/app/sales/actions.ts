@@ -79,13 +79,29 @@ async function donTang(s: string): Promise<DonRow[]> {
   return s ? all.filter((g) => g.order_code.toLowerCase().includes(sl) || (g.customer_name ?? '').toLowerCase().includes(sl)) : all
 }
 
+/**
+ * Bộ lọc danh sách đơn. Tên tham số theo `docs/CHUAN-FILTER.md` — `ngtu`/`ngden` là
+ * tên chuẩn TOÀN APP cho lọc ngày, đừng đặt tên khác.
+ */
+export type LocDon = {
+  ngtu?: string
+  ngden?: string
+  tt?: string
+  tp?: string
+  kenh?: string
+  sp?: string
+}
+
 /** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng, lọc theo tab. */
-export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
+export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<DonRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
   const onlyTang = tab === 'DON_TANG'
   const map = new Map<string, DonRow>()
+  // Đơn TẶNG không có tình trạng / thanh toán / kênh / sản phẩm-lọc-được. Bật một trong
+  // các lọc đó mà vẫn trả đơn tặng thì kết quả lẫn lộn -> loại hẳn nhóm đó ra.
+  const locNghiepVu = !!(loc.tt || loc.tp || loc.kenh || loc.sp)
 
   if (!onlyTang) {
     let mq = db
@@ -95,6 +111,14 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
       .limit(5000)
     if (tab) mq = mq.eq('source_tab', tab)
     if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
+    if (loc.ngtu) mq = mq.gte('order_date', loc.ngtu)
+    if (loc.ngden) mq = mq.lte('order_date', loc.ngden)
+    if (loc.tt) mq = mq.eq('fulfillment_status', loc.tt)
+    if (loc.tp) mq = mq.eq('payment_status', loc.tp)
+    if (loc.kenh) mq = mq.eq('channel', loc.kenh)
+    // internal_code nằm ở DÒNG, không ở đơn -> lọc sản phẩm trả về đơn CÓ CHỨA sản phẩm đó,
+    // và line_count/total_vat khi ấy chỉ tính các dòng khớp. Giao diện phải nói rõ chuyện này.
+    if (loc.sp) mq = mq.eq('internal_code', loc.sp)
     const { data: lines, error } = await mq
     if (error) throw error
     for (const r of (lines ?? []) as Array<Record<string, unknown>>) {
@@ -122,10 +146,29 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
 
     let aq = db
       .from('sales_orders')
-      .select('order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
+      .select('order_id, order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
       .order('order_date', { ascending: false, nullsFirst: false })
       .limit(2000)
     if (tab) aq = aq.eq('source_tab', tab)
+    if (loc.ngtu) aq = aq.gte('order_date', loc.ngtu)
+    if (loc.ngden) aq = aq.lte('order_date', loc.ngden)
+    if (loc.tt) aq = aq.eq('status', loc.tt)
+    if (loc.tp) aq = aq.eq('payment_status', loc.tp)
+    if (loc.kenh) {
+      // Đơn mirror lưu TÊN kênh (`channel` text); đơn app lưu `channel_id` (số) -> phải
+      // quy tên sang id, không so thẳng được. Không có id nào khớp thì không có đơn app nào
+      // thuộc kênh đó: dùng -1 để truy vấn trả rỗng, thay vì bỏ qua bộ lọc.
+      const { data: dc } = await db.from('dim_channel').select('id').eq('channel_l1', loc.kenh)
+      const ids = ((dc ?? []) as Array<{ id: number }>).map((r) => r.id)
+      aq = aq.in('channel_id', ids.length ? ids : [-1])
+    }
+    // Lọc theo sản phẩm: đơn app giữ sản phẩm ở `sales_order_items`, không có cột nào trên
+    // header để lọc -> lấy trước danh sách order_id có mã đó.
+    if (loc.sp) {
+      const { data: it } = await db.from('sales_order_items').select('order_id').eq('internal_code', loc.sp)
+      const ids = [...new Set(((it ?? []) as Array<{ order_id: string }>).map((r) => r.order_id))]
+      aq = aq.in('order_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
+    }
     const { data: apps } = await aq
     const sl = s.toLowerCase()
     for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
@@ -146,13 +189,55 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
     }
   }
 
-  if (!tab || onlyTang) {
-    for (const g of await donTang(s)) map.set(g.order_code, g)
+  if ((!tab || onlyTang) && !locNghiepVu) {
+    for (const g of await donTang(s)) {
+      if (loc.ngtu && (g.order_date ?? '') < loc.ngtu) continue
+      if (loc.ngden && (g.order_date ?? '') > loc.ngden) continue
+      map.set(g.order_code, g)
+    }
   }
 
   return [...map.values()]
     .sort((a, b) => (b.order_date ?? '').localeCompare(a.order_date ?? ''))
     .slice(0, 300)
+}
+
+/**
+ * Kênh có THẬT trong đơn (không lấy cả `dim_channel` để khỏi hiện kênh chưa dùng bao giờ).
+ * Gom trùng bằng cách so bản đã bỏ khoảng trắng thừa — xem "một giá trị nhiều cách viết"
+ * trong docs/CHUAN-FILTER.md.
+ */
+export async function kenhTrongDon(): Promise<string[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('channel')
+    .not('channel', 'is', null)
+    .limit(5000)
+  const set = new Map<string, string>()
+  for (const r of (data ?? []) as Array<{ channel: string }>) {
+    const v = String(r.channel).trim()
+    if (v) set.set(v.toLowerCase(), v)
+  }
+  return [...set.values()].sort((a, b) => a.localeCompare(b, 'vi'))
+}
+
+/** Mã sản phẩm có THẬT trong đơn. Nhãn = mã nội bộ (ngắn), như ô lọc Sản phẩm bên CSKH. */
+export async function spTrongDon(): Promise<string[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('internal_code')
+    .not('internal_code', 'is', null)
+    .limit(5000)
+  const set = new Set<string>()
+  for (const r of (data ?? []) as Array<{ internal_code: string }>) {
+    const v = String(r.internal_code).trim()
+    if (v) set.add(v)
+  }
+  return [...set].sort()
 }
 
 export type KhachRow = {
