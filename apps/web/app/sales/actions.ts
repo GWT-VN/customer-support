@@ -14,6 +14,7 @@ import {
   deleteCustomer,
 } from './_db'
 import { tongDon } from './_calc'
+import { cacBienThe, gomDanhSachTinh } from '@/lib/tinhGom'
 import type { NewOrderInput, CustomerInput } from './_types'
 
 /** Gác khu Sales: nền tảng (mọi nhân sự) + phải có vai trò Sales. */
@@ -249,26 +250,81 @@ export type KhachRow = {
   last_order_date: string | null
 }
 
-export async function danhSachKhach(q = ''): Promise<KhachRow[]> {
+/** Mọi giá trị Tỉnh thô đang có trong `customers` — nguồn để dựng ô lọc và tra biến thể. */
+async function tinhThoCuaKhach(db: ReturnType<typeof dataClient>): Promise<string[]> {
+  const { data } = await db.from('customers').select('province').not('province', 'is', null).limit(5000)
+  return ((data ?? []) as Array<{ province: string }>).map((r) => r.province)
+}
+
+/** Danh sách Tỉnh cho ô lọc, đã gom biến thể (HCM / TP. Hồ Chí Minh / Hồ Chí Minh -> một mục). */
+export async function tinhTrongKhach(): Promise<string[]> {
+  await chanSales()
+  return gomDanhSachTinh(await tinhThoCuaKhach(dataClient()))
+}
+
+/**
+ * Kênh của từng khách, SUY TỪ ĐƠN: `customer_purchases` (có customer_code) nối
+ * `sales_order_lines` (có channel) theo `order_code`.
+ *
+ * Vì sao không đọc `customers.channel_id`: cột đó vừa thêm 21/08 và **đang rỗng toàn bộ**
+ * (0/412 khách). Khi nào có người điền thì đọc thẳng cột đó sẽ nhanh hơn.
+ * Hai bảng đều nhỏ (822 + 810 dòng) nên gom trong bộ nhớ là đủ.
+ */
+export async function kenhTheoKhach(): Promise<Map<string, string[]>> {
+  await chanSales()
+  const db = dataClient()
+  const [cp, sol] = await Promise.all([
+    db.from('customer_purchases').select('customer_code, order_code').not('customer_code', 'is', null).limit(5000),
+    db.from('sales_order_lines').select('order_code, channel').not('channel', 'is', null).limit(5000),
+  ])
+  const kenhTheoDon = new Map<string, string>()
+  for (const r of ((sol.data ?? []) as Array<{ order_code: string; channel: string }>)) {
+    if (r.order_code && !kenhTheoDon.has(r.order_code)) kenhTheoDon.set(r.order_code, String(r.channel).trim())
+  }
+  const ra = new Map<string, string[]>()
+  for (const r of ((cp.data ?? []) as Array<{ customer_code: string; order_code: string }>)) {
+    const k = kenhTheoDon.get(r.order_code)
+    if (!k) continue
+    const cur = ra.get(r.customer_code)
+    if (cur) { if (!cur.includes(k)) cur.push(k) } else ra.set(r.customer_code, [k])
+  }
+  return ra
+}
+
+export type LocKhach = { tinh?: string; kenh?: string }
+
+export async function danhSachKhach(q = '', loc: LocKhach = {}): Promise<KhachRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
   let query = db
     .from('customers')
-    .select('customer_code, name, phone, phone_chuan, province, province_moi, total_orders, last_order_date')
+    // Dùng `province` (KHÔNG `province_moi`): quy ước chung chốt 21/08 là `province` giữ
+    // tỉnh hiện hành, và `province_moi` sắp bỏ. Xem SYSTEM.md §8.
+    .select('customer_code, name, phone, phone_chuan, province, total_orders, last_order_date')
     .order('last_order_date', { ascending: false, nullsFirst: false })
     .limit(200)
   if (s) query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone_chuan.ilike.%${s}%,customer_code.ilike.%${s}%`)
+  if (loc.tinh) {
+    // Một tỉnh có nhiều cách viết trong DB -> khớp MỌI biến thể, không chỉ tên đã gom.
+    const bienThe = cacBienThe(loc.tinh, await tinhThoCuaKhach(db))
+    query = query.in('province', bienThe.length ? bienThe : ['\u0000'])
+  }
   const { data, error } = await query
   if (error) throw error
-  return ((data ?? []) as Array<Record<string, unknown>>).map((c) => ({
+  let rows = ((data ?? []) as Array<Record<string, unknown>>).map((c) => ({
     customer_code: c.customer_code as string,
     name: (c.name as string) ?? null,
     phone: (c.phone_chuan as string) || (c.phone as string) || null,
-    province: (c.province_moi as string) || (c.province as string) || null,
+    province: (c.province as string) ?? null,
     total_orders: (c.total_orders as number) ?? null,
     last_order_date: (c.last_order_date as string) ?? null,
   }))
+  if (loc.kenh) {
+    const map = await kenhTheoKhach()
+    rows = rows.filter((r) => (map.get(r.customer_code) ?? []).includes(loc.kenh as string))
+  }
+  return rows
 }
 
 // ---------- Chi tiết đơn ----------
