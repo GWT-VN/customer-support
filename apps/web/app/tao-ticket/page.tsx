@@ -1,4 +1,5 @@
-import { ticketTypes, listStaff, currentStaff } from '@/app/actions'
+import { ticketTypes } from '@/app/actions'
+import { listStaff, currentStaff } from '@/lib/nen-tang/nhan-su'
 import { TaoTicketForm } from '@/components/TaoTicketForm'
 
 export default async function TaoTicketPage() {

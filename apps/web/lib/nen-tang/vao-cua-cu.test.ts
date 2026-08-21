@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { xetLuatVaoCua } from './auth'
+import { xetLuatVaoCua } from './vao-cua'
 
 describe('xetLuatVaoCua', () => {
   it('luật 3 (C1): email @gwt.vn chưa có trong bảng thì CHỜ DUYỆT, không tự vào', () => {

@@ -138,11 +138,30 @@ export function inputTuIso(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+/**
+ * Mốc thời gian cho nhật ký / bình luận: "14:32 hôm nay", "09:10 hôm qua",
+ * "20/08 09:10". Tự ghép, KHÔNG dùng toLocaleString — bản ICU của Node và của
+ * trình duyệt cho ra chuỗi khác nhau, gây lỗi hydration (đã dính một lần).
+ */
+export function mocThoiGian(iso: string | null | undefined, bayGio: Date = new Date()): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  const gio = `${p(d.getHours())}:${p(d.getMinutes())}`
+  const n = soNgayToiHan(d, bayGio)
+  if (n === 0) return `${gio} hôm nay`
+  if (n === -1) return `${gio} hôm qua`
+  if (n === 1) return `${gio} ngày mai`
+  return `${ngayThang(d)} ${gio}`
+}
+
 /** Câu mô tả 1 dòng cho nhật ký. */
 export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null): string {
   const p = payload ?? {}
   switch (verb) {
     case 'created': return 'tạo việc'
+    case 'auto_created': return 'việc được sinh tự động từ ERP'
     case 'status_changed': return `đổi trạng thái → ${NHAN_TRANG_THAI[String(p.status)] ?? p.status}`
     case 'assigned': return `gán ${p.ten ?? 'ai đó'} · ${NHAN_VAI_TRO[String(p.role)] ?? p.role}`
     case 'unassigned': return 'bỏ một người khỏi việc'

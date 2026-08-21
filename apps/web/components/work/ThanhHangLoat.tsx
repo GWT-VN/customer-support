@@ -28,15 +28,13 @@ export function ThanhHangLoat({
 
   function chay(input: Parameters<typeof hangLoat>[1], mo_ta: string) {
     start(async () => {
-      try {
-        const kq = await hangLoat(ids, input)
-        onXong(
-          `${mo_ta}: ${kq.da_sua} việc` +
-          (kq.bo_qua > 0 ? ` · bỏ qua ${kq.bo_qua} việc bạn không có quyền sửa` : '')
-        )
-      } catch (e) {
-        onXong(e instanceof Error ? `Lỗi: ${e.message}` : 'Thao tác không thành công')
-      }
+      const kq = await hangLoat(ids, input)
+      if (!kq.ok) { onXong(`Không xong: ${kq.loi}`); return }
+      const { da_sua, bo_qua } = kq.duLieu
+      onXong(
+        `${mo_ta}: ${da_sua} việc` +
+        (bo_qua > 0 ? ` · bỏ qua ${bo_qua} việc bạn không có quyền sửa` : '')
+      )
     })
   }
 

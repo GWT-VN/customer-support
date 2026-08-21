@@ -4,7 +4,7 @@ import { OTimKiem } from '@/bang'
 import { maintenanceDue, maintenanceCounts, khoaTatCaBaoTri, listBangView, baoTriTheoThang } from '@/app/actions'
 import { PhanTrang } from '@/bang'
 import { ChipSapXep } from '@/bang'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { KhungChon, ThanhDaChon } from '@/bang'
 import { LocNgay } from '@/bang'
 import { ExportBaoTriButton } from '@/components/ExportBaoTriButton'
@@ -26,13 +26,17 @@ export default async function BaoTriPage({
   const laLich = tt === 'lich'
   const thang = /^\d{4}-\d{2}$/.test(thangRaw ?? '') ? thangRaw! : new Date().toISOString().slice(0, 7)
   const tinhTrang = tt ?? SAP           // mặc định: việc cần làm gần nhất
-  const [{ rows, tong, soTrang, sapXep }, counts, views, admin, lichRows] = await Promise.all([
+  const [{ rows, tong, soTrang, sapXep }, counts, views, quyen, lichRows] = await Promise.all([
     laLich
       ? Promise.resolve({ rows: [], tong: 0, trang: 1, soTrang: 1, sapXep: { cot: 'due_date', tang: true, macDinh: true } } as Awaited<ReturnType<typeof maintenanceDue>>)
       : maintenanceDue(tinhTrang, q, { trang, cot, chieu, ngtu, ngden }),
     maintenanceCounts(),
     laLich ? Promise.resolve([]) : listBangView('maintenance'),
-    laQuanLy(),
+    hoiQuyen({
+      hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+      viewChung: ['he_thong.view_chung', 'QUANLY'],
+      xuat: ['cs.bao_cao.xuat', 'QUANLY'],
+    }),
     laLich ? baoTriTheoThang(thang) : Promise.resolve([]),
   ])
 
@@ -101,15 +105,15 @@ export default async function BaoTriPage({
             <KhungChon
               khoaTrang={rows.map((r) => r.visit_id)}
               tong={tong}
-              bat={admin}
+              bat={quyen.hangLoat}
               thamSo={{ q, tt: tinhTrang, cot, chieu, ngtu, ngden }}
               layTatCaKhoa={khoaTatCaBaoTri}
             >
             <ThanhDaChon nhan="lượt bảo trì" />
-            <BangBaoTri rows={rows} admin={admin} views={views} congCu={
+            <BangBaoTri rows={rows} choViewChung={quyen.viewChung} views={views} congCu={
               <>
                 <Suspense><LocNgay nhan="Đến hạn" /></Suspense>
-                {admin && <ExportBaoTriButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
+                {quyen.xuat && <ExportBaoTriButton tt={tt} q={q} ngtu={ngtu} ngden={ngden} />}
               </>
             } />
             </KhungChon>

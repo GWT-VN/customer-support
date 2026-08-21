@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { xetLuatVaoNenTang } from './auth'
+import { xetLuatVaoNenTang } from './vao-cua'
 
 /**
  * Cổng NỀN TẢNG (khu /work) — rộng hơn cổng CS: mọi nhân sự đang hoạt động vào được,

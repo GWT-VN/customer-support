@@ -1,5 +1,5 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import Link from 'next/link'
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { dsKyThuat, dsLichKyThuat } from '@/app/actions'
 import { LichKyThuatList } from '@/components/LichKyThuatList'
 import { LichKyThuatCalendar } from '@/components/LichKyThuatCalendar'
@@ -21,7 +21,12 @@ export default async function XemLichKyThuatPage({
 }: {
   searchParams: Promise<{ view?: string; tu?: string; den?: string; kt?: string; thang?: string; tuan?: string; loai?: string }>
 }) {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.ky_thuat.xep_lich', 'QUANLY')
+  // Trang này còn đọc DANH SÁCH kỹ thuật, vốn đòi cs.ky_thuat.ho_so — một quyền
+  // KHÁC với quyền gác trang. Không gác cả hai thì ai được tick "xếp lịch" mà
+  // không được tick "hồ sơ kỹ thuật viên" sẽ vào tới nơi rồi mới bị đá ra giữa
+  // chừng, không hiểu vì sao. Mà thiếu danh sách kỹ thuật thì trang cũng vô nghĩa.
+  await chanNeuThieuQuyen('cs.ky_thuat.ho_so', 'QUANLY')
   const { view = 'list', tu: tuRaw, den: denRaw, kt, thang: thangRaw, tuan: tuanRaw, loai } = await searchParams
   const laCalendar = view === 'calendar'
   const laBoard = view === 'board'

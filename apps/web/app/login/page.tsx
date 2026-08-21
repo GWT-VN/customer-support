@@ -11,6 +11,7 @@ const THONG_BAO_LOI: Record<string, string> = {
   ngoai_danh_sach: 'Tài khoản này chưa được cấp quyền vào hệ thống CSKH. Liên hệ quản trị.',
   ngoai_cs: 'Tài khoản này không có vai trò CSKH (chỉ Sales, hoặc chưa được gán vai trò CS). Liên hệ quản trị.',
   google: 'Đăng nhập Google không thành công. Thử lại hoặc dùng email + mật khẩu.',
+  het_han: 'Phiên đăng nhập đã hết hạn hoặc không còn hợp lệ. Đăng nhập lại.',
 }
 
 function taoClient() {
@@ -30,11 +31,19 @@ function FormDangNhap() {
 
   const maLoi = searchParams.get('loi') ?? ''
   const loiTuUrl = THONG_BAO_LOI[maLoi] ?? null
+  // Vừa đổi mật khẩu ban đầu xong -> phiên cũ bị huỷ, phải đăng nhập lại. Không
+  // nói ra thì người dùng tưởng đổi hỏng và gõ lại mật khẩu cũ.
+  const vuaDoiMatKhau = searchParams.get('doi_mk') === 'ok'
 
   // Bị luật vào cửa từ chối thì session cũ phải dọn. Không dọn thì người dùng
   // vẫn "đang đăng nhập", mỗi lần mở app lại bị đá về đây mà không hiểu vì sao.
   useEffect(() => {
-    if (maLoi === 'bi_khoa' || maLoi === 'ngoai_danh_sach' || maLoi === 'cho_duyet' || maLoi === 'ngoai_cs') {
+    // 'het_han' PHẢI nằm trong danh sách này: đó chính là ca cookie ma. Không dọn
+    // thì proxy vẫn tưởng còn phiên và app khoá chết bằng vòng lặp chuyển hướng.
+    if (
+      maLoi === 'bi_khoa' || maLoi === 'ngoai_danh_sach' || maLoi === 'cho_duyet'
+      || maLoi === 'ngoai_cs' || maLoi === 'het_han'
+    ) {
       taoClient().auth.signOut()
     }
   }, [maLoi])
@@ -43,7 +52,18 @@ function FormDangNhap() {
     e.preventDefault()
     setBusy(true)
     setErr(null)
+    // try/catch quanh TOÀN BỘ thân hàm: chỉ cần một lời gọi ném lỗi là setBusy(false)
+    // không bao giờ chạy và nút đứng vĩnh viễn ở "Đang vào…" — người dùng tưởng hỏng
+    // rồi bấm lại, dù phiên đã tạo xong. Đúng bài học của nút Gộp treo hôm 20/08.
+    try {
+      await vaoApp()
+    } catch {
+      setErr('Không kết nối được máy chủ. Thử lại.')
+      setBusy(false)
+    }
+  }
 
+  async function vaoApp() {
     const { error } = await taoClient().auth.signInWithPassword({ email, password })
     if (error) {
       setErr('Email hoặc mật khẩu không đúng.')
@@ -63,7 +83,12 @@ function FormDangNhap() {
     // bằng App Router hay kẹt — layout gốc bọc /login không re-render nên nút cứ
     // "Đang vào…" dù server đã trả trang chủ 200. Tải lại nguyên trang thì server
     // dựng '/' với đúng session, proxy cho qua, hết đường treo.
-    window.location.assign('/')
+    //
+    // Mật khẩu do quản trị cấp thì đi thẳng màn đổi mật khẩu. Proxy cũng chặn,
+    // nhưng gửi thẳng tới đúng chỗ thì người dùng không thấy một cú nhảy thừa.
+    window.location.assign(
+      quyen.phaiDoiMatKhau ? '/auth/doi-mat-khau' : quyen.vaoDuocCS ? '/' : '/work'
+    )
   }
 
   async function quenMatKhau() {
@@ -128,8 +153,10 @@ function FormDangNhap() {
           <button type="button" onClick={quenMatKhau} disabled={busy} className="text-xs text-sky-700 underline disabled:opacity-50">Quên mật khẩu?</button>
         </div>
 
-        {thongBao && (
-          <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">{thongBao}</p>
+        {(thongBao ?? (vuaDoiMatKhau ? 'Đã đổi mật khẩu. Đăng nhập lại bằng mật khẩu MỚI của bạn.' : null)) && (
+          <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+            {thongBao ?? 'Đã đổi mật khẩu. Đăng nhập lại bằng mật khẩu MỚI của bạn.'}
+          </p>
         )}
         {(err ?? loiTuUrl) && (
           <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err ?? loiTuUrl}</p>

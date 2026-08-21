@@ -63,7 +63,19 @@ cd apps/web
 npm install     # một lần
 npm run dev     # mở http://localhost:3000
 ```
-Tạo tài khoản test để đăng nhập: Studio local (54323) → **Authentication → Add user** → dùng email có sẵn trong data giả, ví dụ `dev.admin@gwt.vn` (toàn quyền) hoặc `dev.sales@gwt.vn` (chỉ thấy Việc + Sales) — để thử phân quyền.
+Đăng nhập bằng **tài khoản dev cố định** (CEO chốt 21/08/2026 — đừng đổi mật khẩu, mọi
+worktree dùng chung một Supabase local):
+
+| Email | Mật khẩu | Thấy gì |
+|---|---|---|
+| `dev.admin@gwt.vn` | `gwtlocal123` | `admin` — mọi khu: Việc · CSKH · Sales |
+| `dev.sales@gwt.vn` | `gwtlocal123` | `sales` — chỉ Sales (kèm khu Việc, mở cho mọi nhân viên) |
+
+> ⚠️ **21/08: `dev.sales@gwt.vn` chưa đăng nhập được** (lỗi **27** ở `backlog/nen-tang.md`) — cửa đăng
+> nhập đang xét bằng luật khu CSKH nên tài khoản Sales thuần bị chặn. Không phải sai mật khẩu.
+
+Chưa có / sai mật khẩu → `bash supabase/seed-prod-masked.sh` đặt lại đúng bảng trên.
+Chi tiết + cách thêm vai trò khác để thử phân quyền: [LOCAL-DEV.md](LOCAL-DEV.md).
 
 ---
 

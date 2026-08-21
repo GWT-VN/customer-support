@@ -1,4 +1,4 @@
-import { layNguoiDung } from '@/lib/supabase'
+import { layNguoiDung } from '@/lib/nen-tang/phien'
 import { dangXuat } from '@/app/auth/actions'
 
 /**

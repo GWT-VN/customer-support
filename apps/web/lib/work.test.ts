@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   nhomTheoHan, nhanHan, gomTheoHan, soNgayToiHan, chuTat,
-  isoTuOInput, inputTuIso, moTaNhatKy, THU_TU_NHOM,
+  isoTuOInput, inputTuIso, moTaNhatKy, mocThoiGian, THU_TU_NHOM,
 } from './work'
 
 // Mốc cố định: 15/09/2026 lúc 10:00 giờ địa phương.
@@ -118,5 +118,23 @@ describe('moTaNhatKy', () => {
   })
   it('verb lạ thì trả nguyên văn, không vỡ', () => {
     expect(moTaNhatKy('chua_biet', null)).toBe('chua_biet')
+  })
+})
+
+describe('mocThoiGian', () => {
+  const bay = new Date(2026, 8, 15, 10, 0)
+  it('cùng ngày -> giờ + "hôm nay"', () => {
+    expect(mocThoiGian(new Date(2026, 8, 15, 14, 32).toISOString(), bay)).toBe('14:32 hôm nay')
+  })
+  it('hôm qua / ngày mai gọi đúng tên', () => {
+    expect(mocThoiGian(new Date(2026, 8, 14, 9, 5).toISOString(), bay)).toBe('09:05 hôm qua')
+    expect(mocThoiGian(new Date(2026, 8, 16, 8, 0).toISOString(), bay)).toBe('08:00 ngày mai')
+  })
+  it('xa hơn thì kèm ngày/tháng', () => {
+    expect(mocThoiGian(new Date(2026, 7, 20, 9, 10).toISOString(), bay)).toBe('20/08 09:10')
+  })
+  it('rỗng hoặc hỏng -> chuỗi rỗng, không vỡ', () => {
+    expect(mocThoiGian(null, bay)).toBe('')
+    expect(mocThoiGian('lung tung', bay)).toBe('')
   })
 })

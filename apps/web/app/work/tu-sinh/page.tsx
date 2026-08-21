@@ -1,9 +1,17 @@
 import Link from 'next/link'
-import { requireNhanSu } from '@/lib/supabase'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
+import { quyenChoMan } from '@/lib/nen-tang/kiem-quyen'
 import { manTuSinh, nenTang } from '../actions'
 import { TuSinh } from '@/components/work/TuSinh'
 
 export const metadata = { title: 'Việc tự sinh · GWT Work' }
+
+/**
+ * Bật/tắt luật, đổi người nhận, chỉnh ngưỡng, chạy tay — cùng một mã quyền.
+ * Hỏi qua ma trận chứ không đọc cờ vai trò: CEO tick khác đi thì nút đổi theo,
+ * và nút hiện ra luôn khớp với rào phía Server Action.
+ */
+const QUYEN_MAN = [['work.luat_tu_sinh', 'QUANLY']] as const
 
 /**
  * Sự kiện trong CSKH / Sales tự đẻ ra việc — không ai phải nhớ.
@@ -11,11 +19,11 @@ export const metadata = { title: 'Việc tự sinh · GWT Work' }
  */
 export default async function TuSinhPage() {
   await requireNhanSu()
-  const [duLieu, nt] = await Promise.all([manTuSinh(), nenTang()])
+  const [duLieu, nt, quyen] = await Promise.all([manTuSinh(), nenTang(), quyenChoMan(QUYEN_MAN)])
 
   return (
     <main data-khu="work" className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-5 py-5 sm:px-6 space-y-5">
+      <div className="max-w-5xl mx-auto px-5 py-5 sm:px-6 space-y-5 khung-trang">
         <header>
           <nav className="flex gap-3 mb-2" style={{ fontSize: 12.5 }} aria-label="Khu Việc">
             <Link href="/work" style={{ color: 'var(--accent-ink)' }}>Việc của tôi</Link>
@@ -27,7 +35,7 @@ export default async function TuSinhPage() {
             Sự kiện trong CSKH / Sales tự đẻ ra việc — không ai phải nhớ.
           </p>
         </header>
-        <TuSinh duLieu={duLieu} nenTang={nt} />
+        <TuSinh duLieu={duLieu} nenTang={nt} duocSuaLuat={quyen['work.luat_tu_sinh'] ?? false} />
       </div>
     </main>
   )

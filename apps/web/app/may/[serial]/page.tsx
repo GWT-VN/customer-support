@@ -8,14 +8,19 @@ import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
 import { QuanLyMay } from '@/components/QuanLyMay'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
-  const [tickets, vongDoi, admin, dsTT] = await Promise.all([
-    ticketsOfSerial(m.serial), lichSuSerial(m.serial), laQuanLy(), dsTrangThai(),
+  const [tickets, vongDoi, quyen, dsTT] = await Promise.all([
+    ticketsOfSerial(m.serial), lichSuSerial(m.serial), hoiQuyen({
+      lichKT: ['cs.ky_thuat.ho_so', 'QUANLY'],
+      lapThuDoi: ['cs.may.lap_thu_doi', 'QUANLY'],
+      suaKhach: ['cs.khach.xin_xoa', 'NHANVIEN'],
+      khoSerial: ['cs.serial.kho', 'QUANLY'],
+    }), dsTrangThai(),
   ])
   // Máy này có phải máy THAY THẾ (đổi máy cho khách) không -> hiện tính chuyển tiếp.
   const suKienThayThe = vongDoi.su_kien.find((s) => s.su_kien === 'doi_may_lap_moi')
@@ -93,7 +98,7 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Lõi lọc & lịch thay</h2>
           <LoiCuaMay serial={m.serial} />
-          {admin && m.customer_id && (
+          {quyen.lichKT && m.customer_id && (
             <Link href={`/ky-thuat?kh=${m.customer_id}&loai=thay_loi&ref=${encodeURIComponent(m.serial)}`}
               className="mt-3 inline-block rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
               + Tạo lịch kỹ thuật (thay lõi máy này)
@@ -119,7 +124,8 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Quản lý máy</h2>
           <QuanLyMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
-            dangLap={!!m.customer_id} laAdmin={admin} ds={dsTT} />
+            dangLap={!!m.customer_id} ds={dsTT}
+            choLapThuDoi={quyen.lapThuDoi} choSuaKhach={quyen.suaKhach} choKhoSerial={quyen.khoSerial} />
         </section>
       </div>
     </main>

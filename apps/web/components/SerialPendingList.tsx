@@ -6,7 +6,8 @@ import { approveSerial, rejectSerial, deleteSerialPending, type SerialPending } 
 import { vnDateTime } from '@/components/TicketBadge'
 
 /** Danh sách serial chờ duyệt. Duyệt/từ chối/xoá CHỈ admin (server cũng chặn). */
-export function SerialPendingList({ items, laAdmin }: { items: SerialPending[]; laAdmin: boolean }) {
+/** choDuyet — quyền cs.serial.duyet, đúng thứ approveSerial/rejectSerial đòi. */
+export function SerialPendingList({ items, choDuyet }: { items: SerialPending[]; choDuyet: boolean }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -46,7 +47,7 @@ export function SerialPendingList({ items, laAdmin }: { items: SerialPending[]; 
                 {s.nguoi_tao && `${s.nguoi_tao} · `}{vnDateTime(s.created_at)}
               </div>
             </div>
-            {laAdmin ? (
+            {choDuyet ? (
               <div className="flex items-center gap-2 flex-none">
                 <button onClick={() => duyet(s.id)} disabled={busy === s.id}
                   className="rounded-lg bg-emerald-600 text-white px-3 py-1 text-xs font-medium disabled:opacity-50">

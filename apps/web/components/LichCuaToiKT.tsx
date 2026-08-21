@@ -192,7 +192,9 @@ export function LichCuaToiKT({ rows }: { rows: LichKyThuatRow[] }) {
     setBusy(id); setMsg(null); setErr(null)
     const r = await datTrangThaiLichKT(id, 'xong')
     setBusy(null)
-    if (!r.ok) { setErr(r.error); return }
+    // Ca chuyến ĐÃ xong nhưng vài việc ăn theo không cập nhật được: vẫn phải tải lại, nếu
+    // không màn hình còn hiện nút "Hoàn thành chuyến" trong khi chuyến đã xong thật.
+    if (!r.ok) { setErr(r.error); router.refresh(); return }
     if (r.cap_nhat > 0) setMsg(`Đã hoàn thành + cập nhật ${r.cap_nhat} việc.`)
     router.refresh()
   }

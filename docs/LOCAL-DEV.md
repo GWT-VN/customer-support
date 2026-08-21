@@ -51,7 +51,28 @@ ALLOWED_EMAIL_DOMAIN=gwt.vn
 ```
 > Giữ 1 file `.env.local.prod` (trỏ prod) và 1 `.env.local.local` (trỏ local), đổi qua lại. **Đừng commit .env.local.**
 
-Tạo user test: Studio local → Authentication → Add user → email khớp `staff` giả trong `seed.sql` (vd `dev.admin@gwt.vn`) → đăng nhập thử phân quyền.
+### Tài khoản đăng nhập local — CỐ ĐỊNH, không đổi
+
+CEO chốt 21/08/2026. Mọi phiên/worktree dùng **chung một Supabase local**, nên mật khẩu
+cũng phải chung. **Không phiên nào được đặt mật khẩu khác** rồi ghi số riêng vào tài liệu
+của mình — đã xảy ra 3 mật khẩu cho cùng một email, CEO gõ đúng tài liệu vẫn không vào được.
+
+| Email | Mật khẩu | Thấy gì |
+|---|---|---|
+| `dev.admin@gwt.vn` | `gwtlocal123` | vai trò `admin` — **mọi khu**: Việc · CSKH · Sales |
+| `dev.sales@gwt.vn` | `gwtlocal123` | vai trò `sales` — **chỉ Sales** (kèm khu Việc, khu này mở cho mọi nhân viên) |
+
+> ⚠️ **21/08: `dev.sales@gwt.vn` hiện CHƯA đăng nhập được** — không phải sai mật khẩu. Cửa đăng nhập
+> đang xét bằng luật của khu CSKH, nên tài khoản chỉ có vai trò `sales` bị đăng xuất ngay tại cửa
+> (`ngoai_cs`), kể cả đường Google. Đã ghi thành lỗi **27** ở `backlog/nen-tang.md`, phiên nền tảng
+> đang giữ. Cần thử vai trò Sales ngay bây giờ thì tạm gán thêm một vai trò CS cho tài khoản đó
+> trong bảng `staff` (DB local), xong nhớ trả lại.
+
+Mất/lệch mật khẩu thì chạy lại `bash supabase/seed-prod-masked.sh` — bước 4/4 **đặt lại**
+cả hai tài khoản về đúng bảng trên (chạy lại bao nhiêu lần cũng ra một kết quả).
+
+Muốn thử vai trò khác (`cs`, `cs_manager`, `ky_thuat`…): Studio local → Authentication →
+Add user, email lấy trong bảng `staff` — **đừng đụng hai tài khoản trên**.
 
 ## Vòng đời một thay đổi DB (local → prod)
 1. Viết migration mới: `supabase migration new ten_viec` → sửa file trong `supabase/migrations/`.

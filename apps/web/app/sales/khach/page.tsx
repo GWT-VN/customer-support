@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
-import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { BoLocChon, OTimKiem, ThanhDangLoc } from '@/bang'
 import { danhSachKhach, kenhTrongDon, tinhTrongKhach } from '../actions'
 

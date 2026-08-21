@@ -34,21 +34,18 @@ export function FormTaoViec({
     const t = title.trim()
     if (!t) return
     start(async () => {
-      try {
-        await taoViec({
-          title: t,
-          description: description.trim() || null,
-          priority,
-          due: isoTuOInput(due),
-          team_id: teamId ? Number(teamId) : null,
-          assignees: nguoi,
-        })
-        setTitle(''); setDescription(''); setPriority(3); setDue('')
-        setNguoi([]); setMoRong(false); setLoi(null)
-        onXong()
-      } catch (err) {
-        setLoi(err instanceof Error ? err.message : 'Không tạo được việc')
-      }
+      const kq = await taoViec({
+        title: t,
+        description: description.trim() || null,
+        priority,
+        due: isoTuOInput(due),
+        team_id: teamId ? Number(teamId) : null,
+        assignees: nguoi,
+      })
+      if (!kq.ok) { setLoi(kq.loi); return }
+      setTitle(''); setDescription(''); setPriority(3); setDue('')
+      setNguoi([]); setMoRong(false); setLoi(null)
+      onXong()
     })
   }
 

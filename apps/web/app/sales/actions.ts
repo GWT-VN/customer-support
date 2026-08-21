@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { coTheVaoSales, dataClient, requireNhanSu } from '@/lib/supabase'
+import { dataClient } from '@/lib/nen-tang/db'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import {
   createSalesOrder,
   updateSalesOrder,
