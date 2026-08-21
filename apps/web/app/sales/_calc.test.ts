@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode, tachVat, tongDon } from './_calc'
+import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode, tachVat, tongDon, chuanVat } from './_calc'
 
 describe('deriveSourceTab', () => {
   it('POE thắng khi có dòng POE', () => {
@@ -86,4 +86,26 @@ describe('tongDon', () => {
     ])).toEqual({ net: 1500000, vat: 80000, sauVat: 1580000 })
   })
   it('đơn rỗng -> tất cả 0', () => expect(tongDon([])).toEqual({ net: 0, vat: 0, sauVat: 0 }))
+})
+
+describe('chuanVat — chấp cả hai cách ghi', () => {
+  it('phân số giữ nguyên', () => {
+    expect(chuanVat(0.08)).toBe(0.08)
+    expect(chuanVat(0.1)).toBe(0.1)
+    expect(chuanVat(0)).toBe(0)
+  })
+  it('phần trăm quy về phân số — hết lỗi 800%', () => {
+    expect(chuanVat(8)).toBe(0.08)
+    expect(chuanVat(10)).toBe(0.1)
+    expect(chuanVat(5)).toBe(0.05)
+  })
+  it('rỗng/không hợp lệ -> null, không đoán', () => {
+    expect(chuanVat(null)).toBeNull()
+    expect(chuanVat(undefined)).toBeNull()
+    expect(chuanVat(-1)).toBeNull()
+  })
+  it('tachVat cho KẾT QUẢ NHƯ NHAU dù ghi 8 hay 0.08', () => {
+    expect(tachVat(1080000, 8)).toEqual(tachVat(1080000, 0.08))
+    expect(tachVat(1080000, 8)).toEqual({ net: 1000000, vat: 80000 })
+  })
 })

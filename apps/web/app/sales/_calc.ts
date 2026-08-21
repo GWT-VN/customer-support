@@ -61,6 +61,23 @@ export function nextSeqCode(existing: Array<string | null | undefined>, prefix: 
 }
 
 /**
+ * Quy thuế suất VAT về dạng PHÂN SỐ, chấp được cả hai cách ghi.
+ *
+ * Vì sao cần: Google Sheet lưu phân số (`0.08`), nhưng ô nhập cũ của app ghi nhãn
+ * "VAT%" nên người dùng gõ `8`. Hai cách ghi cùng tồn tại trong dữ liệu cũ, và nếu
+ * đem `8` đi nhân 100 để hiển thị thì ra **800%** — đúng lỗi CEO báo 21/08.
+ *
+ * Luật: giá trị > 1 hiểu là PHẦN TRĂM (8 -> 0.08); ≤ 1 hiểu là PHÂN SỐ (0.08 giữ nguyên).
+ * Không có thuế suất thực tế nào vừa hợp lệ ở cả hai cách hiểu, nên luật này không nhập nhằng.
+ */
+export function chuanVat(v: number | null | undefined): number | null {
+  if (v == null || v === '' as unknown as number) return null
+  const n = Number(v)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n > 1 ? n / 100 : n
+}
+
+/**
  * Tách tiền TRƯỚC VAT và tiền VAT từ tiền SAU VAT.
  *
  * ⚠️ `vatPct` là PHÂN SỐ: 0.08 = 8%. Đây là cách Google Sheet lưu — đo trên production
@@ -74,7 +91,7 @@ export function tachVat(
   vatPct: number | null | undefined
 ): { net: number; vat: number } {
   const sau = Math.round(Number(amountVat) || 0)
-  const p = Number(vatPct) || 0
+  const p = chuanVat(vatPct) ?? 0
   if (p <= 0) return { net: sau, vat: 0 }
   const net = Math.round(sau / (1 + p))
   // Trừ ngược thay vì tính riêng, để net + vat LUÔN khớp đúng tiền sau VAT —

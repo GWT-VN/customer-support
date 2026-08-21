@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
-import { BoLocChon, LocNgay, OTimKiem, ThanhDangLoc } from '@/bang'
-import { danhSachDon, kenhTrongDon, spTrongDon } from './actions'
+import { BoLocChon, BoLocGoiY, LocNgay, OTimKiem, ThanhDangLoc } from '@/bang'
+import { danhSachDon, kenhChiTietTrongDon, kenhTrongDon, spTrongDon } from './actions'
 import { FULFILL_OPTS, PAYMENT_OPTS } from './_types'
 
 export const metadata = { title: 'Đơn hàng · GWT Sales' }
@@ -29,26 +29,32 @@ type ThamSo = {
   q?: string; tab?: string
   // Tên tham số lọc ngày theo chuẩn TOÀN APP — xem docs/CHUAN-FILTER.md.
   ngtu?: string; ngden?: string
-  tt?: string; tp?: string; kenh?: string; sp?: string
+  tt?: string; tp?: string; kenh?: string; kenh2?: string; sp?: string
 }
 
 export default async function SalesDonPage({ searchParams }: { searchParams: Promise<ThamSo> }) {
   await requireNhanSu()
   if (!(await coTheVaoSales())) redirect('/?loi=khong_du_quyen')
   const sp0 = await searchParams
-  const { q, ngtu, ngden, tt, tp, kenh, sp } = sp0
+  const { q, ngtu, ngden, tt, tp, kenh, kenh2, sp } = sp0
   const curTab = sp0.tab ?? ''
-  const [rows, kenhOpts, spOpts] = await Promise.all([
-    danhSachDon(q ?? '', curTab, { ngtu, ngden, tt, tp, kenh, sp }),
+  const [rows, kenhOpts, kenhCtOpts, spOpts] = await Promise.all([
+    danhSachDon(q ?? '', curTab, { ngtu, ngden, tt, tp, kenh, kenh2, sp }),
     kenhTrongDon(),
+    kenhChiTietTrongDon(),
     spTrongDon(),
   ])
+  // Chọn kênh cấp 1 rồi thì cấp 2 chỉ hiện chi tiết THUỘC kênh đó — đỡ phải cuộn qua
+  // chi tiết của kênh khác. Chưa chọn cấp 1 thì hiện tất cả.
+  const kenh2Opts = (kenh ? kenhCtOpts.filter((k) => k.kenh === kenh) : kenhCtOpts)
+    .map((k) => ({ giaTri: k.chiTiet, nhan: kenh ? k.chiTiet : `${k.chiTiet} (${k.kenh || '—'})` }))
 
   const dieuKien = [
     ngtu || ngden ? { nhan: 'Ngày', giaTri: `${ngtu || '…'} → ${ngden || '…'}` } : null,
     tt ? { nhan: 'Tình trạng', giaTri: tt } : null,
     tp ? { nhan: 'Thanh toán', giaTri: tp } : null,
     kenh ? { nhan: 'Kênh', giaTri: kenh } : null,
+    kenh2 ? { nhan: 'Kênh chi tiết', giaTri: kenh2 } : null,
     sp ? { nhan: 'Sản phẩm', giaTri: sp } : null,
   ].filter(Boolean) as { nhan: string; giaTri: string }[]
 
@@ -75,7 +81,9 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
               <BoLocChon param="tt" nhan="Tình trạng" tuyChon={FULFILL_OPTS.map((o) => ({ giaTri: o, nhan: o }))} />
               <BoLocChon param="tp" nhan="Thanh toán" tuyChon={PAYMENT_OPTS.map((o) => ({ giaTri: o, nhan: o }))} />
               <BoLocChon param="kenh" nhan="Kênh" tuyChon={kenhOpts.map((o) => ({ giaTri: o, nhan: o }))} />
-              <BoLocChon param="sp" nhan="Sản phẩm" tuyChon={spOpts.map((o) => ({ giaTri: o, nhan: o }))} />
+              <BoLocChon param="kenh2" nhan="Kênh chi tiết" tuyChon={kenh2Opts} />
+              {/* Sản phẩm dùng ô GÕ-ĐỂ-GỢI-Ý: danh mục quá dài để cuộn tay. Gõ mã hoặc tên đều ra. */}
+              <BoLocGoiY param="sp" nhan="Sản phẩm" tuyChon={spOpts.map((o) => ({ giaTri: o.ma, nhan: o.ten }))} />
             </div>
           </div>
         </Suspense>

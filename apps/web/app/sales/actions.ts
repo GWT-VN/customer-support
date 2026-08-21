@@ -89,7 +89,10 @@ export type LocDon = {
   ngden?: string
   tt?: string
   tp?: string
+  /** Kênh cấp 1 (`sales_order_lines.channel`). */
   kenh?: string
+  /** Kênh cấp 2 / chi tiết kênh (`sales_order_lines.channel_detail`). */
+  kenh2?: string
   sp?: string
 }
 
@@ -102,7 +105,7 @@ export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<D
   const map = new Map<string, DonRow>()
   // Đơn TẶNG không có tình trạng / thanh toán / kênh / sản phẩm-lọc-được. Bật một trong
   // các lọc đó mà vẫn trả đơn tặng thì kết quả lẫn lộn -> loại hẳn nhóm đó ra.
-  const locNghiepVu = !!(loc.tt || loc.tp || loc.kenh || loc.sp)
+  const locNghiepVu = !!(loc.tt || loc.tp || loc.kenh || loc.kenh2 || loc.sp)
 
   if (!onlyTang) {
     let mq = db
@@ -117,6 +120,7 @@ export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<D
     if (loc.tt) mq = mq.eq('fulfillment_status', loc.tt)
     if (loc.tp) mq = mq.eq('payment_status', loc.tp)
     if (loc.kenh) mq = mq.eq('channel', loc.kenh)
+    if (loc.kenh2) mq = mq.eq('channel_detail', loc.kenh2)
     // internal_code nằm ở DÒNG, không ở đơn -> lọc sản phẩm trả về đơn CÓ CHỨA sản phẩm đó,
     // và line_count/total_vat khi ấy chỉ tính các dòng khớp. Giao diện phải nói rõ chuyện này.
     if (loc.sp) mq = mq.eq('internal_code', loc.sp)
@@ -165,6 +169,9 @@ export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<D
     }
     // Lọc theo sản phẩm: đơn app giữ sản phẩm ở `sales_order_items`, không có cột nào trên
     // header để lọc -> lấy trước danh sách order_id có mã đó.
+    // Đơn app chỉ có channel_id (kênh cấp 1), không lưu kênh cấp 2 -> lọc cấp 2 thì
+    // không đơn app nào khớp. Trả rỗng thay vì lờ bộ lọc đi.
+    if (loc.kenh2) aq = aq.in('order_id', ['00000000-0000-0000-0000-000000000000'])
     if (loc.sp) {
       const { data: it } = await db.from('sales_order_items').select('order_id').eq('internal_code', loc.sp)
       const ids = [...new Set(((it ?? []) as Array<{ order_id: string }>).map((r) => r.order_id))]
@@ -224,21 +231,47 @@ export async function kenhTrongDon(): Promise<string[]> {
   return [...set.values()].sort((a, b) => a.localeCompare(b, 'vi'))
 }
 
-/** Mã sản phẩm có THẬT trong đơn. Nhãn = mã nội bộ (ngắn), như ô lọc Sản phẩm bên CSKH. */
-export async function spTrongDon(): Promise<string[]> {
+/**
+ * Cặp (kênh cấp 1, kênh cấp 2) có thật trong đơn. Trang dùng để dựng ô lọc cấp 2 và
+ * THU HẸP theo cấp 1 đang chọn — chọn "Đại lý" thì cấp 2 chỉ hiện đại lý, không hiện
+ * chi tiết của kênh khác.
+ */
+export async function kenhChiTietTrongDon(): Promise<{ kenh: string; chiTiet: string }[]> {
   await chanSales()
   const db = dataClient()
   const { data } = await db
     .from('sales_order_lines')
-    .select('internal_code')
+    .select('channel, channel_detail')
+    .not('channel_detail', 'is', null)
+    .limit(5000)
+  const set = new Map<string, { kenh: string; chiTiet: string }>()
+  for (const r of (data ?? []) as Array<{ channel: string | null; channel_detail: string }>) {
+    const ct = String(r.channel_detail).trim()
+    if (!ct) continue
+    const k = String(r.channel ?? '').trim()
+    set.set(`${k.toLowerCase()}|${ct.toLowerCase()}`, { kenh: k, chiTiet: ct })
+  }
+  return [...set.values()].sort((a, b) => a.chiTiet.localeCompare(b.chiTiet, 'vi'))
+}
+
+/** Mã sản phẩm có THẬT trong đơn. Nhãn = mã nội bộ (ngắn), như ô lọc Sản phẩm bên CSKH. */
+export async function spTrongDon(): Promise<{ ma: string; ten: string }[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('internal_code, product_name')
     .not('internal_code', 'is', null)
     .limit(5000)
-  const set = new Set<string>()
-  for (const r of (data ?? []) as Array<{ internal_code: string }>) {
-    const v = String(r.internal_code).trim()
-    if (v) set.add(v)
+  const set = new Map<string, string>()
+  for (const r of (data ?? []) as Array<{ internal_code: string; product_name: string | null }>) {
+    const ma = String(r.internal_code).trim()
+    if (!ma) continue
+    const ten = String(r.product_name ?? '').trim()
+    // Giữ tên ĐẦU TIÊN gặp được: cùng một mã có thể ghi tên hơi khác nhau giữa các dòng.
+    if (!set.has(ma) || (!set.get(ma) && ten)) set.set(ma, ten)
   }
-  return [...set].sort()
+  return [...set.entries()].map(([ma, ten]) => ({ ma, ten })).sort((a, b) => a.ma.localeCompare(b.ma))
 }
 
 export type KhachRow = {

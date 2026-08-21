@@ -4,6 +4,7 @@ import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
 import { chiTietDon } from '../../actions'
 import { OrderActions } from '../../OrderActions'
 import { Field, StatusBadge, TabBadge, fmtDate, fmtQty, fmtVnd } from '../../_ui'
+import { chuanVat } from '../../_calc'
 
 export const metadata = { title: 'Chi tiết đơn · GWT Sales' }
 export const dynamic = 'force-dynamic'
@@ -93,7 +94,7 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   <th className="px-3 py-2.5 font-medium">Mã nội bộ</th>
                   <th className="px-3 py-2.5 font-medium">Danh mục</th>
                   <th className="px-3 py-2.5 text-right font-medium">SL</th>
-                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">Đơn giá</th>}
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium" title="Đơn giá ĐÃ GỒM VAT">Đơn giá<span className="ml-0.5 font-normal text-slate-400">(gồm VAT)</span></th>}
                   {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">VAT</th>}
                   {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">Thành tiền</th>}
                 </tr>
@@ -115,7 +116,7 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                     {!laDonTang && <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>}
                     {!laDonTang && (
                       <td className="px-3 py-2.5 text-right text-slate-500">
-                        {l.vat_pct == null ? '—' : `${Math.round(l.vat_pct * 100)}%`}
+                        {chuanVat(l.vat_pct) == null ? '—' : `${Math.round((chuanVat(l.vat_pct) as number) * 100)}%`}
                       </td>
                     )}
                     {!laDonTang && <td className="px-3 py-2.5 text-right font-medium text-slate-900">{fmtVnd(l.amount_vat)}</td>}
