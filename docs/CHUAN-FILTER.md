@@ -110,6 +110,23 @@ thì **21 dòng sai hoàn toàn** — Phương / Phượng / Thương, kể cả
 `boDau()` trong `bang/timkiem.ts` phải khớp **đúng** hàm `public.khong_dau()` dưới Postgres. Lệch
 nhau là gõ ra kết quả rỗng mà không ai hiểu vì sao.
 
+### ⚠️ Đổi `khong_dau()` là việc NGUY HIỂM — đọc trước khi sửa
+
+`khong_dau()` đỡ **cột sinh** của cả `cs_customers` (CS) lẫn `customers` (Sales):
+`ten_kd`, `dia_chi_kd`. Thực nghiệm trên DB local (transaction + rollback, 21/08/2026):
+
+1. **Postgres KHÔNG chặn** `CREATE OR REPLACE` một hàm đang đỡ cột sinh. Lệnh chạy trót lọt,
+   không một cảnh báo.
+2. Cột sinh là **STORED** nên **không tự tính lại**. Dòng cũ giữ kết quả hàm **CŨ**; chỉ dòng nào
+   bị `INSERT`/`UPDATE` mới mang kết quả hàm **MỚI**.
+
+Đo được trực tiếp: sau khi đổi ruột hàm, `UPDATE` một dòng thì dòng đó ra `HAM_MOI` còn dòng không
+đụng vẫn là `tran thi b` — **cùng một cột, hai phiên bản dữ liệu, lệch dần theo thời gian, không có
+lỗi nào báo**. Tìm kiếm sẽ ra thiếu và không ai hiểu vì sao.
+
+**Luật:** sửa `khong_dau()` phải (a) **báo cả CS lẫn Sales trước**, (b) **backfill NGAY cả hai bảng
+trong cùng đợt** (`update … set name = name` để ép tính lại cột sinh). Xem `GWT-SHARED/SYSTEM.md` §8.
+
 ### Danh mục lọc phải khớp NGUỒN CHÂN LÝ
 
 Lấy danh sách lựa chọn từ đúng nguồn đang sinh ra dữ liệu, đừng gõ lại từ trí nhớ.
