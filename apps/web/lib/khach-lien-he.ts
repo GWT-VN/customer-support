@@ -1,0 +1,133 @@
+/**
+ * SĐT PHỤ và ĐỊA CHỈ PHỤ của khách — đường ghi DÙNG CHUNG cho mọi khu.
+ *
+ * Vì sao có file này (CEO chốt 21/08/2026):
+ * Sales muốn khách có ô "SĐT phụ" nên đề xuất thêm cột phẳng `customers.phone2`. CS đã có
+ * sẵn hai bảng 1-N là `customer_contacts` và `customer_addresses` — chính là chỗ màn Gộp
+ * khách trùng đổ SĐT/địa chỉ thừa vào. Thêm `phone2` sẽ đẻ ra NGUỒN SỰ THẬT THỨ HAI cho
+ * cùng một dữ kiện, sớm muộn hai chỗ lệch nhau. CEO chốt: **Sales làm giống CS, bỏ `phone2`**.
+ *
+ * Nhưng "dùng chung bảng" chưa đủ. Nếu mỗi khu tự viết câu `insert` của mình thì `role`,
+ * `loai`, `is_primary` mỗi bên đặt một kiểu và nhật ký mỗi bên ghi một tên — dùng chung
+ * bảng mà vẫn lệch. File này là chỗ DUY NHẤT chuẩn hoá + ghi, để hai khu ra cùng một dạng.
+ *
+ * KHÔNG đánh dấu `'use server'`: đây là hàm thường, chỉ gọi từ code chạy trên server. Đánh
+ * dấu là biến mỗi hàm thành một endpoint ai cũng gọi được (đúng lý do `nhat-ky.ts` nêu).
+ *
+ * ⚠️ File này KHÔNG kiểm quyền. Cố ý: mỗi khu gác bằng quyền của khu mình
+ * (CS dùng `cs.khach.sua`, Sales dùng quyền Sales) rồi mới gọi vào đây. Người gọi có
+ * trách nhiệm `requireStaff()` + kiểm quyền TRƯỚC.
+ */
+
+import { dataClient } from './nen-tang/db'
+import { ghiAudit } from './nen-tang/nhat-ky'
+import { chuanHoaSdt } from './sdt'
+
+/** Khu nào ghi — để nhật ký phân biệt được, và để soi khi hai khu lệch nhau. */
+export type NguonGhi = 'cskh' | 'sales'
+
+export type KetQuaGhi = { ok: true; id: string } | { ok: false; error: string }
+
+// ── Địa chỉ phụ ────────────────────────────────────────────────────────────
+
+/** Phân loại địa chỉ phụ. `khac` là chốt chặn cho giá trị lạ, không phải để dùng thường. */
+export const LOAI_DIA_CHI = ['nha', 'cty', 'lap_dat', 'khac'] as const
+export type LoaiDiaChi = (typeof LOAI_DIA_CHI)[number]
+
+/** Giá trị lạ -> `khac` thay vì ném lỗi: thà xếp nhầm nhóm còn hơn mất địa chỉ khách. */
+export function chuanHoaLoaiDiaChi(v: string | null | undefined): LoaiDiaChi {
+  const s = (v ?? '').trim()
+  return (LOAI_DIA_CHI as readonly string[]).includes(s) ? (s as LoaiDiaChi) : 'khac'
+}
+
+export async function themDiaChiPhu(input: {
+  customer_id: string
+  dia_chi: string
+  loai?: string | null
+  ghi_chu?: string | null
+  nguon: NguonGhi
+}): Promise<KetQuaGhi> {
+  const dia_chi = (input.dia_chi ?? '').trim()
+  if (!dia_chi) return { ok: false, error: 'Nhập địa chỉ đã.' }
+
+  const loai = chuanHoaLoaiDiaChi(input.loai)
+  const { data, error } = await dataClient()
+    .from('customer_addresses')
+    .insert({
+      customer_id: input.customer_id,
+      dia_chi,
+      loai,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
+    })
+    .select('id')
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  await ghiAudit('them_dia_chi_khach', `khach:${input.customer_id}`, { loai, nguon: input.nguon })
+  return { ok: true, id: (data as { id: string }).id }
+}
+
+export async function xoaDiaChiPhu(input: {
+  id: string
+  customer_id: string
+  nguon: NguonGhi
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await dataClient().from('customer_addresses').delete().eq('id', input.id)
+  if (error) return { ok: false, error: error.message }
+  await ghiAudit('xoa_dia_chi_khach', `khach:${input.customer_id}`, {
+    dia_chi_id: input.id, nguon: input.nguon,
+  })
+  return { ok: true }
+}
+
+// ── SĐT phụ ────────────────────────────────────────────────────────────────
+
+/**
+ * Dạng lưu của SĐT phụ. Tách riêng khỏi hàm ghi để test được không cần DB.
+ *
+ * Chuẩn hoá về cùng dạng với `cs_customers.primary_phone` (0xxxxxxxxx) để tra SĐT ra được
+ * cả số phụ. Số KHÔNG hợp lệ (máy bàn, số nước ngoài, cách ghi khác) thì giữ NGUYÊN như
+ * người dùng gõ — chặn hoặc bóp méo ở đây là mất liên hệ thật, đắt hơn là lưu lệch dạng.
+ */
+export function dangLuuSdtPhu(raw: string | null | undefined): string | null {
+  const tho = (raw ?? '').trim()
+  if (!tho) return null
+  const { chuan, hopLe } = chuanHoaSdt(tho)
+  return hopLe ? chuan : tho
+}
+
+export async function themSdtPhu(input: {
+  customer_id: string
+  phone?: string | null
+  contact_name?: string | null
+  role?: string | null
+  is_primary?: boolean
+  zalo_ok?: boolean
+  nguon: NguonGhi
+}): Promise<KetQuaGhi> {
+  const tho = (input.phone ?? '').trim()
+  const ten = (input.contact_name ?? '').trim()
+  if (!tho && !ten) return { ok: false, error: 'Nhập số điện thoại hoặc tên người liên hệ.' }
+
+  const phone = dangLuuSdtPhu(tho)
+  const daChuanHoa = Boolean(tho) && phone !== tho
+
+  const { data, error } = await dataClient()
+    .from('customer_contacts')
+    .insert({
+      customer_id: input.customer_id,
+      phone,
+      contact_name: ten || null,
+      role: (input.role ?? '').trim() || null,
+      is_primary: input.is_primary ?? false,
+      zalo_ok: input.zalo_ok ?? false,
+    })
+    .select('id')
+    .single()
+  if (error) return { ok: false, error: error.message }
+
+  await ghiAudit('them_sdt_phu', `khach:${input.customer_id}`, {
+    nguon: input.nguon, chuan_hoa_sdt: daChuanHoa,
+  })
+  return { ok: true, id: (data as { id: string }).id }
+}
