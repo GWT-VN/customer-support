@@ -91,7 +91,11 @@ export const PAYMETHOD_OPTS = ['', 'Chuyển khoản', 'COD', 'Tiền mặt'] as
 export const VAT_OPTS: { nhan: string; giaTri: number | null }[] = [
   { nhan: '—', giaTri: null },
   { nhan: '0%', giaTri: 0 },
-  { nhan: '5%', giaTri: 0.05 },
   { nhan: '8%', giaTri: 0.08 },
   { nhan: '10%', giaTri: 0.1 },
 ]
+// ⚠️ BẢN TẠM. CEO chốt 21/08: VAT phải lấy mặc định theo mã nội bộ (Masterdata
+// `catalog_item."Mức VAT"`) và có thêm hai mục KCT + Không VAT — là HAI thứ khác nhau,
+// không gộp như Apps Script đang làm. Hai mục đó cần cột `vat_loai` (text) vì `vat_pct`
+// là số, không chứa được chữ. Xem backlog Sales, mục "VAT lấy theo mã nội bộ".
+// Không có mức 5%: Apps Script chỉ dùng [0, 0.08, 0.10, 'Không VAT'] (Code.gs:123).
