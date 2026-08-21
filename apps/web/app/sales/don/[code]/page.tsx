@@ -95,6 +95,8 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   <th className="px-3 py-2.5 font-medium">Danh mục</th>
                   <th className="px-3 py-2.5 text-right font-medium">SL</th>
                   {!laDonTang && <th className="px-3 py-2.5 text-right font-medium" title="Đơn giá ĐÃ GỒM VAT">Đơn giá<span className="ml-0.5 font-normal text-slate-400">(gồm VAT)</span></th>}
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium" title="Giá niêm yết 1 đơn vị, đã gồm VAT">Niêm yết</th>}
+                  {!laDonTang && <th className="px-3 py-2.5 text-right font-medium" title="(giá niêm yết × SL) − thành tiền">Khuyến mãi</th>}
                   {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">VAT</th>}
                   {!laDonTang && <th className="px-3 py-2.5 text-right font-medium">Thành tiền</th>}
                 </tr>
@@ -116,6 +118,24 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                     {!laDonTang && <td className="px-3 py-2.5 text-right text-slate-700">{fmtVnd(l.unit_price_vat)}</td>}
                     {!laDonTang && (
                       <td className="px-3 py-2.5 text-right text-slate-500">
+                        {l.gia_niem_yet == null ? <span title="Mã này chưa có trong bảng giá niêm yết">—</span> : fmtVnd(l.gia_niem_yet)}
+                      </td>
+                    )}
+                    {!laDonTang && (
+                      <td className="px-3 py-2.5 text-right">
+                        {l.khuyen_mai == null ? (
+                          <span className="text-slate-300" title={l.is_gift ? 'Dòng quà — theo dõi ở cột Tặng' : 'Chưa có giá niêm yết cho mã này'}>—</span>
+                        ) : l.khuyen_mai > 0 ? (
+                          <span className="font-medium text-emerald-700">{fmtVnd(l.khuyen_mai)}</span>
+                        ) : l.khuyen_mai < 0 ? (
+                          <span className="text-amber-700" title="Bán CAO hơn giá niêm yết">+{fmtVnd(-l.khuyen_mai)}</span>
+                        ) : (
+                          <span className="text-slate-400" title="Bán đúng giá niêm yết">0 ₫</span>
+                        )}
+                      </td>
+                    )}
+                    {!laDonTang && (
+                      <td className="px-3 py-2.5 text-right text-slate-500">
                         {nhanVat(l.vat_pct, l.vat_loai)}
                       </td>
                     )}
@@ -123,20 +143,20 @@ export default async function ChiTietDonPage({ params }: { params: Promise<{ cod
                   </tr>
                 ))}
               </tbody>
-              {/* colSpan=6 vì bảng có 7 cột: SP · Mã · Danh mục · SL · Đơn giá · VAT · Thành tiền.
-                  Thêm/bớt cột thì phải sửa số này, không thì bảng lệch. */}
+              {/* colSpan=8 vì bảng có 9 cột: SP · Mã · Danh mục · SL · Đơn giá · Niêm yết ·
+                  Khuyến mãi · VAT · Thành tiền. Thêm/bớt cột thì PHẢI sửa số này. */}
               {!laDonTang && (
               <tfoot className="border-t border-slate-200 bg-slate-50">
                 <tr>
-                  <td colSpan={6} className="px-3 py-2 text-right text-slate-600">Tổng trước VAT</td>
+                  <td colSpan={8} className="px-3 py-2 text-right text-slate-600">Tổng trước VAT</td>
                   <td className="px-3 py-2 text-right text-slate-700">{fmtVnd(don.total_net)}</td>
                 </tr>
                 <tr>
-                  <td colSpan={6} className="px-3 py-2 text-right text-slate-600">Tiền VAT</td>
+                  <td colSpan={8} className="px-3 py-2 text-right text-slate-600">Tiền VAT</td>
                   <td className="px-3 py-2 text-right text-slate-700">{fmtVnd(don.total_vat_tien)}</td>
                 </tr>
                 <tr className="border-t border-slate-200">
-                  <td colSpan={6} className="px-3 py-2.5 text-right font-medium text-slate-700">Tổng sau VAT</td>
+                  <td colSpan={8} className="px-3 py-2.5 text-right font-medium text-slate-700">Tổng sau VAT</td>
                   <td className="px-3 py-2.5 text-right text-base font-semibold text-slate-900">{fmtVnd(don.total_vat)}</td>
                 </tr>
               </tfoot>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode, tachVat, tongDon, chuanVat } from './_calc'
+import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode, tachVat, tongDon, chuanVat, tinhKhuyenMai } from './_calc'
 
 describe('deriveSourceTab', () => {
   it('POE thắng khi có dòng POE', () => {
@@ -107,5 +107,27 @@ describe('chuanVat — chấp cả hai cách ghi', () => {
   it('tachVat cho KẾT QUẢ NHƯ NHAU dù ghi 8 hay 0.08', () => {
     expect(tachVat(1080000, 8)).toEqual(tachVat(1080000, 0.08))
     expect(tachVat(1080000, 8)).toEqual({ net: 1000000, vat: 80000 })
+  })
+})
+
+describe('tinhKhuyenMai', () => {
+  it('đơn thật: CTS20NG niêm yết 39.950.000, bán 32.000.000 -> KM 7.950.000', () => {
+    expect(tinhKhuyenMai(39950000, 1, 32000000, false)).toBe(7950000)
+  })
+  it('nhân theo số lượng', () => {
+    expect(tinhKhuyenMai(1000000, 3, 2700000, false)).toBe(300000)
+  })
+  it('bán ĐÚNG giá niêm yết -> 0', () => {
+    expect(tinhKhuyenMai(1000000, 2, 2000000, false)).toBe(0)
+  })
+  it('bán CAO hơn niêm yết -> số âm, không giấu', () => {
+    expect(tinhKhuyenMai(1000000, 1, 1200000, false)).toBe(-200000)
+  })
+  it('chưa có giá niêm yết -> null, KHÔNG bịa số 0', () => {
+    expect(tinhKhuyenMai(null, 1, 32000000, false)).toBeNull()
+    expect(tinhKhuyenMai(0, 1, 32000000, false)).toBeNull()
+  })
+  it('dòng QUÀ -> null, vì hiệu số bằng nguyên giá niêm yết sẽ như giảm giá khổng lồ', () => {
+    expect(tinhKhuyenMai(39950000, 1, 0, true)).toBeNull()
   })
 })

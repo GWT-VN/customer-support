@@ -116,3 +116,28 @@ export function tongDon(
   }
   return { net, vat: sauVat - net, sauVat }
 }
+
+/**
+ * Khuyến mãi của MỘT dòng = (giá niêm yết × SL) − thành tiền thực bán.
+ * Cả hai vế đều là tiền ĐÃ GỒM VAT nên trừ thẳng được.
+ *
+ * Trả `null` khi KHÔNG tính được hoặc không có nghĩa:
+ *  - chưa có giá niêm yết cho mã đó (mới phủ 37/53 mã đang bán) -> đừng bịa số 0;
+ *  - dòng QUÀ: thành tiền = 0 nên hiệu số bằng nguyên giá niêm yết, hiện ra sẽ như một
+ *    khoản giảm giá khổng lồ. Quà là chuyện riêng, theo dõi ở cột Tặng.
+ *
+ * Số ÂM (bán cao hơn niêm yết) vẫn trả về nguyên: đó là thông tin thật, không giấu.
+ */
+export function tinhKhuyenMai(
+  giaNiemYet: number | null | undefined,
+  qty: number | null | undefined,
+  amountVat: number | null | undefined,
+  isGift: boolean
+): number | null {
+  if (isGift) return null
+  const gia = Number(giaNiemYet) || 0
+  if (!giaNiemYet || gia <= 0) return null
+  const sl = Number(qty) || 0
+  const thuc = Math.round(Number(amountVat) || 0)
+  return Math.round(gia * sl) - thuc
+}

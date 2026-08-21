@@ -13,7 +13,7 @@ import {
   updateCustomer,
   deleteCustomer,
 } from './_db'
-import { tongDon } from './_calc'
+import { tinhKhuyenMai, tongDon } from './_calc'
 import { cacBienThe, gomDanhSachTinh } from '@/lib/tinhGom'
 import type { NewOrderInput, CustomerInput } from './_types'
 
@@ -377,6 +377,10 @@ export type DonLine = {
   vat_pct: number | null
   /** VAT = chịu thuế · KCT = không chịu thuế (muối) · KAD = không áp dụng (bình gas). */
   vat_loai: 'VAT' | 'KCT' | 'KAD' | null
+  /** Giá niêm yết 1 đơn vị, ĐÃ GỒM VAT. null = mã chưa có trong bảng giá. */
+  gia_niem_yet: number | null
+  /** (giá niêm yết × SL) − thành tiền. null = không tính được, hoặc dòng quà. */
+  khuyen_mai: number | null
   /** Đơn bán từ Sheet luôn false — quà từ Sheet là cả một đơn DON_TANG riêng. */
   is_gift: boolean
   note: string | null
@@ -412,6 +416,38 @@ export type DonChiTiet = {
 
 const MIRROR_COLS =
   'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, vat_loai, fulfillment_status, payment_status, note'
+
+/**
+ * Giá niêm yết theo mã, lấy bản CÒN HIỆU LỰC tại `ngay` (mặc định hôm nay).
+ * Bảng `product_price` là GƯƠNG từ Masterdata, chỉ đọc.
+ */
+async function giaNiemYetTheoMa(
+  db: ReturnType<typeof dataClient>,
+  maList: string[],
+  ngay: string | null
+): Promise<Map<string, number>> {
+  const ra = new Map<string, number>()
+  const ma = [...new Set(maList.filter(Boolean))]
+  if (!ma.length) return ra
+  const { data } = await db
+    .from('product_price')
+    .select('internal_code, gia_vat, hieu_luc_tu, hieu_luc_den')
+    .in('internal_code', ma)
+    .eq('kenh', 'NIEM_YET')
+  const moc = ngay || new Date().toISOString().slice(0, 10)
+  for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+    const tu = (r.hieu_luc_tu as string) ?? ''
+    const den = (r.hieu_luc_den as string) ?? null
+    // Đơn CŨ hơn ngày bảng giá bắt đầu có hiệu lực vẫn lấy bảng giá hiện có —
+    // thà so với giá đang niêm yết còn hơn bỏ trống cột Khuyến mãi.
+    if (den && moc > den) continue
+    const gia = Number(r.gia_vat) || 0
+    const code = r.internal_code as string
+    // Nhiều mốc hiệu lực -> lấy mốc MỚI NHẤT còn áp dụng được.
+    if (!ra.has(code) || tu <= moc) ra.set(code, gia)
+  }
+  return ra
+}
 
 /**
  * Chi tiết đơn TẶNG (`source_tab = 'DON_TANG'`) — chỉ tồn tại ở `customer_purchases`.
@@ -472,6 +508,8 @@ async function chiTietDonTang(
       amount_net: null,
       vat_pct: null,
       vat_loai: null,
+      gia_niem_yet: null,
+      khuyen_mai: null,
       is_gift: !!r.is_gift, // đơn tặng: cờ quà CÓ THẬT ở bảng này
       note: null,
     })),
@@ -505,9 +543,16 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       amount_net: null,     // -> tongDon() suy từ vat_pct
       vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
       vat_loai: (it.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
+      gia_niem_yet: null,
+      khuyen_mai: null,
       is_gift: !!it.is_gift,
       note: (it.note as string) ?? null,
     }))
+    const giaMap = await giaNiemYetTheoMa(db, lines.map((l) => l.internal_code ?? ''), (header.order_date as string) ?? null)
+    for (const l of lines) {
+      l.gia_niem_yet = l.internal_code ? giaMap.get(l.internal_code) ?? null : null
+      l.khuyen_mai = tinhKhuyenMai(l.gia_niem_yet, l.quantity, l.amount_vat, l.is_gift)
+    }
     const tong = tongDon(lines)
     return {
       order_code: header.order_code as string,
@@ -560,9 +605,16 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     amount_net: (r.amount_net as number) ?? null,
     vat_pct: r.vat_pct == null ? null : Number(r.vat_pct),
     vat_loai: (r.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
+    gia_niem_yet: null,
+    khuyen_mai: null,
     is_gift: false, // đơn bán từ Sheet KHÔNG có dòng quà — quà là đơn DON_TANG riêng
     note: (r.note as string) ?? null,
   }))
+  const giaMap = await giaNiemYetTheoMa(db, lines.map((l) => l.internal_code ?? ''), (f.order_date as string) ?? null)
+  for (const l of lines) {
+    l.gia_niem_yet = l.internal_code ? giaMap.get(l.internal_code) ?? null : null
+    l.khuyen_mai = tinhKhuyenMai(l.gia_niem_yet, l.quantity, l.amount_vat, l.is_gift)
+  }
   const tong = tongDon(lines)
   return {
     order_code: (f.order_code as string) || orderCode,
