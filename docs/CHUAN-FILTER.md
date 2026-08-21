@@ -124,8 +124,19 @@ nhau là gõ ra kết quả rỗng mà không ai hiểu vì sao.
 đụng vẫn là `tran thi b` — **cùng một cột, hai phiên bản dữ liệu, lệch dần theo thời gian, không có
 lỗi nào báo**. Tìm kiếm sẽ ra thiếu và không ai hiểu vì sao.
 
-**Luật:** sửa `khong_dau()` phải (a) **báo cả CS lẫn Sales trước**, (b) **backfill NGAY cả hai bảng
-trong cùng đợt** (`update … set name = name` để ép tính lại cột sinh). Xem `GWT-SHARED/SYSTEM.md` §8.
+3. **Chỉ cột sinh nào có cột NGUỒN được gán trong `UPDATE` mới tính lại.** Đo được: sau khi đổi hàm,
+   `update … set ten = ten` làm `ten_kd` ra giá trị mới nhưng `dia_chi_kd` **giữ nguyên giá trị cũ** —
+   vì `dia_chi_kd` dựng từ `address` + `province`, không phải `name`.
+
+**Luật:** sửa `khong_dau()` phải **(a)** báo cả CS lẫn Sales trước, **(b)** backfill NGAY cả hai bảng
+trong **cùng** một đợt, **(c)** backfill phải chạm **đúng cột nguồn của TỪNG cột sinh**:
+
+```sql
+update public.customers    set name      = name,      address = address, province = province;
+update public.cs_customers set full_name = full_name, address = address, province = province;
+```
+
+Làm (a)+(b) mà quên (c) là vẫn dính đúng cái bẫy, chỉ khác chỗ. Xem `GWT-SHARED/SYSTEM.md` §8.
 
 ### Danh mục lọc phải khớp NGUỒN CHÂN LÝ
 
