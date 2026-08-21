@@ -29,7 +29,9 @@ const emptyLine = (key: number): Line => ({
   quantity: 1,
   unit_price_vat: 0,
   is_gift: false,
-  vat_pct: null,
+  // Mặc định 8%: 300/328 mã trên Masterdata là 8%, và Apps Script cũng mặc định vậy
+  // (defaultVatFor_). Để trống là người nhập dễ quên -> tiền trước VAT tính sai.
+  vat_pct: 0.08,
   note: null,
 })
 
@@ -274,6 +276,15 @@ export function OrderForm({
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-800">Sản phẩm</span>
           <button type="button" onClick={addLine} className="rounded-md bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-200">＋ Thêm dòng</button>
+        </div>
+        {/* Hàng tiêu đề: các ô số bên phải rất hẹp, không có nhãn thì không đoán được ô nào là gì. */}
+        <div className="mb-1 hidden grid-cols-12 gap-2 px-2 text-[11px] uppercase tracking-wide text-slate-400 sm:grid">
+          <span className="col-span-5">Sản phẩm</span>
+          <span className="col-span-2 text-right">Số lượng</span>
+          <span className="col-span-2 text-right">Đơn giá (gồm VAT)</span>
+          <span className="col-span-1 text-right">VAT</span>
+          <span className="col-span-1 text-center">Quà</span>
+          <span className="col-span-1" />
         </div>
         <div className="space-y-2">
           {lines.map((l) => (
