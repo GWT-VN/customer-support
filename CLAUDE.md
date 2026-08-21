@@ -123,6 +123,10 @@ npx --prefix apps/web tsc --noEmit
 ```
 
 Dựng máy từ 0: `docs/ONBOARDING-DEV.md` · DB local: `docs/LOCAL-DEV.md`.
+
+⚠️ Viết **filter / tìm kiếm / sắp xếp / phân trang** ở BẤT KỲ khu nào → đọc
+[`docs/CHUAN-FILTER.md`](docs/CHUAN-FILTER.md) TRƯỚC. Gói dùng chung nằm ở `apps/web/bang/`;
+thêm kiểu lọc mới thì thêm vào đó rồi bổ sung vào tài liệu, đừng viết riêng trong khu mình.
 Backlog: `BACKLOG.md` (xem `../GWT-SHARED/HUONG-DAN-BACKLOG.md`).
 
 ## ⚠️ Quy trình giao việc: LOCAL trước, KHÔNG đẩy CEO sang preview
