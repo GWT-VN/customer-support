@@ -1,7 +1,11 @@
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { authClient, dataClient } from './db'
-import { chuanHoaEmail, xetLuatVao, type KetQuaVaoCua } from './vao-cua'
+import {
+  DUONG_DOI_MAT_KHAU, HEADER_DUONG_DAN, chuanHoaEmail, conNoDoiMatKhau, xetLuatVao,
+  type KetQuaVaoCua,
+} from './vao-cua'
 import { chuanHoaVaiTro, type VaiTro } from './vai-tro'
 
 /**
@@ -71,6 +75,25 @@ export async function ghiNhanNhanVienMoi(email: string) {
 }
 
 /**
+ * Rào THẬT của luật "đổi mật khẩu lần đầu".
+ *
+ * proxy.ts cũng chặn, nhưng nó đọc cookie nên chỉ là rào lạc quan — ai gọi thẳng
+ * Server Action thì không đi qua proxy. Đặt ở đây thì MỌI đường chạm dữ liệu đều
+ * bị chặn, giống hệt cách requireStaff() rào luật vào cửa.
+ *
+ * Đứng SAU luật vào cửa có chủ đích: người vừa bị khoá phải thấy lý do "bị khoá"
+ * ở trang đăng nhập, chứ không phải bị lùa sang màn đổi mật khẩu rồi bí.
+ */
+async function chanNeuConNoDoiMatKhau(user: { user_metadata?: Record<string, unknown> }) {
+  if (!conNoDoiMatKhau(user.user_metadata)) return
+  // Đang Ở màn đổi mật khẩu thì thôi — layout gốc bọc cả trang đó, đá tiếp là
+  // trang tự đá về chính nó mãi mãi. Đường dẫn do proxy.ts đưa xuống bằng header.
+  const duongDan = (await headers()).get(HEADER_DUONG_DAN) ?? ''
+  if (duongDan.startsWith(DUONG_DOI_MAT_KHAU)) return
+  redirect(DUONG_DOI_MAT_KHAU)
+}
+
+/**
  * Chặn cổng: chưa đăng nhập HOẶC không có quyền -> đá về /login kèm lý do.
  * Mọi truy vấn dữ liệu phải gọi hàm này trước.
  *
@@ -83,15 +106,29 @@ export async function ghiNhanNhanVienMoi(email: string) {
  */
 export const requireStaff = cache(async () => {
   const user = await layNguoiDung()
-  if (!user) redirect('/login')
+  // Kèm ?loi=het_han có chủ đích: proxy thấy tham số này thì thôi không đá ngược
+  // vào trong, còn trang đăng nhập thì dọn cookie ma. Không có nó thì cookie hỏng
+  // (còn hình dạng nhưng token chết) làm hai bên đá qua đá lại tới khi trình duyệt
+  // bỏ cuộc — CEO đã dính, đo được 40 lượt 307.
+  if (!user) redirect('/login?loi=het_han')
 
   const email = chuanHoaEmail(user.email)
   const kq = await kiemTraVaoCua(email)
   if (!kq.duocVao) {
     // Người @gwt.vn lần đầu -> tạo hồ sơ CHỜ DUYỆT (inactive) để admin thấy + bật.
     if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
+
+    // Nhân sự HỢP LỆ nhưng không thuộc CSKH (CTV lắp đặt, Sales thuần, Kho…):
+    // đá về khu Việc chứ KHÔNG về /login. Đá về /login là vòng lặp: trang đăng
+    // nhập thấy mã lỗi này liền signOut, họ đăng nhập lại rồi bị đá tiếp, không
+    // bao giờ vào được khu nào cả.
+    if (kq.lyDo === 'ngoai_cs' && (await kiemTraVaoNenTang(email)).duocVao) {
+      await chanNeuConNoDoiMatKhau(user)
+      redirect('/work?loi=ngoai_cs')
+    }
     redirect(`/login?loi=${kq.lyDo}`)
   }
+  await chanNeuConNoDoiMatKhau(user)
 
   return user
 })
@@ -109,7 +146,11 @@ export async function kiemTraVaoNenTang(email: string): Promise<KetQuaVaoCua> {
  */
 export const requireNhanSu = cache(async () => {
   const user = await layNguoiDung()
-  if (!user) redirect('/login')
+  // Kèm ?loi=het_han có chủ đích: proxy thấy tham số này thì thôi không đá ngược
+  // vào trong, còn trang đăng nhập thì dọn cookie ma. Không có nó thì cookie hỏng
+  // (còn hình dạng nhưng token chết) làm hai bên đá qua đá lại tới khi trình duyệt
+  // bỏ cuộc — CEO đã dính, đo được 40 lượt 307.
+  if (!user) redirect('/login?loi=het_han')
 
   const email = chuanHoaEmail(user.email)
   const kq = await kiemTraVaoNenTang(email)
@@ -117,16 +158,29 @@ export const requireNhanSu = cache(async () => {
     if (kq.lyDo === 'cho_duyet') await ghiNhanNhanVienMoi(email)
     redirect(`/login?loi=${kq.lyDo}`)
   }
+  await chanNeuConNoDoiMatKhau(user)
   return user
 })
 
 /**
- * Hồ sơ nhân viên của người đang đăng nhập.
+ * Hồ sơ nhân viên của người đang đăng nhập, hoặc null.
  *
- * Dùng lại layDongStaff() nên KHÔNG tốn thêm lượt gọi database: requireStaff()
- * đã đọc đúng dòng đó rồi, cache() trả lại kết quả cũ.
+ * KHÔNG gác cổng — cố ý. Trước đây hàm này gọi requireStaff() (cổng khu CS), nên
+ * mọi thứ đọc nó cũng bị gác theo, kể cả THANH MENU vốn hiện ở cả khu Việc và
+ * khu Sales. Hậu quả: người ngoài CSKH (CTV lắp đặt, Sales thuần, Kho…) mở /work
+ * là menu tự đá họ ra, đá tới đâu menu lại đá tiếp — vòng lặp chuyển hướng, đo
+ * được 13 lượt 307 liên tiếp khi thử tay 21/08.
+ *
+ * Vẫn an toàn vì: layNguoiDung() xác minh token QUA MẠNG (không chỉ đọc cookie),
+ * người bị khoá trả về null, và người gọi nào cần chặn thì tự gọi requireStaff()
+ * / requireNhanSu() / chanNeuThieuQuyen() — mọi trang hiện đã làm đúng thế.
+ * Null ở đây luôn dẫn tới "không có quyền gì", tức là hỏng theo hướng CẤM.
  */
 export const layNhanVien = cache(async (): Promise<NhanVien | null> => {
-  const user = await requireStaff()
-  return layDongStaff(chuanHoaEmail(user.email))
+  const user = await layNguoiDung()
+  if (!user) return null
+  const dong = await layDongStaff(chuanHoaEmail(user.email))
+  // Người bị khoá coi như không có hồ sơ: khoá phải cắt quyền NGAY, không đợi
+  // tới lượt gác cổng kế tiếp.
+  return dong && dong.hoat_dong ? dong : null
 })

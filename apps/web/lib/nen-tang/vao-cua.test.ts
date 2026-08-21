@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { xetLuatVao, xetLuatVaoCua, xetLuatVaoNenTang } from './vao-cua'
+import { conNoDoiMatKhau, xetLuatVao, xetLuatVaoCua, xetLuatVaoNenTang } from './vao-cua'
 
 describe('xetLuatVao — một hàm cho mọi khu', () => {
   it("khu 'cs' cho ra ĐÚNG kết quả của xetLuatVaoCua cũ", () => {
@@ -43,5 +43,24 @@ describe('xetLuatVao — một hàm cho mọi khu', () => {
   it('CTV được mời (email ngoài domain, có trong bảng, đang bật) vào được nền tảng', () => {
     expect(xetLuatVao('nen_tang', 'ctv@gmail.com', { hoat_dong: true, vai_tro: ['ctv_lap_dat'] }))
       .toEqual({ duocVao: true, nguon: 'staff' })
+  })
+})
+
+describe('conNoDoiMatKhau — mật khẩu admin cấp, chưa đổi', () => {
+  it('cờ bật thì còn nợ', () => {
+    expect(conNoDoiMatKhau({ phai_doi_mat_khau: true })).toBe(true)
+  })
+
+  it('không có cờ, cờ tắt, hoặc không có metadata thì hết nợ', () => {
+    expect(conNoDoiMatKhau({ phai_doi_mat_khau: false })).toBe(false)
+    expect(conNoDoiMatKhau({})).toBe(false)
+    expect(conNoDoiMatKhau(null)).toBe(false)
+    expect(conNoDoiMatKhau(undefined)).toBe(false)
+  })
+
+  it('giá trị JSON lạ KHÔNG được ép thành true — nếu không luật đảo chiều', () => {
+    expect(conNoDoiMatKhau({ phai_doi_mat_khau: 'true' })).toBe(false)
+    expect(conNoDoiMatKhau({ phai_doi_mat_khau: 1 })).toBe(false)
+    expect(conNoDoiMatKhau({ phai_doi_mat_khau: 'false' })).toBe(false)
   })
 })

@@ -1,7 +1,11 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { doiTenNhanVien, guiLaiMatKhau, suaNhanVien } from '@/lib/nen-tang/nhan-su'
+import {
+  capMatKhauMoi, demThamChieuNhanSu, doiTenNhanVien, guiLaiMatKhau, suaNhanVien, xoaNhanSu,
+} from '@/lib/nen-tang/nhan-su'
+import { moTaThamChieu } from '@/lib/nen-tang/nhan-su-luat'
+import { MatKhauVuaCap } from './MatKhauVuaCap'
 import {
   HO_SO_VAI_TRO, NHAN_BO_PHAN, NHAN_VAI_TRO, VAI_TRO,
   apDungLoaiTruCapBac, apDungLoaiTruKhiTick, type BoPhan, type VaiTro,
@@ -45,7 +49,9 @@ for (const v of VAI_TRO) {
 /** Cột Tên + Trạng thái dính bên trái khi kéo ngang — luôn biết đang tick cho ai. */
 const GHIM = 'sticky left-0 z-20 bg-inherit border-r'
 
-export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string }) {
+export function BangNhanVien({
+  ds, toiId, choXoa = false, choMatKhau = false,
+}: { ds: DongNhanVien[]; toiId: string; choXoa?: boolean; choMatKhau?: boolean }) {
   // KHÔNG khoá ô lúc lưu — dù chỉ khoá một dòng. Người dùng bấm 3-4 vai trò liên
   // tiếp cho cùng một người là chuyện thường; khoá là nuốt mất cú bấm thứ 2 trở đi
   // (đúng triệu chứng "tick loạn xạ"). Thay bằng: hiện ngay + gửi lưu ngay.
@@ -58,6 +64,11 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
   const [loi, setLoi] = useState<Record<string, string>>({})
   const [xong, setXong] = useState<Record<string, string>>({})
   const luot = useRef<Record<string, number>>({})
+  // Mật khẩu vừa cấp hiện Ở TRÊN BẢNG chứ không trong ô Trạng thái: ô đó rộng
+  // chưa tới 200px, nhét mật khẩu + hai nút chép vào là vỡ bảng.
+  const [mkVuaCap, setMkVuaCap] = useState<{ email: string; matKhau: string } | null>(null)
+  // id -> đang chờ admin bấm xác nhận xoá. Hỏi lại là bắt buộc: xoá không hoàn tác được.
+  const [hoiXoa, setHoiXoa] = useState<Record<string, boolean>>({})
   const [, batDau] = useTransition()
 
   const vaiTroCua = (nv: DongNhanVien) => ghiDe[nv.id] ?? (nv.vai_tro as VaiTro[])
@@ -95,6 +106,8 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
 
   return (
     <div className="space-y-2">
+      {mkVuaCap && <MatKhauVuaCap email={mkVuaCap.email} matKhau={mkVuaCap.matKhau} />}
+
       <div className="bg-white rounded-xl border overflow-x-auto">
         <table className="text-sm border-separate border-spacing-0">
           <thead className="text-slate-600">
@@ -202,6 +215,87 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
                         gửi lại mật khẩu
                       </button>
                     </div>
+                    {choMatKhau && (
+                      <div>
+                        <button
+                          type="button"
+                          disabled={dangChay || !nv.email}
+                          title={nv.email
+                            ? 'Đặt mật khẩu ban đầu mới và bắt họ đổi ở lần đăng nhập tới'
+                            : 'Chưa có email'}
+                          onClick={() => {
+                            setXong((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== nv.id)))
+                            setMkVuaCap(null)
+                            luu(nv.id, null, async () => {
+                              const r = await capMatKhauMoi(nv.id)
+                              if (r.ok) setMkVuaCap({ email: r.email, matKhau: r.matKhau })
+                              return r
+                            })
+                          }}
+                          className="text-[11px] text-slate-500 underline hover:text-slate-800 disabled:opacity-40 disabled:no-underline"
+                        >
+                          cấp mật khẩu mới
+                        </button>
+                      </div>
+                    )}
+
+                    {choXoa && nv.id !== toiId && (
+                      <div>
+                        {hoiXoa[nv.id] ? (
+                          <span className="text-[11px] text-red-700">
+                            Xoá hẳn?{' '}
+                            <button
+                              type="button" disabled={dangChay}
+                              onClick={() => {
+                                setHoiXoa((h) => ({ ...h, [nv.id]: false }))
+                                // Xoá người nào thì dọn luôn ô mật khẩu của người đó,
+                                // không thì màn hình còn khoe mật khẩu của một tài khoản
+                                // vừa bị xoá — nhìn là tưởng chưa xoá được.
+                                setMkVuaCap((m) => (m && m.email === nv.email ? null : m))
+                                luu(nv.id, null, () => xoaNhanSu(nv.id))
+                              }}
+                              className="underline font-medium disabled:opacity-40"
+                            >
+                              xoá
+                            </button>
+                            {' · '}
+                            <button
+                              type="button"
+                              onClick={() => setHoiXoa((h) => ({ ...h, [nv.id]: false }))}
+                              className="underline text-slate-500"
+                            >
+                              huỷ
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={dangChay}
+                            title="Chỉ xoá được người chưa có dữ liệu gì trong hệ thống"
+                            onClick={() => {
+                              // Đếm TRƯỚC khi hỏi: câu "xoá hẳn?" chỉ nên hiện khi
+                              // thật sự xoá được, còn không thì nói luôn vì sao không.
+                              luu(nv.id, null, async () => {
+                                const r = await demThamChieuNhanSu(nv.id)
+                                if (!r.ok) return r
+                                if (r.chan.length > 0) {
+                                  return {
+                                    ok: false,
+                                    error: `Còn ${moTaThamChieu(r.chan)} — không xoá được, chỉ nên KHOÁ.`,
+                                  }
+                                }
+                                setHoiXoa((h) => ({ ...h, [nv.id]: true }))
+                                return { ok: true }
+                              })
+                            }}
+                            className="text-[11px] text-red-600 underline hover:text-red-800 disabled:opacity-40 disabled:no-underline"
+                          >
+                            xoá
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {xong[nv.id] && (
                       <div className="text-[11px] text-emerald-700">{xong[nv.id]}</div>
                     )}
@@ -219,6 +313,15 @@ export function BangNhanVien({ ds, toiId }: { ds: DongNhanVien[]; toiId: string 
         mà bấm NV CSKH thì thành nhân viên. Khoá một người là họ mất đường vào ngay lần tải trang kế
         tiếp, kể cả email <code className="mx-1 text-[11px]">@gwt.vn</code>. Sửa tên xong bấm ra ngoài ô là lưu.
       </p>
+
+      {choXoa && (
+        <p className="text-xs text-slate-500">
+          <b>Khoá</b> và <b>xoá</b> khác nhau: khoá là chặn đường vào, mọi ticket và việc của họ còn
+          nguyên — dùng cho người nghỉ việc. Xoá là bỏ hẳn khỏi hệ thống, <b>chỉ làm được khi họ chưa
+          có dữ liệu gì</b>, dành đúng cho ca gõ nhầm email lúc mời. Xoá thì mất luôn cả tài khoản
+          đăng nhập của email đó.
+        </p>
+      )}
     </div>
   )
 }

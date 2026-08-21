@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { moiNhanSu } from '@/lib/nen-tang/nhan-su'
+import { MatKhauVuaCap } from './MatKhauVuaCap'
 import { HO_SO_VAI_TRO, NHAN_BO_PHAN, NHAN_VAI_TRO, VAI_TRO, apDungLoaiTruCapBac, type VaiTro } from '@/lib/nen-tang/vai-tro'
 
 /** Không mời thẳng vào quyền quản trị — xem kiemTraLoiMoi(). */
@@ -12,15 +13,22 @@ export function MoiNhanSu() {
   const [chon, setChon] = useState<VaiTro[]>([])
   const [loi, setLoi] = useState<string | null>(null)
   const [xong, setXong] = useState<string | null>(null)
+  const [ghiChu, setGhiChu] = useState<string | null>(null)
+  const [capMk, setCapMk] = useState<{ email: string; matKhau: string } | null>(null)
   const [dangChay, batDau] = useTransition()
 
   function gui() {
     setLoi(null)
     setXong(null)
+    setGhiChu(null)
+    setCapMk(null)
+    const e = email.trim().toLowerCase()
     batDau(async () => {
       const r = await moiNhanSu(email, chon)
       if (!r.ok) { setLoi(r.error); return }
-      setXong(`Đã thêm ${email.trim().toLowerCase()} vào danh sách.`)
+      setXong(`Đã thêm ${e} vào danh sách.`)
+      if (r.matKhau) setCapMk({ email: e, matKhau: r.matKhau })
+      else if (r.ghiChu) setGhiChu(r.ghiChu)
       setEmail('')
       setChon([])
     })
@@ -31,13 +39,16 @@ export function MoiNhanSu() {
       <div>
         <p className="font-medium text-slate-900">Mời người ngoài @gwt.vn</p>
         <p className="text-sm text-slate-500">
-          Dành cho cộng tác viên lắp đặt và người dùng email cá nhân. Họ đăng nhập Google
-          bằng đúng email này. Gõ sai email là mời nhầm người lạ — kiểm lại trước khi bấm.
+          Dành cho cộng tác viên lắp đặt và người dùng email cá nhân. Hệ thống tạo luôn tài khoản
+          kèm <b>mật khẩu ban đầu</b> hiện ngay dưới đây để bạn gửi cho họ; lần đăng nhập đầu họ
+          bắt buộc tự đổi. Gõ sai email là mời nhầm người lạ — kiểm lại trước khi bấm.
         </p>
       </div>
 
       {loi && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{loi}</p>}
       {xong && <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">{xong}</p>}
+      {ghiChu && <p className="text-sm text-slate-700 bg-slate-100 rounded-lg px-3 py-2">{ghiChu}</p>}
+      {capMk && <MatKhauVuaCap email={capMk.email} matKhau={capMk.matKhau} />}
 
       <input
         type="email"

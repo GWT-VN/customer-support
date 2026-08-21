@@ -36,6 +36,30 @@ export type KetQuaVaoCua =
  */
 export type Khu = 'cs' | 'nen_tang'
 
+/**
+ * Cờ trên tài khoản: "mật khẩu hiện tại là mật khẩu admin cấp, chưa được đổi".
+ *
+ * Nằm ở user_metadata chứ không ở bảng staff vì proxy.ts đọc được nó THẲNG TỪ
+ * COOKIE, không phải hỏi database ở Singapore trên mọi lượt chuyển trang.
+ */
+export const CO_DOI_MAT_KHAU = 'phai_doi_mat_khau'
+
+/** Đường dẫn màn đổi mật khẩu — chỗ DUY NHẤT người còn nợ đổi được phép vào. */
+export const DUONG_DOI_MAT_KHAU = '/auth/doi-mat-khau'
+
+/** Header proxy.ts nhét đường dẫn vào, để Server Component đọc lại được. */
+export const HEADER_DUONG_DAN = 'x-gwt-duong-dan'
+
+/**
+ * Người này còn nợ việc đổi mật khẩu ban đầu không?
+ *
+ * So sánh === true chứ không ép kiểu: metadata là JSON tự do, chuỗi 'false' hay
+ * số 0 lọt vào mà ép kiểu thì luật đảo chiều.
+ */
+export function conNoDoiMatKhau(meta: Record<string, unknown> | null | undefined): boolean {
+  return meta?.[CO_DOI_MAT_KHAU] === true
+}
+
 export function chuanHoaEmail(email: string | null | undefined): string {
   return (email ?? '').trim().toLowerCase()
 }

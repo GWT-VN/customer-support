@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/TopNav";
 import { layNguoiDung } from "@/lib/nen-tang/phien";
+import { conNoDoiMatKhau } from "@/lib/nen-tang/vao-cua";
 import { CauHinhBang } from "@/bang";
 import { TEN_COT, NGHIA_SAP_XEP } from "@/lib/danhSach";
 
@@ -28,6 +29,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await layNguoiDung();
+  // Người còn nợ đổi mật khẩu ban đầu chỉ đi được một chỗ. Hiện thanh menu đầy đủ
+  // là mời họ bấm vào những mục mà proxy sẽ đá ngược lại — trông như app hỏng.
+  const choXemMenu = user !== null && !conNoDoiMatKhau(user.user_metadata);
   return (
     <html
       lang="en"
@@ -41,7 +45,7 @@ export default async function RootLayout({
           diện thì truyền đè vài khoá, xem bang/README.md.
         */}
         <CauHinhBang tenCot={TEN_COT} nghiaSapXep={NGHIA_SAP_XEP}>
-          {user ? <TopNav /> : null}
+          {choXemMenu ? <TopNav /> : null}
           <div className="flex-1 min-w-0">{children}</div>
         </CauHinhBang>
       </body>

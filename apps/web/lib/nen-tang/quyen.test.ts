@@ -3,9 +3,9 @@ import { VAI_TRO } from './vai-tro'
 import { HO_SO_QUYEN, MAC_DINH, QUYEN, laMaQuyenHopLe } from './quyen'
 
 describe('kho quyền', () => {
-  it('có đủ 50 quyền, không trùng mã', () => {
-    expect(QUYEN.length).toBe(50)
-    expect(new Set(QUYEN).size).toBe(50)
+  it('có đủ 51 quyền, không trùng mã', () => {
+    expect(QUYEN.length).toBe(51)
+    expect(new Set(QUYEN).size).toBe(51)
   })
 
   it('mã quyền theo khuôn khu.đối_tượng.hành_động', () => {
@@ -36,7 +36,7 @@ describe('giá trị khởi tạo — sinh từ hành vi HÔM NAY', () => {
     }
   })
 
-  it('admin có TOÀN BỘ 42 quyền', () => {
+  it('admin có TOÀN BỘ quyền', () => {
     expect([...MAC_DINH.admin].sort()).toEqual([...QUYEN].sort())
   })
 

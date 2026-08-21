@@ -3,11 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 import { authClient, dataClient } from './db'
-import { KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, toStaff, type Staff } from './nhan-su-luat'
+import {
+  KHONG_DU_QUYEN, chuanBiVaiTroDeGhi, kiemTraLoiMoi, kiemTraXoaNhanSu, locThamChieuChan,
+  sinhMatKhauBanDau, toStaff, type Staff, type ThamChieuStaff,
+} from './nhan-su-luat'
 import { coQuyen } from './kiem-quyen'
 import { ghiAudit } from './nhat-ky'
 import { layNhanVien, requireStaff } from './phien'
 import { chuanHoaVaiTro, kiemTraSuaNhanVien, laQuyenAdmin, type VaiTro } from './vai-tro'
+import { DOMAIN_CONG_TY, chuanHoaEmail } from './vao-cua'
 
 /** Danh sách NV đang hoạt động — để chọn người phụ trách. */
 export async function listStaff(): Promise<Staff[]> {
@@ -142,6 +146,180 @@ export async function moiNhanSu(email: string, vaiTro: string[]) {
   if (error) return { ok: false as const, error: error.message }
 
   await ghiAudit('moi_nhan_su', `email:${kt.email}`, { vai_tro: kt.vaiTro })
+
+  // Tài khoản đăng nhập là việc RIÊNG, làm sau khi đã ghi tên vào staff. Hỏng ở
+  // bước này thì lời mời vẫn còn giá trị — admin bấm "cấp mật khẩu mới" là xong,
+  // không phải mời lại từ đầu.
+  const tk = await taoTaiKhoanNeuCan(kt.email)
+  revalidatePath('/nhan-vien')
+  return { ok: true as const, ...tk }
+}
+
+/**
+ * Tạo tài khoản đăng nhập kèm MẬT KHẨU BAN ĐẦU cho người vừa được mời.
+ *
+ * CEO chốt 21/08: chỉ áp cho email NGOÀI @gwt.vn. Người dùng email công ty vẫn
+ * đi đường Google như cũ — họ đã có sẵn danh tính, cấp thêm mật khẩu chỉ đẻ ra
+ * một chìa khoá nữa để mất.
+ *
+ * Cờ `phai_doi_mat_khau` là thứ khiến mật khẩu này dùng được đúng một lần: lần
+ * đăng nhập đầu bị chặn ở màn đổi mật khẩu, đổi xong admin hết biết mật khẩu.
+ */
+async function taoTaiKhoanNeuCan(
+  email: string
+): Promise<{ matKhau: string | null; ghiChu: string }> {
+  if (email.endsWith(DOMAIN_CONG_TY)) {
+    return {
+      matKhau: null,
+      ghiChu: `Email công ty ${DOMAIN_CONG_TY} — họ bấm “Đăng nhập bằng Google” là vào được, không cần mật khẩu.`,
+    }
+  }
+
+  const db = dataClient()
+  const { data: daCo } = await db.rpc('nen_tang_co_tai_khoan', { p_email: email })
+  if (daCo) {
+    return {
+      matKhau: null,
+      ghiChu: 'Email này đã có tài khoản đăng nhập từ trước — họ dùng mật khẩu cũ. '
+        + 'Quên thì bấm “Quên mật khẩu?” ở trang đăng nhập, hoặc bấm “cấp mật khẩu mới” ở dòng của họ.',
+    }
+  }
+
+  const matKhau = sinhMatKhauBanDau()
+  const { error } = await db.auth.admin.createUser({
+    email,
+    password: matKhau,
+    email_confirm: true,
+    user_metadata: { phai_doi_mat_khau: true },
+  })
+  if (error) {
+    return {
+      matKhau: null,
+      ghiChu: `Đã thêm vào danh sách nhưng CHƯA tạo được tài khoản đăng nhập (${error.message}). `
+        + 'Bấm “cấp mật khẩu mới” ở dòng của họ để thử lại.',
+    }
+  }
+
+  await ghiAudit('tao_tai_khoan', `email:${email}`, { phai_doi_mat_khau: true })
+  return { matKhau, ghiChu: '' }
+}
+
+/**
+ * Cấp một mật khẩu ban đầu MỚI và bắt đổi lại ở lần đăng nhập kế tiếp.
+ *
+ * Khác nút "gửi lại mật khẩu" ở chỗ KHÔNG cần email đi được: admin đọc mật khẩu
+ * cho người kia qua Zalo/điện thoại. Đây là đường thoát cho ca SMTP chưa cấu
+ * hình, hoặc người được mời không mở được hộp thư.
+ *
+ * Đổi lại: admin BIẾT mật khẩu này trong khoảng thời gian trước khi người kia
+ * đăng nhập. Đó là lý do cờ phai_doi_mat_khau bật lên cùng lúc.
+ */
+export async function capMatKhauMoi(id: string) {
+  await requireStaff()
+  if (!(await coQuyen('he_thong.nhan_su.mat_khau', 'ADMIN'))) {
+    return { ok: false as const, error: KHONG_DU_QUYEN }
+  }
+
+  const db = dataClient()
+  const { data, error: e1 } = await db.from('staff').select('email').eq('id', id).maybeSingle()
+  if (e1) return { ok: false as const, error: e1.message }
+  const email = chuanHoaEmail((data as { email: string | null } | null)?.email)
+  if (!email) return { ok: false as const, error: 'Nhân sự này chưa có email.' }
+
+  const matKhau = sinhMatKhauBanDau()
+  const { data: idTk, error: e2 } = await db.rpc('nen_tang_id_tai_khoan', { p_email: email })
+  if (e2) return { ok: false as const, error: e2.message }
+
+  const { error } = idTk
+    ? await db.auth.admin.updateUserById(idTk as string, {
+        password: matKhau,
+        user_metadata: { phai_doi_mat_khau: true },
+      })
+    : await db.auth.admin.createUser({
+        email,
+        password: matKhau,
+        email_confirm: true,
+        user_metadata: { phai_doi_mat_khau: true },
+      })
+  if (error) return { ok: false as const, error: error.message }
+
+  await ghiAudit('cap_mat_khau_moi', `nv:${id}`, { email, tao_moi: !idTk })
+  revalidatePath('/nhan-vien')
+  return { ok: true as const, matKhau, email }
+}
+
+/**
+ * Đếm chỗ còn trỏ vào một nhân sự — để nút xoá biết mình có được phép hiện không.
+ *
+ * Tách khỏi xoaNhanSu() để giao diện hỏi TRƯỚC khi hỏi lại admin: câu xác nhận
+ * "xoá hẳn?" chỉ nên hiện khi thật sự xoá được, còn không thì nói luôn vì sao không.
+ */
+export async function demThamChieuNhanSu(id: string) {
+  await requireStaff()
+  if (!(await coQuyen('he_thong.nhan_su.xoa', 'ADMIN'))) {
+    return { ok: false as const, error: KHONG_DU_QUYEN }
+  }
+  const { data, error } = await dataClient()
+    .rpc('nen_tang_dem_tham_chieu_staff', { p_staff_id: id })
+  if (error) return { ok: false as const, error: error.message }
+  const tho = (data ?? []) as ThamChieuStaff[]
+  return { ok: true as const, thamChieu: tho, chan: locThamChieuChan(tho) }
+}
+
+/**
+ * Xoá hẳn một nhân sự — CHỈ ca "mời nhầm email, người đó chưa làm gì".
+ *
+ * Đếm lại tham chiếu NGAY TRƯỚC KHI XOÁ chứ không tin con số giao diện gửi lên:
+ * giữa lúc admin đọc câu xác nhận, người kia có thể vừa được giao một việc.
+ *
+ * Xoá cả tài khoản đăng nhập. Không xoá thì email mời nhầm vẫn còn đường vào:
+ * dòng staff mất nhưng auth.users còn, người @gwt.vn lại tự tạo được hồ sơ chờ
+ * duyệt ở lần đăng nhập sau.
+ */
+export async function xoaNhanSu(id: string) {
+  await requireStaff()
+  const toi = await layNhanVien()
+  if (!toi || !(await coQuyen('he_thong.nhan_su.xoa', 'ADMIN'))) {
+    return { ok: false as const, error: KHONG_DU_QUYEN }
+  }
+
+  const db = dataClient()
+  const { data: biXoa, error: e1 } = await db
+    .from('staff').select('id, ten, email, vai_tro').eq('id', id).maybeSingle()
+  if (e1) return { ok: false as const, error: e1.message }
+  if (!biXoa) return { ok: false as const, error: 'Không tìm thấy nhân viên.' }
+
+  const { data: tc, error: e2 } = await db.rpc('nen_tang_dem_tham_chieu_staff', { p_staff_id: id })
+  if (e2) return { ok: false as const, error: e2.message }
+
+  const kt = kiemTraXoaNhanSu({
+    idNguoiXoa: toi.id,
+    idBiXoa: id,
+    vaiTroBiXoa: chuanHoaVaiTro((biXoa as { vai_tro: unknown }).vai_tro as string | string[] | null),
+    thamChieu: (tc ?? []) as ThamChieuStaff[],
+  })
+  if (!kt.ok) return { ok: false as const, error: kt.lyDo }
+
+  const email = chuanHoaEmail((biXoa as { email: string | null }).email)
+  if (email) {
+    const { data: idTk } = await db.rpc('nen_tang_id_tai_khoan', { p_email: email })
+    // Tài khoản xoá trước, dòng staff xoá sau. Ngược lại mà bước hai hỏng thì
+    // còn một tài khoản đăng nhập không còn hồ sơ nào ứng với nó — mồ côi, và
+    // không màn hình nào của app nhìn thấy để dọn.
+    if (idTk) {
+      const { error } = await db.auth.admin.deleteUser(idTk as string)
+      if (error) return { ok: false as const, error: `Không xoá được tài khoản đăng nhập: ${error.message}` }
+    }
+  }
+
+  const { error } = await db.from('staff').delete().eq('id', id)
+  if (error) return { ok: false as const, error: error.message }
+
+  await ghiAudit('xoa_nhan_su', `nv:${id}`, {
+    email,
+    ten: (biXoa as { ten: string }).ten,
+    vai_tro: (biXoa as { vai_tro: unknown }).vai_tro,
+  })
   revalidatePath('/nhan-vien')
   return { ok: true as const }
 }

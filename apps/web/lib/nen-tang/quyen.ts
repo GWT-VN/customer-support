@@ -6,7 +6,7 @@
  * DB là đẻ ra "quyền ma" — tick vào thấy yên tâm nhưng chẳng gác gì cả.
  * DB chỉ lưu Ô NÀO ĐƯỢC TICK (bảng quyen_vai_tro).
  *
- * 50 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
+ * 51 quyền gom từ 149 hàm thật trong app theo *đối tượng + hành động*.
  * Spec: docs/superpowers/specs/2026-08-20-nen-tang-tai-khoan-phan-quyen-design.md §6.1
  */
 import { VAI_TRO, type VaiTro } from './vai-tro'
@@ -119,6 +119,8 @@ const BANG_QUYEN = {
 
   'he_thong.nhan_su.xem': { nhom: 'he_thong', nhan: 'Xem danh sách nhân sự', mucMacDinh: 'A', chiXem: true },
   'he_thong.nhan_su.sua': { nhom: 'he_thong', nhan: 'Đổi vai trò, khoá, mời người', mucMacDinh: 'A' },
+  // Tách khỏi .sua có chủ đích: sửa vai trò sai thì sửa lại được, xoá thì không.
+  'he_thong.nhan_su.xoa': { nhom: 'he_thong', nhan: 'Xoá hẳn người mời nhầm', mucMacDinh: 'A' },
   'he_thong.nhan_su.mat_khau': { nhom: 'he_thong', nhan: 'Gửi lại email đặt mật khẩu', mucMacDinh: 'A' },
   'he_thong.phan_quyen': { nhom: 'he_thong', nhan: 'Sửa CHÍNH ma trận quyền này', mucMacDinh: 'A' },
   'he_thong.nhat_ky': { nhom: 'he_thong', nhan: 'Xem nhật ký thao tác', mucMacDinh: 'A', chiXem: true },
@@ -169,6 +171,7 @@ const QUYEN_QUAN_TRI_HT: MaQuyen[] = [
   ...QUYEN_NEN,
   'he_thong.nhan_su.xem',
   'he_thong.nhan_su.sua',
+  'he_thong.nhan_su.xoa',
   'he_thong.nhan_su.mat_khau',
   'he_thong.phan_quyen',
   'he_thong.nhat_ky',
