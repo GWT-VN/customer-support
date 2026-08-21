@@ -135,6 +135,14 @@ Cũng vậy: `Đã lắp đặt` (356 dòng) và `ĐÃ LẮP ĐẶT` (46 dòng).
 **Gom nhóm lúc ĐỌC** — ô lọc hiện một mục, truy vấn khớp mọi biến thể — chứ đừng sửa dữ liệu, trừ
 khi được giao dọn hẳn ở nguồn.
 
+Bản dùng chung cho Tỉnh/TP: [`apps/web/lib/tinhGom.ts`](../apps/web/lib/tinhGom.ts) —
+`gomTinh()` · `gomDanhSachTinh()` (dựng lựa chọn) · `cacBienThe()` (dựng `.in(...)`).
+**Cả CSKH lẫn Sales dùng CHUNG file này**, đừng viết bản thứ hai. Thiếu bí danh thì **đo trên DB
+rồi thêm**, đừng bịa — comment trong file ghi rõ luật đó.
+
+Giá trị rác cũng phải **hiện ra chứ không giấu**: `#REF!` (52 dòng, công thức Sheet gãy) được gom
+thành một mục riêng `(lỗi dữ liệu)`. Lọc bỏ im lặng là người xem tưởng dữ liệu đã sạch.
+
 ---
 
 ## Kiểu dữ liệu chung
