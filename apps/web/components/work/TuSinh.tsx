@@ -16,7 +16,7 @@ import { ThanhHangLoat } from './ThanhHangLoat'
 import { LuatTuSinh } from './LuatTuSinh'
 import { Nut } from './ui'
 
-export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTang }) {
+export function TuSinh({ duLieu, nenTang, duocSuaLuat }: { duLieu: ManTuSinh; nenTang: NenTang; duocSuaLuat: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [loi, setLoi] = useState<string | null>(null)
@@ -88,7 +88,7 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
             {soBat}/{duLieu.luat.length} bật
           </span>
           <span className="flex-1" />
-          {duLieu.la_quan_ly && (
+          {duocSuaLuat && (
             <Nut chinh onClick={bamChayNgay} disabled={pending}>
               {pending ? 'Đang quét…' : 'Chạy ngay'}
             </Nut>
@@ -100,7 +100,7 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
           {duLieu.luat.map((l, i) => (
             <LuatTuSinh
               key={l.key} l={l} nenTang={nenTang}
-              laQuanLy={duLieu.la_quan_ly}
+              duocSuaLuat={duocSuaLuat}
               cuoi={i === duLieu.luat.length - 1}
               onXong={() => router.refresh()}
               onLoi={setLoi}
@@ -108,7 +108,7 @@ export function TuSinh({ duLieu, nenTang }: { duLieu: ManTuSinh; nenTang: NenTan
           ))}
         </ul>
 
-        {!duLieu.la_quan_ly && (
+        {!duocSuaLuat && (
           <p className="mt-2" style={{ fontSize: 11.5, color: 'var(--faint)' }}>
             Chỉ cấp quản lý mới bật/tắt luật, đổi người nhận hoặc chạy tay.
           </p>

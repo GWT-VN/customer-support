@@ -36,11 +36,11 @@ function gioChay(iso: string | null): string {
 }
 
 export function LuatTuSinh({
-  l, nenTang, laQuanLy, cuoi, onXong, onLoi,
+  l, nenTang, duocSuaLuat, cuoi, onXong, onLoi,
 }: {
   l: Luat
   nenTang: NenTang
-  laQuanLy: boolean
+  duocSuaLuat: boolean
   cuoi: boolean
   onXong: () => void
   onLoi: (s: string) => void
@@ -113,7 +113,7 @@ export function LuatTuSinh({
               Giao cho{' '}
               <select
                 value={l.nguoi_nhan ?? ''}
-                disabled={!laQuanLy || pending}
+                disabled={!duocSuaLuat || pending}
                 onChange={(e) => chay(() => doiNguoiNhan(l.key, e.target.value || null))}
                 style={o}
                 aria-label={`Người nhận việc của luật ${l.name}`}
@@ -125,7 +125,7 @@ export function LuatTuSinh({
             <span style={{ fontSize: 11.5, color: 'var(--faint)' }}>
               · quét {gioChay(l.last_run_at)}{l.last_created > 0 && `, sinh ${l.last_created} việc`}
             </span>
-            {laQuanLy && (
+            {duocSuaLuat && (
               <>
                 <button
                   onClick={() => setMoSua((v) => !v)}
@@ -143,7 +143,7 @@ export function LuatTuSinh({
 
         <button
           onClick={() => chay(() => batTatLuat(l.key, !l.active))}
-          disabled={!laQuanLy || pending}
+          disabled={!duocSuaLuat || pending}
           aria-pressed={l.active}
           className="flex-none"
           style={{
@@ -151,7 +151,7 @@ export function LuatTuSinh({
             border: `1px solid ${l.active ? 'var(--green)' : 'var(--border-strong)'}`,
             background: l.active ? 'var(--green-wash)' : 'var(--surface-2)',
             color: l.active ? 'var(--green)' : 'var(--muted)',
-            opacity: laQuanLy ? 1 : .6,
+            opacity: duocSuaLuat ? 1 : .6,
           }}
         >{l.active ? 'Bật' : 'Tắt'}</button>
       </div>
