@@ -789,7 +789,6 @@ git commit -m "feat(sales/khach): lọc Kênh + Tỉnh theo chuẩn bang/"
 -- Cột MỚI đặt tên GIỐNG HỆT ở cả customers và cs_customers.
 -- CS tự chạy phần cs_customers; file này chỉ đụng bảng Sales làm chủ.
 alter table public.customers add column if not exists channel_id   integer references public.dim_channel(id) on delete set null;
-alter table public.customers add column if not exists phone2       text;  -- ⛔ CHỜ CEO CHỐT, xem ghi chú dưới
 alter table public.customers add column if not exists sales_owner  uuid    references public.staff(id) on delete set null;
 alter table public.customers add column if not exists email        text;
 alter table public.customers add column if not exists ngay_sinh    date;
@@ -905,28 +904,17 @@ git commit -m "refactor(sales): bỏ đọc province_moi — province đã là t
 
 ---
 
-### Task 10c: Port `tinhMoi_()` sang TypeScript — CHỜ CEO CHỐT
+### Task 10c: ~~Port `tinhMoi_()` sang TypeScript~~ — ❌ CEO BÁC 21/08
 
-> ⛔ **Chưa làm cho tới khi CEO trả lời.** Vấn đề: `apps/web/lib/tinh.ts` `TINH_VN` là bộ **63 tỉnh CŨ**
-> (comment trong file ghi rõ là cố ý), và nó là nguồn cho `ChonTinh.tsx`, `KyThuatBang.tsx` (CS),
-> `khopPlanKhach.ts`, `OrderForm.tsx`, `CustomerForm.tsx`. ⇒ Sau khi chốt `province` = tỉnh MỚI,
-> **mọi bản ghi nhập tay từ giao diện (cả CS lẫn Sales) vẫn ghi tên tỉnh CŨ**. Chỉ hàng qua Apps
-> Script mới được quy đổi. Quy ước sẽ đúng với hàng sync, sai với hàng nhập tay.
+CEO chốt: *"Ko đổi 34 tỉnh, cho phép điền cả tỉnh cũ vs mới."* ⇒ **không port `tinhMoi_()`,
+không chuẩn hoá lúc ghi, không backfill.** Ô chọn tỉnh nhận CẢ tên cũ LẪN tên mới, cả hai đều hợp lệ.
 
-**Files (nếu CEO duyệt):**
-- Create: `apps/web/lib/tinhMoi.ts`, `apps/web/lib/tinhMoi.test.ts`
-- Modify: `apps/web/app/sales/_db.ts` (`cleanCustomer`), `createSalesOrder`/`updateSalesOrder`
+CS đã thêm **đúng 1 dòng** vào `apps/web/lib/tinh.ts`: `Huế` — tên mới duy nhất chưa có trong bộ 63.
+(`TP. Hồ Chí Minh` KHÔNG thêm vì trùng `Hồ Chí Minh` đã có.)
 
-- [ ] **Bước 1:** Chép **nguyên** bảng `PROVINCE_PAIRS` (30 cặp) từ `Sales Tracking/apps-script/Code.gs:170`.
-      Đọc luôn `mapTinh_` ở cùng file để khớp **đúng** cách nó chuẩn hoá (bỏ dấu, bỏ gạch nối) —
-      `TINH_VN` ghi `'Thừa Thiên - Huế'` còn bảng cặp ghi `'Thừa Thiên Huế'`, so chuỗi thô là trượt.
-- [ ] **Bước 2:** Viết test trước: `tinhMoi('Bắc Kạn') === 'Thái Nguyên'`,
-      `tinhMoi('Thừa Thiên - Huế') === 'Huế'`, `tinhMoi('Hà Nội') === 'Hà Nội'` (34 tỉnh mới ánh xạ về chính nó),
-      `tinhMoi('') === ''`, `tinhMoi(null) === null`.
-- [ ] **Bước 3:** Chuẩn hoá **phía server lúc ghi** trong `cleanCustomer`:
-      `province: tinhMoi(input.province)`, `province_truoc_sap_nhap: input.province?.trim() || null`.
-      Giữ nguyên dropdown 63 tên cũ — nhân viên không phải học lại tên mới.
-- [ ] **Bước 4:** Báo CS là file dùng chung được, để CS khỏi viết bản thứ hai.
+⚠️ **Hệ quả phải xử ở nơi khác:** cùng một tỉnh đang có nhiều cách viết trong dữ liệu —
+`HCM` **226 dòng** bên Sales · `Hồ Chí Minh` · `TP. Hồ Chí Minh`. Ô lọc theo Tỉnh phải
+**gom nhóm lúc ĐỌC** (hiện một mục, khớp mọi biến thể), KHÔNG sửa dữ liệu. Xem Task 8.
 
 ---
 
