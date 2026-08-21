@@ -12,6 +12,7 @@ export type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc, SapXep } from './kieu'
 
 // Hàm thuần — không đụng DB, không đụng React
 export { boDau, chuanHoaTuKhoa, antoanChoOr, mauDauTu, sapXepHopLe } from './timkiem'
+export { isoNgay, khoangPreset, PRESETS, type MaPreset } from './ngay'
 
 // Lấy toàn bộ khoá khớp bộ lọc (chọn tất cả)
 export { gomKhoa, MOI_LO, TOI_DA_CHON_MAC_DINH } from './gomKhoa'
