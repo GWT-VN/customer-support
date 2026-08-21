@@ -59,3 +59,43 @@ export function nextSeqCode(existing: Array<string | null | undefined>, prefix: 
   }
   return prefix + String(max + 1).padStart(pad, '0')
 }
+
+/**
+ * Tách tiền TRƯỚC VAT và tiền VAT từ tiền SAU VAT.
+ *
+ * ⚠️ `vatPct` là PHÂN SỐ: 0.08 = 8%. Đây là cách Google Sheet lưu — đo trên production
+ * 21/08/2026: 699/810 dòng `sales_order_lines` có vat_pct = 0.08, và 696/699 dòng khớp
+ * công thức `amount_net * (1 + vat_pct)`. Dùng `1 + p/100` là sai đúng 100 lần.
+ *
+ * null hoặc 0 -> coi như không VAT. KHÔNG đoán thuế suất thay người nhập.
+ */
+export function tachVat(
+  amountVat: number | null | undefined,
+  vatPct: number | null | undefined
+): { net: number; vat: number } {
+  const sau = Math.round(Number(amountVat) || 0)
+  const p = Number(vatPct) || 0
+  if (p <= 0) return { net: sau, vat: 0 }
+  const net = Math.round(sau / (1 + p))
+  // Trừ ngược thay vì tính riêng, để net + vat LUÔN khớp đúng tiền sau VAT —
+  // làm tròn hai đầu độc lập sẽ lệch 1 đồng và tổng hoá đơn không cân.
+  return { net, vat: sau - net }
+}
+
+/**
+ * Tổng một đơn: { trước VAT, tiền VAT, sau VAT }.
+ * Có `amount_net` (đơn từ Sheet) thì dùng thẳng; không có (đơn tạo trên app,
+ * `sales_order_items` không lưu giá trước VAT) thì suy từ `vat_pct`.
+ */
+export function tongDon(
+  lines: Array<{ amount_vat: number | null; amount_net: number | null; vat_pct: number | null }>
+): { net: number; vat: number; sauVat: number } {
+  let net = 0
+  let sauVat = 0
+  for (const l of lines) {
+    const sau = Math.round(Number(l.amount_vat) || 0)
+    sauVat += sau
+    net += l.amount_net != null ? Math.round(Number(l.amount_net)) : tachVat(sau, l.vat_pct).net
+  }
+  return { net, vat: sauVat - net, sauVat }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode } from './_calc'
+import { deriveSourceTab, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode, tachVat, tongDon } from './_calc'
 
 describe('deriveSourceTab', () => {
   it('POE thắng khi có dòng POE', () => {
@@ -51,4 +51,39 @@ describe('nextSeqCode', () => {
   it('mã khách KA pad 5', () => {
     expect(nextSeqCode(['KA00007'], 'KA', 5)).toBe('KA00008')
   })
+})
+
+describe('tachVat', () => {
+  it('vat_pct là PHÂN SỐ 0.08, không phải 8', () => {
+    expect(tachVat(1080000, 0.08)).toEqual({ net: 1000000, vat: 80000 })
+  })
+  it('vat_pct = 0 -> không VAT', () => {
+    expect(tachVat(500000, 0)).toEqual({ net: 500000, vat: 0 })
+  })
+  it('vat_pct null -> coi như không VAT, không đoán', () => {
+    expect(tachVat(500000, null)).toEqual({ net: 500000, vat: 0 })
+  })
+  it('net + vat luôn bằng đúng tiền sau VAT (không rơi đồng lẻ)', () => {
+    const r = tachVat(333333, 0.08)
+    expect(r.net + r.vat).toBe(333333)
+  })
+  it('tiền 0 -> 0', () => expect(tachVat(0, 0.08)).toEqual({ net: 0, vat: 0 }))
+})
+
+describe('tongDon', () => {
+  it('ưu tiên amount_net có sẵn (đơn từ Sheet)', () => {
+    expect(tongDon([{ amount_vat: 1080000, amount_net: 1000000, vat_pct: 0.08 }]))
+      .toEqual({ net: 1000000, vat: 80000, sauVat: 1080000 })
+  })
+  it('thiếu amount_net thì suy từ vat_pct (đơn app)', () => {
+    expect(tongDon([{ amount_vat: 1080000, amount_net: null, vat_pct: 0.08 }]))
+      .toEqual({ net: 1000000, vat: 80000, sauVat: 1080000 })
+  })
+  it('cộng nhiều dòng, trộn cả hai kiểu', () => {
+    expect(tongDon([
+      { amount_vat: 1080000, amount_net: 1000000, vat_pct: 0.08 },
+      { amount_vat: 500000, amount_net: null, vat_pct: 0 },
+    ])).toEqual({ net: 1500000, vat: 80000, sauVat: 1580000 })
+  })
+  it('đơn rỗng -> tất cả 0', () => expect(tongDon([])).toEqual({ net: 0, vat: 0, sauVat: 0 }))
 })
