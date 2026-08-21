@@ -1,4 +1,4 @@
-import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
+import { chanNeuThieuQuyen, coQuyenHienNut } from '@/lib/nen-tang/kiem-quyen'
 import { listKhachChoDuyet, listYeuCauThayDoi, listYeuCauExport } from '@/app/actions'
 import { KhachChoDuyetList } from '@/components/KhachChoDuyetList'
 import { DuyetList } from '@/components/DuyetList'
@@ -6,8 +6,13 @@ import { DuyetExportList } from '@/components/DuyetExportList'
 
 export default async function DuyetPage() {
   await chanNeuThieuQuyen('cs.yeu_cau.xem', 'QUANLY')
+  // Trang này gác bằng cs.yeu_cau.xem, nhưng khối "khách chờ duyệt" bên dưới đòi
+  // cs.khach.duyet_cho — HAI quyền khác nhau. Ai được tick quyền này mà không được
+  // tick quyền kia thì gọi vô điều kiện là bị đá khỏi trang.
+  const duocDuyetKhach = await coQuyenHienNut('cs.khach.duyet_cho', 'QUANLY')
   const [khachCho, yeuCau, yeuCauExport] = await Promise.all([
-    listKhachChoDuyet(), listYeuCauThayDoi(), listYeuCauExport(),
+    duocDuyetKhach ? listKhachChoDuyet() : Promise.resolve([]),
+    listYeuCauThayDoi(), listYeuCauExport(),
   ])
 
   return (

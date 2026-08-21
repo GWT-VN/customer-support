@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { laMaQuyenHopLe } from './quyen'
+import { HO_SO_QUYEN, laMaQuyenHopLe, type MaQuyen } from './quyen'
 
 /**
  * Lưới an toàn cho ma trận phân quyền.
@@ -95,6 +95,15 @@ function moiFileTsx(thuMuc: string): string[] {
   return ra
 }
 
+function moiFile(thuMuc: string, duoi: string): string[] {
+  const ra: string[] = []
+  for (const m of readdirSync(GOC + thuMuc, { withFileTypes: true, recursive: true })) {
+    if (!m.isFile() || !m.name.endsWith(duoi)) continue
+    ra.push(`${m.parentPath ?? m.path}/${m.name}`)
+  }
+  return ra
+}
+
 const FILE_GIAO_DIEN = ['app', 'components', 'bang'].flatMap(moiFileTsx)
 
 describe('giao diện ẩn/hiện nút theo MA TRẬN, không theo vai trò', () => {
@@ -127,5 +136,65 @@ describe('giao diện ẩn/hiện nút theo MA TRẬN, không theo vai trò', ()
         expect(['ADMIN', 'QUANLY', 'NHANVIEN'], `${f.replace(GOC, '')}: gate lạ ${m[2]}`).toContain(m[2])
       }
     }
+  })
+})
+
+/**
+ * Lưới an toàn cho lỗi ĐÃ CẮN BA LẦN.
+ *
+ * doQuyen() không trả boolean mà ĐÁ NGƯỜI DÙNG VỀ TRANG CHỦ. Nên một hàm ĐỌC dữ
+ * liệu gác bằng doQuyen ở mức cao (Trưởng CSKH trở lên) mà bị một trang gọi VÔ
+ * ĐIỀU KIỆN lúc vẽ thì cả trang đó chết với người thiếu quyền — không phải thiếu
+ * mỗi khối dữ liệu, mà văng khỏi trang.
+ *
+ * Đã xảy ra thật với `/dang-ky-bh`, `/serial`, và `/tong-quan` (cái cuối lộ ra
+ * trên PRODUCTION đúng hôm bật ma trận, tài khoản NV CSKH mở Tổng quan là bị đá).
+ *
+ * Luật: trang nào gọi những hàm đó thì trong CÙNG file phải có hoiQuyen() hoặc
+ * coQuyenHienNut() — tức là đã hỏi quyền trước khi gọi.
+ */
+describe('hàm đọc gác mức cao: trang gọi nó phải HỎI QUYỀN trước', () => {
+  const nguon = doc('../../app/actions.ts')
+
+  /** tên hàm export trong actions.ts -> mã quyền mức cao mà nó đòi qua doQuyen(). */
+  const HAM_NGUY = (() => {
+    const ra = new Map<string, MaQuyen>()
+    for (const doan of nguon.split(/(?=export async function )/)) {
+      const ten = doan.match(/export async function (\w+)/)?.[1]
+      if (!ten) continue
+      for (const m of doan.matchAll(/doQuyen\('([^']+)'\)/g)) {
+        const ma = m[1]
+        if (!laMaQuyenHopLe(ma)) continue
+        const muc = HO_SO_QUYEN[ma as MaQuyen].mucMacDinh
+        if (muc !== 'NS' && muc !== 'CS') { ra.set(ten, ma as MaQuyen); break }
+      }
+    }
+    return ra
+  })()
+
+  it('tìm được ít nhất một hàm như vậy — nếu 0 thì bài kiểm này vô nghĩa', () => {
+    expect(HAM_NGUY.size).toBeGreaterThan(0)
+  })
+
+  it('mọi trang RENDER gọi chúng đều nhắc tới đúng mã quyền đó', () => {
+    // Chỉ soi đường VẼ TRANG phía server. Component 'use client' gọi khi người dùng
+    // BẤM — thiếu quyền thì hỏng đúng một thao tác, không giết cả trang; chỗ đó đã
+    // được ẩn nút theo ma trận ở việc 24.
+    //
+    // "Nhắc tới đúng mã quyền" gồm cả rào của chính trang (chanNeuThieuQuyen với
+    // cùng mã) lẫn hỏi trước bằng hoiQuyen()/coQuyenHienNut().
+    const NOI_GOI = [...FILE_GIAO_DIEN, ...moiFile('app', '.ts')]
+      .filter((f) => !f.endsWith('/app/actions.ts'))
+    const viPham: string[] = []
+    for (const f of NOI_GOI) {
+      const src = readFileSync(f, 'utf8')
+      if (/^\s*'use client'/m.test(src)) continue
+      for (const [ten, ma] of HAM_NGUY) {
+        if (!new RegExp(`\\b${ten}\\s*\\(`).test(src)) continue
+        if (src.includes(`'${ma}'`)) continue
+        viPham.push(`${f.replace(GOC, '')} gọi ${ten}() (đòi ${ma}) mà không hỏi quyền đó`)
+      }
+    }
+    expect(viPham, viPham.join(' · ')).toEqual([])
   })
 })

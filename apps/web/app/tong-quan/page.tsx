@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { coTheVaoCS, laChiKyThuatVien } from '@/lib/nen-tang/gac-cong'
 import { requireStaff } from '@/lib/nen-tang/phien'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { listKhachChoDuyet } from '@/app/actions'
 import { DauTrang } from '@/components/DauTrang'
 import { soLieuTongQuan, type SoLieuTongQuan } from './actions'
@@ -27,7 +28,13 @@ export default async function TongQuanPage() {
   if (await laChiKyThuatVien()) redirect('/ky-thuat/cua-toi')
   if (!(await coTheVaoCS())) redirect('/work')
 
-  const [so, choDuyet] = await Promise.all([soLieuTongQuan(), listKhachChoDuyet()])
+  // Xem chú thích trong ./actions.ts: đọc hàng chờ duyệt mà không có quyền là bị
+  // đá khỏi trang, chứ không phải chỉ thiếu dữ liệu.
+  const quyen = await hoiQuyen({ duyetKhach: ['cs.khach.duyet_cho', 'QUANLY'] })
+  const [so, choDuyet] = await Promise.all([
+    soLieuTongQuan(),
+    quyen.duyetKhach ? listKhachChoDuyet() : Promise.resolve(null),
+  ])
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -35,7 +42,7 @@ export default async function TongQuanPage() {
         <DauTrang tieuDe="Tổng quan CSKH" phuDe="Việc cần chạm hôm nay" />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {O.map((o) => (
+          {O.filter((o) => so[o.khoa] !== null).map((o) => (
             <Link
               key={o.khoa}
               href={o.href}
@@ -47,12 +54,13 @@ export default async function TongQuanPage() {
                 {o.nhan}
               </div>
               <div className="mt-1.5 text-[26px] font-bold tracking-tight tabular-nums text-slate-900">
-                {so[o.khoa].toLocaleString('vi-VN')}
+                {(so[o.khoa] ?? 0).toLocaleString('vi-VN')}
               </div>
             </Link>
           ))}
         </div>
 
+        {choDuyet !== null && (
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <h2 className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-900">
             Bảo hành chờ duyệt ({choDuyet.length})
@@ -82,6 +90,7 @@ export default async function TongQuanPage() {
             </Link>
           </div>
         </section>
+        )}
       </div>
     </main>
   )
