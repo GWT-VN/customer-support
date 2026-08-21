@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { Suspense } from 'react'
-import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon } from '@/app/actions'
+import { searchSerialsTrang, listSerialPending, khoaTatCaSerial, catalogChon, dsTrangThai, type SerialRow, type CatalogChon, type SerialPending } from '@/app/actions'
 import type { KetQuaTrang } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { DauTrang } from '@/components/DauTrang'
@@ -22,15 +22,23 @@ export default async function SerialPage({
   const laCho = tab === 'cho'
   const laNhap = tab === 'nhap'
   const laCauHinh = tab === 'cauhinh'
-  const [{ rows, tong, soTrang }, pending, admin, catalog, dsTT] = await Promise.all([
+  // Hỏi quyền TRƯỚC. listSerialPending() tự gác bằng cs.serial.duyet và ĐÁ VỀ
+  // TRANG CHỦ nếu thiếu — gọi vô điều kiện là nhân viên thường mở /serial liền bị
+  // văng, dù bảng kho serial vốn cho họ xem.
+  const quyen = await hoiQuyen({
+    kho: ['cs.serial.kho', 'QUANLY'],
+    trangThai: ['cs.may.trang_thai', 'QUANLY'],
+    duyet: ['cs.serial.duyet', 'QUANLY'],
+    hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
+  })
+  const [{ rows, tong, soTrang }, pending, catalog, dsTT] = await Promise.all([
     laCho || laNhap || laCauHinh
       ? Promise.resolve<KetQuaTrang<SerialRow>>({
           rows: [], tong: 0, trang: 1, soTrang: 1,
           sapXep: { cot: 'serial', tang: true, macDinh: true },
         })
       : searchSerialsTrang(q, { trang }, tt),
-    listSerialPending('cho_duyet'),
-    laQuanLy(),
+    quyen.duyet ? listSerialPending('cho_duyet') : Promise.resolve<SerialPending[]>([]),
     laNhap ? catalogChon() : Promise.resolve<CatalogChon[]>([]),
     dsTrangThai(),
   ])
@@ -46,7 +54,7 @@ export default async function SerialPage({
             className={`px-3 py-1.5 rounded-lg text-sm border ${!laCho && !laNhap ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
             Kho serial
           </Link>
-          {admin && (
+          {quyen.kho && (
             <Link href="/serial?tab=nhap"
               className={`px-3 py-1.5 rounded-lg text-sm border ${laNhap ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
               + Nhập kho
@@ -54,9 +62,9 @@ export default async function SerialPage({
           )}
           <Link href="/serial?tab=cho"
             className={`px-3 py-1.5 rounded-lg text-sm border ${laCho ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-amber-700 border-amber-200'}`}>
-            Chờ duyệt ({pending.length})
+            Chờ duyệt{quyen.duyet ? ` (${pending.length})` : ''}
           </Link>
-          {admin && (
+          {quyen.trangThai && (
             <Link href="/serial?tab=cauhinh"
               className={`px-3 py-1.5 rounded-lg text-sm border ${laCauHinh ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'}`}>
               Cấu hình trạng thái
@@ -65,19 +73,25 @@ export default async function SerialPage({
         </div>
 
         {laCauHinh ? (
-          admin ? <TrangThaiCauHinh ds={dsTT} /> : <p className="text-sm text-amber-600">Chỉ admin.</p>
+          quyen.trangThai ? <TrangThaiCauHinh ds={dsTT} /> : <p className="text-sm text-amber-600">Bạn không có quyền cấu hình trạng thái máy.</p>
         ) : laNhap ? (
           <section className="space-y-3">
-            {admin ? (
+            {quyen.kho ? (
               <NhapKhoSerial catalog={catalog} />
             ) : (
-              <p className="text-sm text-amber-600">Chỉ admin mới nhập kho trực tiếp. Bạn có thể “Tạo serial mới (chờ duyệt)”.</p>
+              <p className="text-sm text-amber-600">Bạn không có quyền nhập kho trực tiếp. Bạn có thể “Tạo serial mới (chờ duyệt)”.</p>
             )}
           </section>
         ) : laCho ? (
           <section className="space-y-3">
-            <SerialTao />
-            <SerialPendingList items={pending} laAdmin={admin} />
+            {/*
+              createSerialPending() phía sau nút này đòi cs.serial.kho. Hiện nó cho
+              người không có quyền là mời họ bấm vào một thứ chắc chắn hỏng.
+              ⚠️ Đáng để CEO xem lại: luồng "tạo serial chờ duyệt" sinh ra CHO nhân
+              viên thường xin, mà ma trận đang để nó ở mức Trưởng CSKH.
+            */}
+            {quyen.kho && <SerialTao />}
+            <SerialPendingList items={pending} choDuyet={quyen.duyet} />
           </section>
         ) : (
           <>
@@ -107,7 +121,7 @@ export default async function SerialPage({
             <KhungChon
               khoaTrang={rows.map((s) => s.serial)}
               tong={tong}
-              bat={admin}
+              bat={quyen.hangLoat}
               thamSo={{ q, ...(tt && { tt }) }}
               layTatCaKhoa={khoaTatCaSerial}
             >
@@ -132,14 +146,14 @@ export default async function SerialPage({
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{s.internal_code ?? '—'}</td>
                       <td className="px-4 py-2.5 text-slate-700">{s.model ?? '—'}</td>
                       <td className="px-4 py-2.5">
-                        <DoiTrangThaiKho serial={s.serial} trangThai={s.trang_thai} laAdmin={admin} ds={dsTT} />
+                        <DoiTrangThaiKho serial={s.serial} trangThai={s.trang_thai} choDoiTrangThai={quyen.kho} ds={dsTT} />
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{s.ten_noi_bo ?? '—'}</td>
                     </tr>
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={admin ? 6 : 5} className="px-4 py-10 text-center text-slate-400">
+                      <td colSpan={quyen.hangLoat ? 6 : 5} className="px-4 py-10 text-center text-slate-400">
                         Không tìm thấy serial nào.
                       </td>
                     </tr>

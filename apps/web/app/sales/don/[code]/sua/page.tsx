@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { coTheVaoSales, requireNhanSu } from '@/lib/supabase'
+import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { getOrderForEdit, listCatalogForPicker, listChannels } from '../../../_db'
 import { OrderForm } from '../../../OrderForm'
 

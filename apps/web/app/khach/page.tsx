@@ -5,7 +5,7 @@ import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
 import { PhanTrang } from '@/bang'
 import { TieuDeCotSapXep } from '@/bang'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { KhungChon, OChonTatCa, OChonDong, ThanhDaChon } from '@/bang'
 
 export default async function ToFixPage({
@@ -15,10 +15,11 @@ export default async function ToFixPage({
 }) {
   const { q = '', trang: trangRaw, cot, chieu } = await searchParams
   const trang = Math.max(1, Number(trangRaw) || 1)
-  const [{ rows: list, tong, soTrang, sapXep }, admin] = await Promise.all([
+  const [{ rows: list, tong, soTrang, sapXep }, quyen] = await Promise.all([
     listToFix(q, { trang, cot, chieu }),
-    laQuanLy(),
+    hoiQuyen({ hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'] }),
   ])
+  const choHangLoat = quyen.hangLoat
   // Chỉ tính trên trang hiện tại — tong ở trên là tổng số khách cần dọn thật.
   const thieuSdt = list.filter((c) => c.needs_phone)
   const thieuDiaChi = list.filter((c) => !c.address)
@@ -52,7 +53,7 @@ export default async function ToFixPage({
         <KhungChon
           khoaTrang={list.map((c) => c.id)}
           tong={tong}
-          bat={admin}
+          bat={choHangLoat}
           thamSo={{ q, cot, chieu }}
           layTatCaKhoa={khoaTatCaKhach}
         >
@@ -103,7 +104,7 @@ export default async function ToFixPage({
               ))}
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={admin ? 5 : 4} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={choHangLoat ? 5 : 4} className="px-4 py-10 text-center text-slate-400">
                     Không còn gì để dọn. 🎉
                   </td>
                 </tr>

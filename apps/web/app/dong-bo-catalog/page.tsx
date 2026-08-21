@@ -1,9 +1,9 @@
-import { chanNeuKhongPhaiAdmin } from '@/lib/supabase'
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { catalogSyncLast } from '@/app/actions'
 import { NutDongBoCatalog } from '@/components/NutDongBoCatalog'
 
 export default async function DongBoCatalogPage() {
-  await chanNeuKhongPhaiAdmin()
+  await chanNeuThieuQuyen('he_thong.catalog', 'ADMIN')
   const logs = await catalogSyncLast()
 
   return (

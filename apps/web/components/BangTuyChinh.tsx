@@ -21,7 +21,7 @@ export type CotDef<T> = {
  * Bọc trong <KhungChon> ở trang để có chọn-nhiều-dòng.
  */
 export function BangTuyChinh<T>({
-  rows, keyOf, moTaOf, nhan, bang, cot, macDinh, sapMacDinh, views, admin, congCu,
+  rows, keyOf, moTaOf, nhan, bang, cot, macDinh, sapMacDinh, views, choViewChung, congCu,
 }: {
   rows: T[]
   keyOf: (r: T) => string
@@ -32,7 +32,14 @@ export function BangTuyChinh<T>({
   macDinh: string[]
   sapMacDinh?: string
   views: BangView[]
-  admin: boolean
+  /**
+   * Được lưu view dùng CHUNG cho cả công ty hay không — quyền he_thong.view_chung.
+   *
+   * Trước đây tên là `admin` và nơi gọi truyền cờ vai trò quản lý vào. Tên theo VAI TRÒ
+   * kiểu đó chính là thứ làm giao diện lệch khỏi rào thật: đọc code không ai biết
+   * nó gác cái gì, nên tick lại ma trận là nút hiện/ẩn sai mà không ai ngờ.
+   */
+  choViewChung: boolean
   /** Nút/điều khiển thêm (Xuất Excel, Lọc ngày…) gom chung 1 hàng với View + Cột. */
   congCu?: ReactNode
 }) {
@@ -124,7 +131,7 @@ export function BangTuyChinh<T>({
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
             <input value={tenView} onChange={(e) => setTenView(e.target.value)} placeholder="Tên view…"
               className="rounded border px-2 py-1 text-sm w-32 text-slate-900" />
-            {admin && <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" checked={chung} onChange={(e) => setChung(e.target.checked)} /> Chung (mọi người)</label>}
+            {choViewChung && <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" checked={chung} onChange={(e) => setChung(e.target.checked)} /> Chung (mọi người)</label>}
             <button onClick={luu} disabled={busy || !tenView.trim()}
               className="rounded-lg bg-slate-900 text-white px-3 py-1 text-sm disabled:opacity-50">Lưu view</button>
             {err && <span className="text-xs text-red-600">{err}</span>}

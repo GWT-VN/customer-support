@@ -1,5 +1,5 @@
 import 'server-only'
-import { dataClient } from '@/lib/supabase'
+import { dataClient } from '@/lib/nen-tang/db'
 import { deriveSourceTab, TAB_LETTER, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode } from './_calc'
 import type { CatalogPick, ChannelOpt, CustomerInput, NewOrderInput, OrderFormInitial } from './_types'
 

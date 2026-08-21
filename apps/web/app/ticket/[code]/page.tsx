@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
-import { laQuanLy } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { notFound } from 'next/navigation'
-import { getTicket, groupsOfTicket, listTicketNotes, listStaff, listTicketItems, currentStaff, listCatalogItems, ticketTypes } from '@/app/actions'
+import { getTicket, groupsOfTicket, listTicketNotes, listTicketItems, listCatalogItems, ticketTypes } from '@/app/actions'
+import { listStaff, currentStaff } from '@/lib/nen-tang/nhan-su'
 import { StateBadge, KhanBadge, vnDateTime } from '@/components/TicketBadge'
 import { MucDoBadge } from '@/components/NhomLoiBadge'
 import { TicketEditor } from '@/components/TicketEditor'
@@ -14,9 +15,13 @@ import { vnDate } from '@/components/Badge'
 export default async function TicketPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const ma = decodeURIComponent(code)
-  const [t, nhom, notes, staff, items, me, catalog, loaiList, admin] = await Promise.all([
+  const [t, nhom, notes, staff, items, me, catalog, loaiList, quyen] = await Promise.all([
     getTicket(ma), groupsOfTicket(ma), listTicketNotes(ma), listStaff(), listTicketItems(ma), currentStaff(),
-    listCatalogItems(), ticketTypes(), laQuanLy(),
+    listCatalogItems(), ticketTypes(),
+    hoiQuyen({
+      lichKT: ['cs.ky_thuat.ho_so', 'QUANLY'],
+      chiPhi: ['cs.ticket.chi_phi', 'QUANLY'],
+    }),
   ])
   if (!t) notFound()
 
@@ -108,7 +113,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           </dl>
         </section>
 
-        {admin && t.customer_id && (
+        {quyen.lichKT && t.customer_id && (
           <Link href={`/ky-thuat?kh=${t.customer_id}&loai=ticket&ref=${encodeURIComponent(t.ticket_code)}&mota=${encodeURIComponent(t.description ?? '')}`}
             className="inline-block rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium">
             + Tạo lịch kỹ thuật cho ticket này
@@ -137,7 +142,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Chi phí & vật tư</h2>
-          <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={admin} />
+          <TicketItems code={t.ticket_code} items={items} catalog={catalog} choPhepSua={quyen.chiPhi} />
         </section>
       </div>
     </main>

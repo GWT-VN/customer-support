@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chuanHoaVaiTro, coQuyenQuanLy, kiemTraSuaNhanVien, laChiKyThuat, laKyThuat, laQuyenAdmin, laVaiTroHopLe } from './quyen'
+import { chuanHoaVaiTro, coQuyenQuanLy, kiemTraSuaNhanVien, laChiKyThuat, laKyThuat, laQuyenAdmin, laVaiTroHopLe } from './vai-tro'
 
 const NGUOI_SUA = 'admin-1'
 const NGUOI_KHAC = 'nv-2'

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireNhanSu } from '@/lib/supabase'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { manTuSinh, nenTang } from '../actions'
 import { TuSinh } from '@/components/work/TuSinh'
 

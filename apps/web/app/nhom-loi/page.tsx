@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { issueReport, ticketsChuaPhanNhom, goiYGomNhom } from '@/app/actions'
-import { laAdmin } from '@/lib/supabase'
+import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { MucDoBadge, BaoHangBadge } from '@/components/NhomLoiBadge'
 import { OTimKiem } from '@/bang'
 import { ThanhDangLoc } from '@/bang'
@@ -14,11 +14,11 @@ export default async function NhomLoiPage({
   const { bh, q = '', nguong } = await searchParams
   const baoHangOnly = bh === '1'
   const nguongGom = Math.min(5, Math.max(2, Number(nguong) || 3))
-  const [rows, chuaPhanNhom, goiY, admin] = await Promise.all([
+  const [rows, chuaPhanNhom, goiY, quyen] = await Promise.all([
     issueReport(baoHangOnly, q),
     ticketsChuaPhanNhom(q),
     goiYGomNhom(nguongGom),
-    laAdmin(),
+    hoiQuyen({ cauHinh: ['cs.nhom_loi.cau_hinh', 'QUANLY'] }),
   ])
 
   const anToan = rows.filter((r) => r.muc_do === 'an_toan')
@@ -29,7 +29,7 @@ export default async function NhomLoiPage({
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-slate-900">Nhóm lỗi</h1>
-          {admin && (
+          {quyen.cauHinh && (
             <Link href="/nhom-loi/moi" className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm font-medium">
               + Tạo nhóm lỗi
             </Link>
@@ -134,7 +134,7 @@ export default async function NhomLoiPage({
                 <h2 className="font-medium text-amber-900">💡 Gợi ý gom nhóm mới ({goiY.length})</h2>
                 <p className="text-sm text-amber-800">
                   Cụm từ lặp ở ≥{nguongGom} ticket <strong>chưa có nhóm</strong> — dấu hiệu nên lập nhóm để hệ tự gom về sau.
-                  {admin ? ' Bấm "Tạo nhóm" để mở form đã điền sẵn mẫu.' : ' (Chỉ admin tạo được nhóm.)'}
+                  {quyen.cauHinh ? ' Bấm "Tạo nhóm" để mở form đã điền sẵn mẫu.' : ' (Bạn không có quyền tạo nhóm lỗi.)'}
                 </p>
               </div>
               <div className="flex items-center gap-1 text-xs">
@@ -165,7 +165,7 @@ export default async function NhomLoiPage({
                       </Link>
                     ))}
                   </span>
-                  {admin && (
+                  {quyen.cauHinh && (
                     <Link
                       href={`/nhom-loi/moi?${new URLSearchParams({ goi_y: c.tu, ten: c.tu, tickets: c.tickets.join(',') })}`}
                       className="ml-auto rounded-lg bg-slate-900 text-white px-3 py-1 text-xs font-medium"

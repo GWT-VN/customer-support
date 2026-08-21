@@ -10,8 +10,9 @@
  * rồi dùng dataClient() (service_role, chỉ chạy trên server). Email lấy từ session
  * đã xác minh — KHÔNG bao giờ nhận email từ tham số client.
  */
-import { requireNhanSu, dataClient } from '@/lib/supabase'
-import { chuanHoaEmail } from '@/lib/auth'
+import { dataClient } from '@/lib/nen-tang/db'
+import { requireNhanSu } from '@/lib/nen-tang/phien'
+import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 import { revalidatePath } from 'next/cache'
 
 export type NguoiLam = { staff_id: string; ten: string; email: string; role: string }

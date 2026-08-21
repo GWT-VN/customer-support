@@ -1,4 +1,4 @@
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { baoTriDaMap, baoTriSapHet, boiCanhKhach } from '@/app/actions'
 import { BaoTriQuanLy } from '@/components/BaoTriQuanLy'
 
@@ -7,7 +7,7 @@ export default async function LenLichBaoTriPage({
 }: {
   searchParams: Promise<{ kh?: string }>
 }) {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.bao_tri.tao_plan', 'QUANLY')
   const { kh } = await searchParams
   const [daMap, sapHet] = await Promise.all([baoTriDaMap(), baoTriSapHet()])
   const moTaoKhach = kh ? { id: kh, ctx: await boiCanhKhach(kh) } : undefined

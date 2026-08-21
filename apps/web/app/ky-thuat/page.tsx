@@ -1,5 +1,5 @@
+import { chanNeuThieuQuyen } from '@/lib/nen-tang/kiem-quyen'
 import Link from 'next/link'
-import { chanNeuKhongPhaiQuanLy } from '@/lib/supabase'
 import { dsKyThuat, boiCanhKhach, type ViecInput } from '@/app/actions'
 import { KyThuatBang } from '@/components/KyThuatBang'
 
@@ -8,7 +8,7 @@ export default async function KyThuatPage({
 }: {
   searchParams: Promise<{ kh?: string; loai?: string; ref?: string; mota?: string; ngay?: string }>
 }) {
-  await chanNeuKhongPhaiQuanLy()
+  await chanNeuThieuQuyen('cs.ky_thuat.ho_so', 'QUANLY')
   const { kh, loai, ref, mota, ngay } = await searchParams
   const dsKt = await dsKyThuat()
 
