@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { dataClient } from '@/lib/nen-tang/db'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
+import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
 import {
   createSalesOrder,
   updateSalesOrder,
@@ -18,6 +19,7 @@ import {
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  isAppCustomer,
 } from './_db'
 import { tinhKhuyenMai, tongDon } from './_calc'
 import { cacBienThe, gomDanhSachTinh } from '@/lib/tinhGom'
@@ -887,77 +889,99 @@ export async function kiemTraSdt(phone: string) {
   return findCustomerByPhone(phone)
 }
 
+
+/**
+ * Bọc một thao tác GHI của Sales bằng nhật ký — ghi cả khi THÀNH CÔNG lẫn khi HỎNG.
+ *
+ * Vì sao phải ghi cả lúc hỏng (luật rút ra 22/08, phiên CSKH trả giá): đường ghi chỉ ghi
+ * nhật ký sau khi insert thành công thì lúc tính năng gãy, nó **không để lại dấu vết nào**
+ * — 0 dòng dữ liệu, 0 dòng nhật ký, im lặng tuyệt đối. Bên CSKH nút "thêm SĐT phụ" hỏng
+ * suốt một thời gian dài mà không ai biết, phải suy gián tiếp mới lần ra.
+ *
+ * Vì sao Sales cần gấp: lộ trình bỏ Google Sheet (§8, rủi ro 1) — Sheet đang là lưới an toàn
+ * vì Google giữ lịch sử phiên bản, ai lỡ tay còn khôi phục được. Bỏ Sheet là mất lưới đó,
+ * nên **nhật ký sửa/xoá đơn phải có TRƯỚC**, không làm sau.
+ *
+ * Nhật ký không bao giờ được làm hỏng thao tác chính: `ghiAudit` đã tự nuốt lỗi bên trong.
+ */
+async function ghiLai<T>(
+  hanhDong: string,
+  doiTuong: string,
+  chiTiet: Record<string, unknown>,
+  viec: () => Promise<T>
+): Promise<Kq<T extends object ? T : never> | { ok: false; error: string }> {
+  try {
+    const kq = await viec()
+    await ghiAudit(hanhDong, doiTuong, chiTiet)
+    return { ok: true, ...(kq as object) } as Kq<T extends object ? T : never>
+  } catch (e) {
+    const loi = e instanceof Error ? e.message : String(e)
+    await ghiAudit(hanhDong, doiTuong, { ...chiTiet, loi }, 'loi')
+    return { ok: false, error: loi }
+  }
+}
+
 export async function taoDon(input: NewOrderInput): Promise<Kq<{ order_code: string }>> {
   await chanSales()
   const err = validateOrder(input)
   if (err) return { ok: false, error: err }
-  try {
-    const res = await createSalesOrder(input, await emailHienTai())
-    revalidatePath('/sales')
-    return { ok: true, order_code: res.order_code }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
+  const kq = await ghiLai('sales_tao_don', '(mã cấp khi lưu)',
+    { khach: input.customer_code, so_dong: input.items.length },
+    async () => createSalesOrder(input, await emailHienTai()))
+  if (kq.ok) revalidatePath('/sales')
+  return kq
 }
 
 export async function suaDon(orderCode: string, input: NewOrderInput): Promise<Kq<{ order_code: string }>> {
   await chanSales()
   const err = validateOrder(input)
   if (err) return { ok: false, error: err }
-  try {
-    const res = await updateSalesOrder(orderCode, input)
+  const kq = await ghiLai('sales_sua_don', `don:${orderCode}`,
+    { so_dong: input.items.length },
+    () => updateSalesOrder(orderCode, input))
+  if (kq.ok) {
     revalidatePath('/sales')
     revalidatePath(`/sales/don/${orderCode}`)
-    return { ok: true, order_code: res.order_code }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+  return kq
 }
 
 export async function xoaDon(orderCode: string): Promise<Kq> {
   await chanSales()
-  try {
-    await deleteSalesOrder(orderCode)
-    revalidatePath('/sales')
-    return { ok: true }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
+  const kq = await ghiLai('sales_xoa_don', `don:${orderCode}`, {},
+    async () => { await deleteSalesOrder(orderCode); return {} })
+  if (kq.ok) revalidatePath('/sales')
+  return kq
 }
 
 export async function taoKhach(input: CustomerInput): Promise<Kq<{ customer_code: string }>> {
   await chanSales()
   if (!input.name?.trim() && !input.phone?.trim()) return { ok: false, error: 'Cần ít nhất Tên hoặc SĐT.' }
-  try {
-    const res = await createCustomer(input)
-    revalidatePath('/sales/khach')
-    return { ok: true, customer_code: res.customer_code }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
+  const kq = await ghiLai('sales_tao_khach', '(mã cấp khi lưu)',
+    { co_sdt: !!input.phone?.trim() },
+    () => createCustomer(input))
+  if (kq.ok) revalidatePath('/sales/khach')
+  return kq
 }
 
 export async function suaKhach(code: string, input: CustomerInput): Promise<Kq<{ customer_code: string }>> {
   await chanSales()
-  try {
-    await updateCustomer(code, input)
+  const kq = await ghiLai('sales_sua_khach', `khach:${code}`,
+    { tu_sheet: !isAppCustomer(code) },
+    async () => { await updateCustomer(code, input); return { customer_code: code } })
+  if (kq.ok) {
     revalidatePath('/sales/khach')
     revalidatePath(`/sales/khach/${code}`)
-    return { ok: true, customer_code: code }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+  return kq
 }
 
 export async function xoaKhach(code: string): Promise<Kq> {
   await chanSales()
-  try {
-    await deleteCustomer(code)
-    revalidatePath('/sales/khach')
-    return { ok: true }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
+  const kq = await ghiLai('sales_xoa_khach', `khach:${code}`, {},
+    async () => { await deleteCustomer(code); return {} })
+  if (kq.ok) revalidatePath('/sales/khach')
+  return kq
 }
 
 
