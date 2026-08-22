@@ -29,6 +29,24 @@ export type NguonGhi = 'cskh' | 'sales'
 export type KetQuaGhi = { ok: true; id: string } | { ok: false; error: string }
 
 /**
+ * Ghi nhật ký khi GHI HỎNG, rồi trả lỗi cho người gọi.
+ *
+ * Bài học trả giá 22/08/2026: mọi hàm ở đây chỉ ghi nhật ký SAU khi insert thành công. Khi DB
+ * chối giá trị app gửi (`role = 'khac'` không nằm trong CHECK), tính năng SĐT phụ hỏng suốt một
+ * thời gian dài mà **không để lại một dấu vết nào** — 0 dòng dữ liệu, 0 dòng nhật ký, im lặng
+ * tuyệt đối. Phải suy gián tiếp qua "đã có 3 lượt gộp khách chạy" mới dựng được bằng chứng.
+ *
+ * Có dòng "đã thử, lỗi X" thì phép kiểm *"bảng đáng lẽ có dòng mà đếm ra 0"* tự có đối chứng,
+ * không phải đi tìm. Rẻ lúc viết, đắt lúc điều tra ngược.
+ */
+async function ghiHong(
+  hanhDong: string, doiTuong: string, loi: string, chiTiet: Record<string, unknown> = {},
+): Promise<{ ok: false; error: string }> {
+  await ghiAudit(hanhDong, doiTuong, { ...chiTiet, loi }, 'loi')
+  return { ok: false, error: loi }
+}
+
+/**
  * KHOÁ của hai bảng vệ tinh là `ma_kh`, không phải `customer_id` (migration 22/08/2026).
  *
  * Vì sao: khách chỉ có bên Sales KHÔNG có hồ sơ CS nên không có `customer_id` nào để gắn —
@@ -91,7 +109,7 @@ export async function themDiaChiPhu(input: {
     })
     .select('id')
     .single()
-  if (error) return { ok: false, error: error.message }
+  if (error) return ghiHong('them_dia_chi_khach', `khach:${input.customer_id}`, error.message, { loai, nguon: input.nguon })
 
   await ghiAudit('them_dia_chi_khach', `khach:${input.customer_id}`, { loai, nguon: input.nguon })
   return { ok: true, id: (data as { id: string }).id }
@@ -103,7 +121,7 @@ export async function xoaDiaChiPhu(input: {
   nguon: NguonGhi
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const { error } = await dataClient().from('customer_addresses').delete().eq('id', input.id)
-  if (error) return { ok: false, error: error.message }
+  if (error) return ghiHong('xoa_dia_chi_khach', `khach:${input.customer_id}`, error.message, { nguon: input.nguon })
   await ghiAudit('xoa_dia_chi_khach', `khach:${input.customer_id}`, {
     dia_chi_id: input.id, nguon: input.nguon,
   })
@@ -179,7 +197,7 @@ export async function themSdtPhu(input: {
     })
     .select('id')
     .single()
-  if (error) return { ok: false, error: error.message }
+  if (error) return ghiHong('them_sdt_phu', `khach:${input.customer_id}`, error.message, { nguon: input.nguon })
 
   await ghiAudit('them_sdt_phu', `khach:${input.customer_id}`, {
     nguon: input.nguon, chuan_hoa_sdt: daChuanHoa,
@@ -213,7 +231,7 @@ export async function suaDiaChiPhu(input: {
       ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .eq('id', input.id)
-  if (error) return { ok: false, error: error.message }
+  if (error) return ghiHong('sua_dia_chi_khach', `khach:${input.customer_id}`, error.message, { nguon: input.nguon })
 
   await ghiAudit('sua_dia_chi_khach', `khach:${input.customer_id}`, {
     dia_chi_id: input.id, loai, nguon: input.nguon,
@@ -246,7 +264,7 @@ export async function suaSdtPhu(input: {
       ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .eq('id', input.id)
-  if (error) return { ok: false, error: error.message }
+  if (error) return ghiHong('sua_sdt_phu', `khach:${input.customer_id}`, error.message, { nguon: input.nguon })
 
   await ghiAudit('sua_sdt_phu', `khach:${input.customer_id}`, {
     lien_he_id: input.id, nguon: input.nguon,

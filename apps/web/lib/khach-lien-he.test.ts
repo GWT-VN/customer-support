@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chuanHoaLoaiDiaChi, dangLuuSdtPhu, LOAI_DIA_CHI } from './khach-lien-he'
+import { chuanHoaLoaiDiaChi, chuanHoaVaiTro, dangLuuSdtPhu, LOAI_DIA_CHI, VAI_TRO_LIEN_HE } from './khach-lien-he'
 
 describe('chuanHoaLoaiDiaChi', () => {
   it('giữ nguyên 4 loại hợp lệ', () => {
@@ -40,5 +40,35 @@ describe('dangLuuSdtPhu', () => {
     expect(dangLuuSdtPhu('   ')).toBeNull()
     expect(dangLuuSdtPhu(null)).toBeNull()
     expect(dangLuuSdtPhu(undefined)).toBeNull()
+  })
+})
+
+describe('chuanHoaVaiTro', () => {
+  it('giữ nguyên đúng 5 vai trò DB nhận', () => {
+    for (const v of VAI_TRO_LIEN_HE) expect(chuanHoaVaiTro(v)).toBe(v)
+  })
+
+  // Đây là LỖI THẬT đã làm tính năng SĐT phụ không chạy nổi lần nào trên production:
+  // app gửi 'khac' (bắt chước customer_addresses.loai vốn tiếng Việt), còn
+  // customer_contacts_role_check chỉ nhận 5 giá trị tiếng Anh ⇒ DB chối, không ai biết.
+  it("'khac' — giá trị app cũ gửi — phải về 'other', không được lọt xuống DB", () => {
+    expect(chuanHoaVaiTro('khac')).toBe('other')
+    expect(VAI_TRO_LIEN_HE).not.toContain('khac')
+  })
+
+  it('giá trị lạ khác cũng về other, không ném lỗi (thà xếp nhầm nhóm còn hơn mất số khách)', () => {
+    expect(chuanHoaVaiTro('chu_nha')).toBe('other')
+    expect(chuanHoaVaiTro('OWNER')).toBe('other')   // phân biệt hoa/thường, đúng như DB
+  })
+
+  it('trống -> null: không có vai trò khác với vai trò "khác"', () => {
+    expect(chuanHoaVaiTro('')).toBeNull()
+    expect(chuanHoaVaiTro('   ')).toBeNull()
+    expect(chuanHoaVaiTro(null)).toBeNull()
+    expect(chuanHoaVaiTro(undefined)).toBeNull()
+  })
+
+  it('bỏ khoảng trắng thừa', () => {
+    expect(chuanHoaVaiTro('  helper  ')).toBe('helper')
   })
 })
