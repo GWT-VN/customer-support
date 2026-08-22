@@ -220,9 +220,16 @@ export async function themBinhLuan(taskId: number, body: string): Promise<KQ<voi
 
 // ── Gắn khách / ticket / đơn ────────────────────────────────────────────────
 
-/** Gợi ý để chọn. Trả tối đa 8 dòng; dưới 2 ký tự thì không tìm. */
-export async function timErp(loai: string, tuKhoa: string): Promise<KQ<GoiYErp[]>> {
-  return boc(() => goi<GoiYErp[]>('work_tim_erp', { p_loai: loai, p_tu_khoa: tuKhoa }))
+/**
+ * Gợi ý để chọn. Trả tối đa 8 dòng; dưới 2 ký tự thì không tìm.
+ *
+ * Truyền `taskId` để RPC thu hẹp ticket/đơn về đúng khách việc đó đã gắn — chọn
+ * khách rồi mà vẫn phải lội qua 428 đơn của mọi người là vô nghĩa.
+ */
+export async function timErp(loai: string, tuKhoa: string, taskId?: number): Promise<KQ<GoiYErp[]>> {
+  return boc(() => goi<GoiYErp[]>('work_tim_erp', {
+    p_loai: loai, p_tu_khoa: tuKhoa, p_task_id: taskId ?? null,
+  }))
 }
 
 export type GoiYErp = { ma: string; nhan: string; phu: string | null }

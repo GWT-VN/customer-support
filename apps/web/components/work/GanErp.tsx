@@ -16,7 +16,7 @@ import Link from 'next/link'
 import { OChonTimXa } from '@/bang'
 import type { MucChon } from '@/bang'
 import { timErp, ganErp, boErp, type KQ } from '@/app/work/actions'
-import { NHAN_LOAI_LINK, duongDanLink, type LienKet, type LoaiLink } from '@/lib/work'
+import { NHAN_LOAI_LINK, duongDanLink, nhanChip, type LienKet, type LoaiLink } from '@/lib/work'
 
 const LOAI: LoaiLink[] = ['khach', 'ticket', 'don']
 
@@ -43,8 +43,10 @@ export function GanErp({
     chay(() => ganErp(taskId, loai, ma))
   }
 
+  const khachDaGan = links.find((l) => l.loai === 'khach')
+
   async function timTheoLoai(loai: LoaiLink, tuKhoa: string): Promise<MucChon[]> {
-    const kq = await timErp(loai, tuKhoa)
+    const kq = await timErp(loai, tuKhoa, taskId)
     if (!kq.ok) throw new Error(kq.loi ?? 'Không tìm được')
     return kq.duLieu.map((g) => ({ gt: g.ma, nhan: g.nhan, phu: g.phu ?? undefined }))
   }
@@ -58,13 +60,15 @@ export function GanErp({
       {links.length > 0 && (
         <ul className="list-none p-0 m-0 flex flex-wrap gap-1.5">
           {links.map((l) => {
-            const href = duongDanLink(l)
+            const { ten, treo, giaiThich } = nhanChip(l)
+            const href = treo ? null : duongDanLink(l)
             const noiDung = (
               <>
                 <span style={{ fontSize: 10.5, fontWeight: 700, opacity: .65, textTransform: 'uppercase' }}>
                   {NHAN_LOAI_LINK[l.loai]}
                 </span>
-                <span style={{ fontWeight: 550 }}>{l.nhan}</span>
+                <span style={{ fontWeight: 550, textDecoration: treo ? 'line-through' : undefined }}>{ten}</span>
+                {treo && <span style={{ fontSize: 10.5, opacity: .7 }}>· đã gộp/xoá</span>}
               </>
             )
             return (
@@ -77,19 +81,24 @@ export function GanErp({
                   }}
                 >
                   {href ? (
-                    <Link href={href} className="inline-flex items-center gap-1.5" style={{ color: 'var(--accent-ink)' }}>
+                    <Link
+                      href={href}
+                      title={l.phu ?? undefined}
+                      className="inline-flex items-center gap-1.5"
+                      style={{ color: 'var(--accent-ink)' }}
+                    >
                       {noiDung}
                     </Link>
                   ) : (
                     // Mã treo: giữ chip để không mất dấu, nhưng nói rõ vì sao không bấm được.
-                    <span className="inline-flex items-center gap-1.5" title="Bản ghi này không còn trong hệ thống">
+                    <span className="inline-flex items-center gap-1.5" title={giaiThich ?? l.phu ?? undefined}>
                       {noiDung}
                     </span>
                   )}
                   {coTheSua && (
                     <button
                       type="button"
-                      aria-label={`Bỏ gắn ${NHAN_LOAI_LINK[l.loai]} ${l.nhan}`}
+                      aria-label={`Bỏ gắn ${NHAN_LOAI_LINK[l.loai]} ${ten}`}
                       title="Bỏ gắn"
                       disabled={pending}
                       onClick={() => chay(() => boErp(l.id))}
@@ -128,6 +137,13 @@ export function GanErp({
             ))}
           </div>
 
+          {dangThem && khachDaGan && dangThem !== 'khach' && (
+            // Không nói ra thì "tìm mãi không thấy ticket" trông y như phần mềm hỏng.
+            <p className="m-0" style={{ fontSize: 11, color: 'var(--faint)' }}>
+              Chỉ tìm trong {NHAN_LOAI_LINK[dangThem].toLowerCase()} của khách{' '}
+              <b style={{ fontWeight: 600 }}>{nhanChip(khachDaGan).ten}</b> — bỏ chip khách để tìm rộng hơn.
+            </p>
+          )}
           {dangThem && (
             <OChonTimXa
               key={dangThem}

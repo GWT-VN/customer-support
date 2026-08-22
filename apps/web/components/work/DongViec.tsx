@@ -8,7 +8,7 @@
  * Ô tick và ô trạng thái ghi thẳng; phần thân bấm vào là mở panel chi tiết.
  */
 import type { NguoiLam } from '@/app/work/actions'
-import { TRANG_THAI, NHAN_VAI_TRO, nhanHan, catChip, NHAN_LOAI_LINK, type LienKet } from '@/lib/work'
+import { TRANG_THAI, NHAN_VAI_TRO, nhanHan, catChip, nhanChip, NHAN_LOAI_LINK, type LienKet } from '@/lib/work'
 import { Chip, ChongAvatar, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
 
 export type ViecHienThi = {
@@ -110,14 +110,21 @@ export function DongViec({
               nhét <a> vào trong <button> là HTML không hợp lệ. Bấm sang hồ sơ thì
               làm trong panel, nơi chip là thẻ <a> thật.
             */}
-            {chip.hien.map((l) => (
-              <Chip key={l.id}>
-                <span style={{ fontSize: 10, fontWeight: 700, opacity: .6, textTransform: 'uppercase' }}>
-                  {NHAN_LOAI_LINK[l.loai]}
-                </span>
-                <span className="truncate" style={{ maxWidth: 150 }}>{l.nhan}</span>
-              </Chip>
-            ))}
+            {chip.hien.map((l) => {
+              const { ten, treo, giaiThich } = nhanChip(l)
+              return (
+                <Chip key={l.id}>
+                  <span style={{ fontSize: 10, fontWeight: 700, opacity: .6, textTransform: 'uppercase' }}>
+                    {NHAN_LOAI_LINK[l.loai]}
+                  </span>
+                  <span
+                    className="truncate"
+                    title={giaiThich ?? undefined}
+                    style={{ maxWidth: 150, textDecoration: treo ? 'line-through' : undefined }}
+                  >{ten}</span>
+                </Chip>
+              )
+            })}
             {chip.du > 0 && (
               <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--faint)' }}>+{chip.du}</span>
             )}
