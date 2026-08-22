@@ -8,7 +8,7 @@ import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
-import { themSdtPhu, themDiaChiPhu, xoaDiaChiPhu } from '@/lib/khach-lien-he'
+import { themSdtPhu, themDiaChiPhu, xoaDiaChiPhu, suaDiaChiPhu, suaSdtPhu } from '@/lib/khach-lien-he'
 import { coQuyen, doQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
@@ -557,7 +557,7 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
 }
 
 export type DiaChiKhach = {
-  id: string; dia_chi: string; loai: string; ghi_chu: string | null; created_at: string
+  id: string; dia_chi: string; loai: string; tinh: string | null; ghi_chu: string | null; created_at: string
 }
 
 /** Địa chỉ phụ của khách (migration 48) — nhà / công ty / lắp đặt. */
@@ -565,20 +565,46 @@ export async function diaChiCuaKhach(customerId: string): Promise<DiaChiKhach[]>
   await requireStaff()
   await doQuyen('cs.khach.xem')
   const { data, error } = await dataClient().from('customer_addresses')
-    .select('id, dia_chi, loai, ghi_chu, created_at')
+    .select('id, dia_chi, loai, tinh, ghi_chu, created_at')
     .eq('customer_id', customerId).order('created_at')
   if (error) throw new Error(error.message)
   return (data ?? []) as DiaChiKhach[]
 }
 
 export async function themDiaChiKhach(
-  customerId: string, dia_chi: string, loai: string, ghi_chu?: string
+  customerId: string, dia_chi: string, loai: string, ghi_chu?: string, tinh?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
   await doQuyen('cs.khach.sua')
   const kq = await themDiaChiPhu({
-    customer_id: customerId, dia_chi, loai, ghi_chu, nguon: 'cskh',
+    customer_id: customerId, dia_chi, loai, tinh, ghi_chu, nguon: 'cskh',
   })
+  if (!kq.ok) return { ok: false, error: kq.error }
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+/** Sửa một địa chỉ phụ. CEO chốt 22/08: địa chỉ phụ và SĐT phụ phải SỬA được, không chỉ thêm/xoá. */
+export async function suaDiaChiKhachAction(
+  id: string, customerId: string,
+  patch: { dia_chi: string; loai: string; tinh?: string; ghi_chu?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  await doQuyen('cs.khach.sua')
+  const kq = await suaDiaChiPhu({ id, customer_id: customerId, ...patch, nguon: 'cskh' })
+  if (!kq.ok) return { ok: false, error: kq.error }
+  revalidatePath(`/khach/${customerId}`)
+  return { ok: true }
+}
+
+/** Sửa một SĐT phụ / người liên hệ. */
+export async function suaLienHe(
+  id: string, customerId: string,
+  patch: { phone?: string; contact_name?: string; role?: string; zalo_ok?: boolean },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  await doQuyen('cs.khach.sua')
+  const kq = await suaSdtPhu({ id, customer_id: customerId, ...patch, nguon: 'cskh' })
   if (!kq.ok) return { ok: false, error: kq.error }
   revalidatePath(`/khach/${customerId}`)
   return { ok: true }

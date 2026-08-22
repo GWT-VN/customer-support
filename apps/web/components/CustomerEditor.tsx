@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addContact, deleteContact, updateCustomer, xoaKhach, type Contact, type Customer } from '@/app/actions'
+import { addContact, deleteContact, suaLienHe, updateCustomer, xoaKhach, type Contact, type Customer } from '@/app/actions'
 import { ChonTinh } from '@/components/ChonTinh'
 import { canhBaoSdt } from '@/lib/sdt'
 
@@ -41,6 +41,19 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
 
   // form thêm SĐT phụ
   const [np, setNp] = useState({ phone: '', contact_name: '', role: 'helper', zalo_ok: true })
+  /** id liên hệ đang sửa tại chỗ; null = không sửa dòng nào. CEO 22/08: SĐT phụ phải SỬA được. */
+  const [suaLh, setSuaLh] = useState<string | null>(null)
+  const [lh, setLh] = useState({ phone: '', contact_name: '', role: 'other', zalo_ok: false })
+  const [busyLh, setBusyLh] = useState(false)
+
+  async function luuLienHe() {
+    if (!suaLh) return
+    setBusyLh(true); setErr(null)
+    const r = await suaLienHe(suaLh, c.id, lh)
+    setBusyLh(false)
+    if (!r.ok) { setErr(r.error); return }
+    setSuaLh(null); setMsg('Đã lưu SĐT phụ.'); router.refresh()
+  }
   async function add() {
     if (!np.phone.trim()) { setErr('Nhập SĐT đã.'); return }
     setBusy(true); setErr(null)
@@ -164,14 +177,47 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
           <ul className="divide-y border rounded-lg">
             {contacts.map((ct) => (
               <li key={ct.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                {suaLh === ct.id ? (
+                  <span className="flex flex-1 flex-wrap items-center gap-2">
+                    <input value={lh.phone} onChange={(e) => setLh({ ...lh, phone: e.target.value })}
+                      placeholder="SĐT" className="w-36 rounded border px-2 py-1 font-mono text-sm" />
+                    <input value={lh.contact_name} onChange={(e) => setLh({ ...lh, contact_name: e.target.value })}
+                      placeholder="Tên người nghe" className="w-40 rounded border px-2 py-1 text-sm" />
+                    <select value={lh.role} onChange={(e) => setLh({ ...lh, role: e.target.value })}
+                      className="rounded border bg-white px-2 py-1 text-sm">
+                      {Object.entries(ROLES).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                    </select>
+                    <label className="flex items-center gap-1 text-xs text-slate-600">
+                      <input type="checkbox" checked={lh.zalo_ok}
+                        onChange={(e) => setLh({ ...lh, zalo_ok: e.target.checked })} />
+                      Dùng Zalo
+                    </label>
+                    <button onClick={luuLienHe} disabled={busyLh}
+                      className="rounded bg-slate-900 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50">
+                      {busyLh ? '…' : 'Lưu'}
+                    </button>
+                    <button onClick={() => setSuaLh(null)} className="text-xs text-slate-500 underline">huỷ</button>
+                  </span>
+                ) : (
                 <span>
                   <span className="font-mono">{ct.phone}</span>
                   {ct.contact_name && <span className="text-slate-600"> · {ct.contact_name}</span>}
                   <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                     {ROLES[ct.role ?? 'other'] ?? ct.role}
                   </span>
-                  {!ct.zalo_ok && <span className="ml-1 text-xs text-slate-400">(không Zalo)</span>}
+                  {/* Nói RÕ CẢ HAI CHIỀU. Trước đây chỉ hiện khi KHÔNG có Zalo, nên nhìn dòng
+                      trống người dùng không biết là "có Zalo" hay "chưa ai điền" — CEO 22/08. */}
+                  {ct.zalo_ok
+                    ? <span className="ml-1 rounded bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-700">Zalo</span>
+                    : <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">không Zalo</span>}
+                  <button
+                    onClick={() => { setErr(null); setSuaLh(ct.id); setLh({
+                      phone: ct.phone ?? '', contact_name: ct.contact_name ?? '',
+                      role: ct.role ?? 'other', zalo_ok: ct.zalo_ok,
+                    }) }}
+                    className="ml-3 text-xs text-sky-700 underline">sửa</button>
                 </span>
+                )}
                 <button
                   onClick={async () => {
                     if (!window.confirm('Gửi yêu cầu xoá liên hệ này? (admin duyệt mới xoá)')) return

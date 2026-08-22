@@ -3,9 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ganKenh, type Kenh } from '@/app/actions'
+import { ChonKenh } from '@/components/ChonKenh'
 
-/** Gắn khách vào 1 kênh/đối tác (đại lý/KTS/KOL…). Taxonomy dim_channel do Sales quản,
- *  CSKH chỉ chọn. Nhóm option theo channel_l1. */
+/**
+ * Gắn khách vào 1 kênh/đối tác (đại lý/KTS/KOL…). Danh mục `dim_channel` do Sales quản,
+ * CSKH chỉ chọn.
+ *
+ * Ô chọn dùng CHUNG `ChonKenh` — cùng một component với màn tạo khách và màn tạo đơn của Sales.
+ * CEO chốt 22/08/2026: *"thống nhất app global, các chỗ cho chọn kênh đều chia 2 cấp giống nhau
+ * hết, sửa 1 chỗ apply all các chỗ khác logic như nhau"*.
+ */
 export function GanKenh({
   customerId, channelId, kenh,
 }: { customerId: string; channelId: number | null; kenh: Kenh[] }) {
@@ -14,11 +21,6 @@ export function GanKenh({
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const nhom = new Map<string, Kenh[]>()
-  for (const k of kenh) {
-    const g = nhom.get(k.channel_l1) ?? []
-    g.push(k); nhom.set(k.channel_l1, g)
-  }
 
   async function doi(v: string) {
     setVal(v); setBusy(true); setMsg(null)
@@ -29,18 +31,15 @@ export function GanKenh({
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <select value={val} onChange={(e) => doi(e.target.value)} disabled={busy}
-        className="rounded-lg border px-3 py-1.5 text-sm bg-white text-slate-900">
-        <option value="">— Chưa gắn kênh —</option>
-        {[...nhom.entries()].map(([l1, ks]) => (
-          <optgroup key={l1} label={l1}>
-            {ks.map((k) => (
-              <option key={k.id} value={k.id}>{k.channel_l2 ? `${l1} · ${k.channel_l2}` : l1}</option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Dùng CHUNG `ChonKenh` với màn tạo khách và màn tạo đơn. CEO chốt 22/08: "thống nhất app
+          global, các chỗ cho chọn kênh đều chia 2 cấp giống nhau hết, sửa 1 chỗ apply all".
+          Trước đây chỗ này là một `<select>` phẳng 26 mục — vừa lệch với màn khác, vừa vi phạm
+          luật ">10 mục phải gõ để tìm". */}
+      <div className="min-w-[320px] flex-1">
+        <ChonKenh kenh={kenh} value={val} onChange={doi} />
+      </div>
+      {busy && <span className="text-xs text-slate-400">Đang lưu…</span>}
       {msg && <span className="text-xs text-slate-500">{msg}</span>}
     </div>
   )
