@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import { listKhachHang, khoaTatCaKhachHang, exportCuaToi, listBangView, kenhChon } from '@/app/actions'
+import Link from 'next/link'
+import { listKhachHang, khoaTatCaKhachHang, exportCuaToi, listBangView, kenhChon, demKhachThieuSdt } from '@/app/actions'
 import { ExportKhachButton } from '@/components/ExportKhachButton'
 import { ThaoTacHangLoat } from '@/components/ThaoTacHangLoat'
 import { BangKhach } from '@/components/BangKhach'
@@ -13,14 +14,15 @@ import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 export default async function KhachHangPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string }>
+  searchParams: Promise<{ q?: string; trang?: string; cot?: string; chieu?: string; thieu_sdt?: string }>
 }) {
-  const { q = '', trang: trangRaw, cot, chieu } = await searchParams
+  const { q = '', trang: trangRaw, cot, chieu, thieu_sdt } = await searchParams
+  const locThieuSdt = thieu_sdt === '1'
   const trang = Math.max(1, Number(trangRaw) || 1)
   // Ba nút, ba quyền khác nhau — trước đây gom vào laQuanLy/laAdmin nên tick lại
   // ma trận là nút hiện sai. Cặp (mã quyền, luật cũ) khớp y hệt Server Action.
-  const [{ rows: list, tong, soTrang, sapXep }, quyen, exportDuyet, views, kenh] = await Promise.all([
-    listKhachHang(q, { trang, cot, chieu }),
+  const [{ rows: list, tong, soTrang, sapXep }, quyen, exportDuyet, views, kenh, soThieuSdt] = await Promise.all([
+    listKhachHang(q, { trang, cot, chieu, thieuSdt: locThieuSdt }),
     hoiQuyen({
       hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
       xoaHangLoat: ['cs.khach.xoa_hang_loat', 'ADMIN'],
@@ -29,6 +31,7 @@ export default async function KhachHangPage({
     exportCuaToi(),
     listBangView('cs_customers'),
     kenhChon(),
+    demKhachThieuSdt(),
   ])
 
   return (
@@ -42,8 +45,29 @@ export default async function KhachHangPage({
           <OTimKiem placeholder="Gõ tên khách, SĐT…" />
         </Suspense>
 
+        {/* Chip lọc "Cần xin lại SĐT" — CEO chốt 22/08: cho tạo khách không SĐT, đổi lại phải
+            có chỗ lọc ra danh sách phải gọi xin số. Hiện SỐ ngay trên chip để CS thấy mà làm,
+            chứ chip trống thì không ai bấm. */}
+        {(soThieuSdt > 0 || locThieuSdt) && (
+          <div className="flex">
+            <Link
+              href={locThieuSdt ? '/khach-hang' : '/khach-hang?thieu_sdt=1'}
+              prefetch={false}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                locThieuSdt
+                  ? 'bg-amber-600 text-white'
+                  : 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}
+            >
+              {locThieuSdt ? '✕ Bỏ lọc · ' : '☎ '}Cần xin lại SĐT ({soThieuSdt})
+            </Link>
+          </div>
+        )}
+
         <ThanhDangLoc
-          dieuKien={q ? [{ nhan: 'Từ khoá', giaTri: q }] : []}
+          dieuKien={[
+            ...(q ? [{ nhan: 'Từ khoá', giaTri: q }] : []),
+            ...(locThieuSdt ? [{ nhan: 'Lọc', giaTri: 'Cần xin lại SĐT' }] : []),
+          ]}
           hienThi={list.length}
           tong={tong}
           nhan="khách"

@@ -3345,14 +3345,26 @@ export async function taoKhachChoDuyet(input: {
   const ten = input.full_name?.trim()
   if (!ten) return { ok: false, error: 'Nhập tên khách.' }
 
-  // SĐT BẮT BUỘC + đúng định dạng (khách mới). Rào thật ở server, không chỉ UI.
+  // SĐT KHÔNG còn bắt buộc — CEO chốt 22/08/2026: *"cho tạo KH không có số điện thoại
+  // (nhưng có cảnh báo các khách cần xin lại SĐT sớm)"*.
+  // Lý do: ca thật là khách gọi tới hỏi, CS cần mở hồ sơ ngay để ghi việc, chưa kịp xin số.
+  // Bắt buộc SĐT thì CS hoặc bỏ không tạo (mất dấu khách), hoặc **gõ số bừa cho qua** — cái sau
+  // tệ hơn hẳn vì số rác trông y như số thật.
+  // Đổi lại, hồ sơ thiếu số bị đánh dấu `needs_phone` và lọc ra được ở bảng khách.
+  // CÓ gõ số thì vẫn phải đúng định dạng — nhận số sai còn tệ hơn để trống.
+  const coGoSdt = Boolean((input.primary_phone ?? '').trim())
   const { chuan, cuoi9, hopLe } = chuanHoaSdt(input.primary_phone ?? '')
-  if (!hopLe) return { ok: false, error: 'SĐT bắt buộc và phải đúng định dạng (vd 0xxxxxxxxx).' }
+  if (coGoSdt && !hopLe) {
+    return { ok: false, error: 'SĐT không đúng định dạng (vd 0xxxxxxxxx). Bỏ trống cũng được — hồ sơ sẽ vào danh sách cần xin lại số.' }
+  }
 
   const db = dataClient()
-  // Chống trùng: SĐT đã có ở khách CS -> KHÔNG tạo bản mới, trả id để UI chọn luôn.
-  const { data: trung } = await db.from('cs_customers')
-    .select('id').neq('trang_thai', 'da_xoa').ilike('primary_phone', `%${cuoi9}`).limit(1)
+  // Chống trùng chỉ chạy khi CÓ số — không số thì không có gì để so, và mọi hồ sơ thiếu số
+  // sẽ khớp lẫn nhau nếu so bằng chuỗi rỗng.
+  const { data: trung } = coGoSdt
+    ? await db.from('cs_customers')
+        .select('id').neq('trang_thai', 'da_xoa').ilike('primary_phone', `%${cuoi9}`).limit(1)
+    : { data: null }
   if (trung && trung.length) {
     return {
       ok: false, existingId: (trung[0] as { id: string }).id,
@@ -3361,12 +3373,14 @@ export async function taoKhachChoDuyet(input: {
   }
 
   // Khách chung với Sales? -> lấy customer_code để liên kết (tái dùng hồ sơ Sales).
-  const { data: sa } = await db.from('customers')
-    .select('customer_code').eq('phone_no0', cuoi9).limit(1)
+  // Không có số thì không tra được — bỏ qua, hồ sơ vẫn tạo bình thường.
+  const { data: sa } = coGoSdt
+    ? await db.from('customers').select('customer_code').eq('phone_no0', cuoi9).limit(1)
+    : { data: null }
   const customerCode = sa && sa.length ? (sa[0] as { customer_code: string | null }).customer_code : null
 
   const { data, error } = await db.from('cs_customers').insert({
-    full_name: ten, primary_phone: chuan,
+    full_name: ten, primary_phone: coGoSdt ? chuan : null,
     address: input.address?.trim() || null, province: input.province?.trim() || null,
     customer_code: customerCode,
     // `source` là dấu vết HỆ THỐNG (đợt import / đường tạo), không phải kênh bán
@@ -3375,7 +3389,8 @@ export async function taoKhachChoDuyet(input: {
     channel_id: input.channel_id ?? null,
     // Tạo thẳng (đã duyệt): rác lớn nhất (SĐT sai/trùng) đã chặn ngay lúc tạo nên
     // không cần hàng chờ duyệt cho khách mới. Sửa/xoá khách vẫn qua duyệt như cũ.
-    trang_thai: 'da_duyet', needs_phone: false,
+    // `needs_phone` = cờ "cần xin lại SĐT". Bảng khách lọc theo cờ này ra danh sách CS phải gọi.
+    trang_thai: 'da_duyet', needs_phone: !coGoSdt,
     notes: input.notes?.trim() || null,
     ten_cty: input.ten_cty?.trim() || null,
     mst: input.mst?.trim() || null,
@@ -3954,7 +3969,7 @@ export async function listToFix(
 /** Danh sách KHÁCH HÀNG tổng (tất cả khách, trừ da_xoa) — trang /khach-hang. */
 export async function listKhachHang(
   q = '',
-  tuyChon: TuyChonDanhSach = {}
+  tuyChon: TuyChonDanhSach & { thieuSdt?: boolean } = {}
 ): Promise<KetQuaTrang<Customer & { machines: number }>> {
   await requireStaff()
   await doQuyen('cs.khach.xem')
@@ -3967,6 +3982,10 @@ export async function listKhachHang(
   let truyVan = db.from('cs_customers').select('*', { count: 'exact' }).neq('trang_thai', 'da_xoa')
   const kw = antoanChoOr(chuanHoaTuKhoa(q))
   if (kw) truyVan = truyVan.or(`ten_kd.imatch.${mauDauTu(kw)},primary_phone.ilike.%${kw}%`)
+  // "Cần xin lại SĐT" — CEO chốt 22/08: cho tạo khách không SĐT, đổi lại phải LỌC RA được
+  // danh sách phải gọi xin số. Bắt cả hồ sơ trống số lẫn hồ sơ bị cờ `needs_phone`
+  // (số sai định dạng từ đợt import cũ) — với CS thì hai ca đó cùng một việc phải làm.
+  if (tuyChon.thieuSdt) truyVan = truyVan.or('primary_phone.is.null,needs_phone.is.true')
 
   const { data, error, count } = await truyVan
     .order(sx.cot, { ascending: sx.tang, nullsFirst: false }).order('id', { ascending: true })
@@ -4577,10 +4596,13 @@ export type DonDaiLy = {
 export async function donDaiLyChon(): Promise<DonDaiLy[]> {
   await requireStaff()
   await doQuyen('cs.may.kich_hoat_bh')
+  // CEO chốt 22/08: "đại lý" ở đây gồm CẢ KTS và KOL (Hannah), không chỉ kênh tên 'Đại lý'.
+  // Đo prod 22/08: lọc mỗi 'Đại lý' ra 27 đơn, gộp cả ba kênh ra 130 — tức bản cũ giấu mất
+  // 100 đơn KOL (riêng Hannah 65) và 10 đơn KTS. CS không tìm thấy đơn nên không gắn được máy nào.
   const { data, error } = await dataClient()
     .from('sales_order_lines')
-    .select('order_code, channel_detail, order_date, customer_name, product_name')
-    .eq('channel', 'Đại lý')
+    .select('order_code, channel, channel_detail, order_date, customer_name, product_name')
+    .in('channel', ['Đại lý', 'KTS', 'KOL'])
     .order('order_date', { ascending: false, nullsFirst: false })
   if (error) throw new Error(error.message)
 
@@ -4590,7 +4612,9 @@ export async function donDaiLyChon(): Promise<DonDaiLy[]> {
     if (!ma || gom.has(ma)) continue
     gom.set(ma, {
       order_code: ma,
-      dai_ly: r.channel_detail ?? '(không rõ đại lý)',
+      // Kèm kênh cấp 1 vào nhãn: có tên trùng nhau giữa các kênh (Hannah vừa là KOL vừa dính
+      // vài đơn ghi kênh Trực tiếp), CS phải nhìn ra đang chọn đơn thuộc kênh nào.
+      dai_ly: [r.channel, r.channel_detail].filter(Boolean).join(' › ') || '(không rõ đại lý)',
       ngay: r.order_date,
       khach_tren_don: r.customer_name,
       mat_hang: r.product_name,
@@ -4656,4 +4680,15 @@ export async function daiLyCuaMay(serial: string): Promise<{
     .from('installed_base').select('dai_ly_ten, dai_ly_don').eq('serial', serial).maybeSingle()
   const r = data as { dai_ly_ten: string | null; dai_ly_don: string | null } | null
   return { dai_ly_ten: r?.dai_ly_ten ?? null, dai_ly_don: r?.dai_ly_don ?? null }
+}
+
+/** Đếm khách CẦN XIN LẠI SĐT — để chip lọc hiện số ngay, CS thấy mà làm. */
+export async function demKhachThieuSdt(): Promise<number> {
+  await requireStaff()
+  await doQuyen('cs.khach.xem')
+  const { count } = await dataClient()
+    .from('cs_customers').select('id', { count: 'exact', head: true })
+    .neq('trang_thai', 'da_xoa')
+    .or('primary_phone.is.null,needs_phone.is.true')
+  return count ?? 0
 }
