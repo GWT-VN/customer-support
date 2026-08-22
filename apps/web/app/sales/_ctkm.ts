@@ -154,3 +154,24 @@ export function capGiaVaPct(
   // Làm tròn 1 chữ số thập phân: 179.950.000 -> 112.000.000 ra 37,8% chứ không phải 37,76537…
   return { pct: Math.round((1 - v / ny) * 1000) / 10, gia: Math.round(v) }
 }
+
+const vndCt = new Intl.NumberFormat('vi-VN')
+
+/** Nhãn mức giảm cho danh sách: "Giảm 12%" · "Giảm 5.000.000 ₫" · "Giá còn 29.900.000 ₫". */
+export function nhanKieuGiam(kieu: KieuGiam, muc: number | null | undefined): string {
+  if (muc == null || !Number.isFinite(Number(muc))) return 'Chưa đặt mức giảm'
+  const m = Number(muc)
+  if (kieu === 'PCT') return `Giảm ${m}%`
+  if (kieu === 'TIEN') return `Giảm ${vndCt.format(Math.round(m))} ₫`
+  return `Giá còn ${vndCt.format(Math.round(m))} ₫`
+}
+
+export const NHAN_NHOM_KHACH: Record<string, string> = {
+  TAT_CA: 'Tất cả khách lẻ',
+  MOI: 'Chỉ khách mới',
+  DA_MUA: 'Chỉ khách đã mua',
+  CHI_DINH: 'Danh sách chỉ định',
+}
+export function nhanNhomKhach(ma: string): string {
+  return NHAN_NHOM_KHACH[ma] ?? ma
+}
