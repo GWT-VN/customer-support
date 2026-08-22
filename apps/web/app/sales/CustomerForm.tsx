@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { TINH_VN } from '@/lib/tinh'
+import { ChonTinh } from '@/components/ChonTinh'
 import { taoKhach, suaKhach, kiemTraSdt } from './actions'
 import type { CustomerInput } from './_types'
 
@@ -91,11 +91,7 @@ export function CustomerForm({
           )}
         </div>
         <div><label className={lbl}>Tỉnh / TP</label>
-          <select className={inp} value={province} onChange={(e) => setProvince(e.target.value)}>
-            <option value="">— chọn —</option>
-            {province && !TINH_VN.includes(province) && <option value={province}>{province} (cũ)</option>}
-            {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <ChonTinh value={province} onChange={setProvince} className={inp} />
         </div>
         <div><label className={lbl}>Địa chỉ</label><input className={inp} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
         <div><label className={lbl}>Công ty (xuất HĐ)</label><input className={inp} value={company} onChange={(e) => setCompany(e.target.value)} /></div>

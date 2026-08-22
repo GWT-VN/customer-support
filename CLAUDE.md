@@ -124,8 +124,10 @@ npx --prefix apps/web tsc --noEmit
 
 Dựng máy từ 0: `docs/ONBOARDING-DEV.md` · DB local: `docs/LOCAL-DEV.md`.
 
-⚠️ Viết **filter / tìm kiếm / sắp xếp / phân trang** ở BẤT KỲ khu nào → đọc
-[`docs/CHUAN-FILTER.md`](docs/CHUAN-FILTER.md) TRƯỚC. Gói dùng chung nằm ở `apps/web/bang/`;
+⚠️ Viết **filter / tìm kiếm / sắp xếp / phân trang / ô chọn** ở BẤT KỲ khu nào → đọc
+[`docs/CHUAN-FILTER.md`](docs/CHUAN-FILTER.md) TRƯỚC. Luật CEO chốt 22/08: **danh sách chọn
+quá 10 mục thì phải cho GÕ ĐỂ TÌM**, không để `<select>` trần — dùng `BoLocGoiY` (ô lọc)
+hoặc `OChonGoiY` (ô nhập trong form). Gói dùng chung nằm ở `apps/web/bang/`;
 thêm kiểu lọc mới thì thêm vào đó rồi bổ sung vào tài liệu, đừng viết riêng trong khu mình.
 Backlog: `BACKLOG.md` (xem `../GWT-SHARED/HUONG-DAN-BACKLOG.md`).
 

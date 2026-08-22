@@ -67,10 +67,7 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
             <h1 className="text-xl font-semibold text-slate-900">Đơn hàng</h1>
             <p className="text-sm text-slate-500">{rows.length} đơn · đơn tag &ldquo;App&rdquo; = tạo trên app (sửa/xoá được)</p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/sales/ctkm" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-teal-400 hover:text-teal-700">Khuyến mãi</Link>
-            <Link href="/sales/don/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Tạo đơn</Link>
-          </div>
+          <Link href="/sales/don/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Tạo đơn</Link>
         </header>
 
         {/* Mọi component dưới đây đọc useSearchParams -> BẮT BUỘC bọc Suspense,

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { TINH_VN } from '@/lib/tinh'
+import { ChonTinh } from '@/components/ChonTinh'
 import { taoDon, suaDon, timKhachChoDon } from './actions'
 import { fmtVnd } from './_ui'
 import {
@@ -360,11 +360,7 @@ export function OrderForm({
           <div><label className={lbl}>Hình thức TT</label><select className={inp} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>{PAYMETHOD_OPTS.map((o) => <option key={o} value={o}>{o || '— chọn —'}</option>)}</select></div>
           <div><label className={lbl}>Mã vận đơn</label><input className={inp} value={shippingCode} onChange={(e) => setShippingCode(e.target.value)} /></div>
           <div className="sm:col-span-1"><label className={lbl}>Tỉnh / TP</label>
-            <select className={inp} value={province} onChange={(e) => setProvince(e.target.value)}>
-              <option value="">— chọn —</option>
-              {province && !TINH_VN.includes(province) && <option value={province}>{province} (cũ)</option>}
-              {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <ChonTinh value={province} onChange={setProvince} className={inp} />
           </div>
           <div className="sm:col-span-3"><label className={lbl}>Địa chỉ giao</label><input className={inp} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
         </div>

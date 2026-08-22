@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { luuNhap, banHanh, type CtkmInput } from './actions'
+import { OChonGoiY } from '@/bang'
 import { giaSauGiam, mucApDung, type KieuGiam } from '../_ctkm'
 
 type Kenh = { id: number; l1: string; l2: string }
@@ -187,15 +188,19 @@ export function CtkmForm({
               Sản phẩm ({sp.length === 0 ? 'chưa chọn = áp mọi sản phẩm' : sp.length})
             </span>
             <span className="flex-1" />
-            <select className={inp + ' w-auto max-w-[280px]'} value="" onChange={(e) => {
-              const ma = e.target.value
-              if (ma && !sp.some((s) => s.internal_code === ma)) setSp((ds) => [...ds, { internal_code: ma, muc: null }])
-            }}>
-              <option value="">＋ Thêm sản phẩm…</option>
-              {spDs.filter((s) => !sp.some((x) => x.internal_code === s.ma)).map((s) => (
-                <option key={s.ma} value={s.ma}>{s.ma} — {s.ten}</option>
-              ))}
-            </select>
+            <div className="w-full sm:w-[320px]">
+              <OChonGoiY
+                giaTri={null}
+                choPhepXoa={false}
+                choTrong="＋ Gõ mã hoặc tên sản phẩm…"
+                tuyChon={spDs
+                  .filter((s) => !sp.some((x) => x.internal_code === s.ma))
+                  .map((s) => ({ gt: s.ma, nhan: s.ten, phu: s.gia ? tien(s.gia) : undefined }))}
+                onChon={(ma) => {
+                  if (ma && !sp.some((s) => s.internal_code === ma)) setSp((ds) => [...ds, { internal_code: ma, muc: null }])
+                }}
+              />
+            </div>
           </div>
           {sp.length > 0 && (
             <div className="overflow-x-auto">
@@ -247,13 +252,17 @@ export function CtkmForm({
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Quà ({qua.length})</span>
             <span className="flex-1" />
-            <select className={inp + ' w-auto max-w-[280px]'} value="" onChange={(e) => {
-              const ma = e.target.value
-              if (ma) setQua((ds) => [...ds, { internal_code_qua: ma, so_luong: 1, gia_tri_quy_doi: giaCua(ma), dieu_kien: null }])
-            }}>
-              <option value="">＋ Thêm quà…</option>
-              {spDs.map((s) => <option key={s.ma} value={s.ma}>{s.ma} — {s.ten}</option>)}
-            </select>
+            <div className="w-full sm:w-[320px]">
+              <OChonGoiY
+                giaTri={null}
+                choPhepXoa={false}
+                choTrong="＋ Gõ mã hoặc tên quà tặng…"
+                tuyChon={spDs.map((s) => ({ gt: s.ma, nhan: s.ten, phu: s.gia ? tien(s.gia) : undefined }))}
+                onChon={(ma) => {
+                  if (ma) setQua((ds) => [...ds, { internal_code_qua: ma, so_luong: 1, gia_tri_quy_doi: giaCua(ma), dieu_kien: null }])
+                }}
+              />
+            </div>
           </div>
           {qua.length === 0 ? (
             <p className="py-3 text-center text-sm text-slate-400">Chương trình này không có quà.</p>

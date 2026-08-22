@@ -42,27 +42,60 @@ export type CtkmRow = {
   kenh_nhan: string[]
 }
 
+/** Bộ lọc danh sách khuyến mãi — tên tham số theo `docs/CHUAN-FILTER.md`. */
+export type LocCtkm = {
+  ngtu?: string
+  ngden?: string
+  /** Mã sản phẩm. Chương trình áp MỌI sản phẩm cũng khớp, vì nó bao gồm mã này. */
+  sp?: string
+  /** channel_id của dim_channel. */
+  kenh?: string
+  trang_thai?: string
+}
+
 /**
- * Danh sách chương trình. Lọc theo THÁNG bằng cách so khoảng ngày của chương trình
- * với khoảng ngày của tháng — chương trình chạy vắt qua hai tháng thì hiện ở CẢ HAI,
- * vì tháng nào nó cũng đang có hiệu lực thật.
+ * Danh sách chương trình.
+ *
+ * Lọc NGÀY theo phép GIAO NHAU hai khoảng, không phải "nằm gọn trong": chương trình
+ * chạy vắt qua mốc lọc vẫn phải hiện, vì trong khoảng đó nó CÓ hiệu lực thật.
  */
-export async function danhSachCtkm(thang?: string): Promise<CtkmRow[]> {
+export async function danhSachCtkm(loc: LocCtkm = {}): Promise<CtkmRow[]> {
   await chanXem()
   const db = dataClient()
 
   let q = db.from('sales_ctkm').select('*').order('tu_ngay', { ascending: false })
-  if (thang && /^\d{4}-\d{2}$/.test(thang)) {
-    const dau = `${thang}-01`
-    const cuoi = new Date(Number(thang.slice(0, 4)), Number(thang.slice(5, 7)), 0)
-    const het = `${thang}-${String(cuoi.getDate()).padStart(2, '0')}`
-    // Giao nhau hai khoảng: bắt đầu trước khi tháng kết thúc, và kết thúc sau khi tháng bắt đầu.
-    q = q.lte('tu_ngay', het).or(`den_ngay.is.null,den_ngay.gte.${dau}`)
+  // Giao nhau: bắt đầu trước khi khoảng lọc kết thúc, và kết thúc sau khi khoảng lọc bắt đầu.
+  if (loc.ngden) q = q.lte('tu_ngay', loc.ngden)
+  if (loc.ngtu) q = q.or(`den_ngay.is.null,den_ngay.gte.${loc.ngtu}`)
+  if (loc.trang_thai) q = q.eq('trang_thai', loc.trang_thai)
+
+  if (loc.kenh) {
+    const { data: k } = await db.from('sales_ctkm_kenh').select('ctkm_id').eq('channel_id', Number(loc.kenh))
+    const ids = [...new Set(((k ?? []) as Array<{ ctkm_id: string }>).map((r) => r.ctkm_id))]
+    q = q.in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
   }
+
   const { data, error } = await q
   if (error) throw new Error(error.message)
-  const ds = (data ?? []) as Array<Record<string, unknown>>
+  let ds = (data ?? []) as Array<Record<string, unknown>>
   if (!ds.length) return []
+
+  if (loc.sp) {
+    // Chương trình KHÔNG khai sản phẩm nào = áp cho MỌI sản phẩm -> vẫn khớp.
+    // Lọc kiểu `.in()` thuần sẽ loại mất nhóm đó, nên phải xử ở đây.
+    const { data: rows } = await db
+      .from('sales_ctkm_sp')
+      .select('ctkm_id, internal_code')
+      .in('ctkm_id', ds.map((r) => r.id as string))
+    const coKhai = new Set(((rows ?? []) as Array<{ ctkm_id: string }>).map((r) => r.ctkm_id))
+    const khopMa = new Set(
+      ((rows ?? []) as Array<{ ctkm_id: string; internal_code: string }>)
+        .filter((r) => r.internal_code === loc.sp)
+        .map((r) => r.ctkm_id)
+    )
+    ds = ds.filter((r) => !coKhai.has(r.id as string) || khopMa.has(r.id as string))
+    if (!ds.length) return []
+  }
 
   const ids = ds.map((r) => r.id as string)
   const [kenh, sp, qua, dim] = await Promise.all([

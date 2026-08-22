@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { danhSachCtkm, quyenCtkm } from './actions'
+import { Suspense } from 'react'
+import { BoLocChon, BoLocGoiY, LocNgay, ThanhDangLoc } from '@/bang'
+import { danhSachCtkm, nguonChoForm, quyenCtkm } from './actions'
 import { CtkmActions } from './CtkmActions'
 import { nhanKieuGiam, nhanNhomKhach } from '../_ctkm'
 
@@ -13,16 +15,6 @@ function fmt(d: string | null): string {
   if (!d) return '—'
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d)
   return m ? `${m[3]}/${m[2]}` : d
-}
-
-/** Tháng gần đây cho ô lọc — YYYY-MM, tính theo giờ máy (KHÔNG toISOString, lệch UTC). */
-function cacThang(n = 6): { gt: string; nhan: string }[] {
-  const now = new Date()
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const gt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    return { gt, nhan: `Tháng ${d.getMonth() + 1}/${d.getFullYear()}` }
-  })
 }
 
 const CHIP: Record<string, string> = {
@@ -39,11 +31,24 @@ const NHAN_TT: Record<string, string> = {
 export default async function CtkmPage({
   searchParams,
 }: {
-  searchParams: Promise<{ thang?: string }>
+  searchParams: Promise<{ ngtu?: string; ngden?: string; sp?: string; kenh?: string; tt?: string }>
 }) {
-  const { thang } = await searchParams
-  const [ds, quyen] = await Promise.all([danhSachCtkm(thang), quyenCtkm()])
-  const thangs = cacThang()
+  const { ngtu, ngden, sp, kenh, tt } = await searchParams
+  const [ds, quyen, nguon] = await Promise.all([
+    danhSachCtkm({ ngtu, ngden, sp, kenh, trang_thai: tt }),
+    quyenCtkm(),
+    nguonChoForm(),
+  ])
+  const tenKenh = (id: number) => {
+    const k = nguon.kenh.find((x) => x.id === id)
+    return k ? (k.l2 ? `${k.l1} · ${k.l2}` : k.l1) : `#${id}`
+  }
+  const dieuKien = [
+    ngtu || ngden ? { nhan: 'Thời gian', giaTri: `${ngtu || '…'} → ${ngden || '…'}` } : null,
+    sp ? { nhan: 'Sản phẩm', giaTri: sp } : null,
+    kenh ? { nhan: 'Kênh', giaTri: tenKenh(Number(kenh)) } : null,
+    tt ? { nhan: 'Trạng thái', giaTri: NHAN_TT[tt] ?? tt } : null,
+  ].filter(Boolean) as { nhan: string; giaTri: string }[]
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -69,29 +74,44 @@ export default async function CtkmPage({
           )}
         </header>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/sales/ctkm"
-            className={
-              'rounded-full border px-3 py-1.5 text-xs font-medium ' +
-              (!thang ? 'border-[#0e8c9a] bg-[#0e8c9a] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
-            }
-          >
-            Tất cả
-          </Link>
-          {thangs.map((t) => (
-            <Link
-              key={t.gt}
-              href={`/sales/ctkm?thang=${t.gt}`}
-              className={
-                'rounded-full border px-3 py-1.5 text-xs font-medium ' +
-                (thang === t.gt ? 'border-[#0e8c9a] bg-[#0e8c9a] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
-              }
-            >
-              {t.nhan}
-            </Link>
-          ))}
-        </div>
+        {/* Bộ lọc chuẩn — xem docs/CHUAN-FILTER.md. Đọc useSearchParams nên PHẢI bọc Suspense. */}
+        <Suspense fallback={<div className="h-20" />}>
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <LocNgay nhan="Thời gian chạy" />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <BoLocGoiY
+                param="sp"
+                nhan="Sản phẩm"
+                tuyChon={nguon.sp.map((s) => ({ giaTri: s.ma, nhan: s.ten }))}
+              />
+              <BoLocChon
+                param="kenh"
+                nhan="Kênh"
+                tuyChon={nguon.kenh.map((k) => ({ giaTri: String(k.id), nhan: k.l2 ? `${k.l1} · ${k.l2}` : k.l1 }))}
+              />
+              <BoLocChon
+                param="tt"
+                nhan="Trạng thái"
+                tuyChon={[
+                  { giaTri: 'ban_hanh', nhan: 'Đang chạy' },
+                  { giaTri: 'nhap', nhan: 'Nháp' },
+                  { giaTri: 'ket_thuc', nhan: 'Đã kết thúc' },
+                ]}
+              />
+            </div>
+          </div>
+        </Suspense>
+
+        <ThanhDangLoc dieuKien={dieuKien} hienThi={ds.length} tong={ds.length} nhan="chương trình" />
+
+        {sp && (
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+            Đang lọc theo sản phẩm <b>{sp}</b> — kết quả gồm cả chương trình <b>áp cho mọi sản phẩm</b>,
+            vì mã này nằm trong đó.
+          </p>
+        )}
 
         {!quyen.duyet && (
           <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
@@ -102,7 +122,7 @@ export default async function CtkmPage({
 
         {ds.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-400">
-            {thang ? 'Tháng này chưa có chương trình nào.' : 'Chưa có chương trình nào.'}
+            {dieuKien.length ? 'Không có chương trình nào khớp bộ lọc.' : 'Chưa có chương trình nào.'}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">

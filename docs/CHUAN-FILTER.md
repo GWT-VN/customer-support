@@ -21,6 +21,30 @@ một chỗ không ăn chỗ kia. Bản đó đã bị bỏ và viết lại the
 
 ---
 
+## Luật số 2 — quá 10 mục thì PHẢI cho gõ để tìm
+
+**CEO chốt 22/08/2026, áp cho TOÀN APP, cả ô LỌC lẫn ô NHẬP trong form.**
+
+> Danh sách chọn có **trên 10 mục** thì không được để `<select>` trần — phải cho **gõ mã hoặc
+> tên để tìm**. Cuộn tay qua 51 mã sản phẩm hay 64 tỉnh là chậm và dễ chọn nhầm.
+
+| Dùng ở đâu | Component | Giá trị nằm ở |
+|---|---|---|
+| Ô **LỌC** trên trang danh sách | `<BoLocGoiY param="sp" nhan="Sản phẩm" tuyChon={…} />` | tham số URL |
+| Ô **NHẬP** trong form | `<OChonGoiY giaTri={} onChon={} tuyChon={…} />` | state của form |
+| Danh sách **≤ 10 mục** | `<BoLocChon>` (lọc) hoặc `<select>` (form) | — |
+
+Cả hai đều khớp **không dấu**, tìm theo **mã lẫn tên**, và **nói rõ khi cắt bớt** danh sách
+("Đang hiện 30 / 328 mục — gõ thêm để thu hẹp") thay vì im lặng cắt.
+
+**Chỗ đã áp:** ô lọc Sản phẩm ở `/sales` · ô chọn sản phẩm & quà trong form khuyến mãi ·
+`components/ChonTinh.tsx` (64 tỉnh — dùng chung cả CSKH lẫn Sales).
+
+*CEO đã phải nhắc chuyện này nhiều lần ở nhiều màn khác nhau. Viết vào đây để module sau
+không phải nghe nhắc lần nữa — sửa filter/ô chọn ở đâu cũng đọc file này trước.*
+
+---
+
 ## Tham số URL chuẩn
 
 | Tham số | Nghĩa | Ai điều khiển |
