@@ -188,8 +188,13 @@ end $$;
 -- ── Gắn bù cho dòng đã có ──────────────────────────────────────────────────
 -- Chụp tên tại thời điểm CHẠY migration. Không lý tưởng (đúng ra phải là tên lúc
 -- gắn) nhưng còn hơn để trống — và các dòng này đều vừa sinh hôm nay.
--- `limit 1` không thừa: mã khách ĐÃ từng trùng ở bảng Sales (Sheet sinh đôi dòng).
--- Truy vấn con vô hướng gặp 2 dòng là ném lỗi và cả migration đổ.
+-- `limit 1` không thừa, nhưng KHÔNG phải vì bảng Sales: `public.customers` có
+-- ràng buộc `customers_customer_code_key UNIQUE (customer_code)` và bắt buộc
+-- phải có (Apps Script sync bằng upsert on_conflict=customer_code, PostgREST
+-- không chạy ON CONFLICT nếu thiếu unique index).
+-- Chỗ thật sự hở là `public.cs_customers`: cột customer_code ở đó KHÔNG có
+-- unique constraint lẫn unique index — hôm nay 0 trùng, nhưng không ai canh.
+-- Truy vấn con vô hướng gặp 2 dòng là ném lỗi và đổ cả migration.
 update work.task_link l set nhan_luc_gan = coalesce(
     (select sc.name      from public.customers    sc where sc.customer_code = l.customer_code limit 1),
     (select cc.full_name from public.cs_customers cc where cc.customer_code = l.customer_code limit 1),
