@@ -1,5 +1,7 @@
 'use client'
 
+import { OChonGoiY } from '@/bang/OChonGoiY'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -80,12 +82,19 @@ export function QuanLyMay({
   }
 
   const nut = 'rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50'
+  // Gõ-để-tìm thay `<select>` trần. Danh sách đã lọc theo ĐÚNG loại máy, nhưng đo prod 22/08:
+  // **19/31 loại có hơn 10 serial tồn kho**, loại nhiều nhất **340 serial** — quá ngưỡng luật
+  // CEO chốt 22/08 (`docs/CHUAN-FILTER.md` Luật 2). Serial là chuỗi dài dễ đọc nhầm, cuộn tìm
+  // bằng mắt trong 340 dòng là chỗ chắc chắn bấm nhầm.
   const oSerial = (
-    <select value={serialMoi} onChange={(e) => setSerialMoi(e.target.value)}
-      className="rounded-lg border px-3 py-1.5 text-sm bg-white font-mono text-slate-900">
-      <option value="">— Chọn serial (tồn kho, cùng loại) —</option>
-      {dsMoi.map((s) => <option key={s.serial} value={s.serial}>{s.serial}</option>)}
-    </select>
+    <div className="min-w-[280px]">
+      <OChonGoiY
+        giaTri={serialMoi || null}
+        onChon={setSerialMoi}
+        tuyChon={dsMoi.map((s) => ({ gt: s.serial, nhan: s.serial }))}
+        choTrong="Gõ serial để tìm (tồn kho, cùng loại)…"
+      />
+    </div>
   )
 
   return (

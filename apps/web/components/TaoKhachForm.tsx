@@ -35,7 +35,7 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
   })
   const [kenhId, setKenhId] = useState('')
   const [sdtPhu, setSdtPhu] = useState<{ phone: string; contact_name: string; role: string; zalo_ok: boolean; ghi_chu: string }[]>([])
-  const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string; tinh: string }[]>([])
+  const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string; tinh: string; ghi_chu: string }[]>([])
   const [khop, setKhop] = useState<KetQuaTraKhach | null>(null)
   const [dangTra, setDangTra] = useState(false)
   const [nangCao, setNangCao] = useState(false)
@@ -223,7 +223,7 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-slate-700">Địa chỉ phụ</span>
-                <button type="button" onClick={() => setDcPhu([...dcPhu, { dia_chi: '', loai: 'nha', tinh: '' }])}
+                <button type="button" onClick={() => setDcPhu([...dcPhu, { dia_chi: '', loai: 'nha', tinh: '', ghi_chu: '' }])}
                   className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
               </div>
               {/* KHÔNG có loại "công ty" ở đây: địa chỉ công ty đã là ô riêng trong
@@ -247,6 +247,12 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
                     <option value="lap_dat">Lắp đặt</option>
                     <option value="khac">Khác</option>
                   </select>
+                  {/* Ô ghi chú — màn SỬA vốn có, màn TẠO thì thiếu. CEO bắt được 22/08:
+                      hai màn phải y hệt nhau, không thì nhập ở màn này rồi sang màn kia
+                      không thấy đâu. */}
+                  <input value={x.ghi_chu} placeholder="Ghi chú: nhà bố mẹ, kho hàng…"
+                    onChange={(e) => setDcPhu(dcPhu.map((y, j) => j === i ? { ...y, ghi_chu: e.target.value } : y))}
+                    className="w-40 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                   <button type="button" onClick={() => setDcPhu(dcPhu.filter((_, j) => j !== i))}
                     className="pb-1.5 text-xs text-slate-400 underline hover:text-red-600">xoá</button>
                 </div>

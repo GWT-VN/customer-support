@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { taoKyThuat, suaKyThuat, xoaKyThuat, taoLichKyThuat, boiCanhKhach, capNhatDiaChiMay, lichTuanKyThuat, taoNghiKyThuat, xoaNghiKyThuat, type KyThuat, type ViecInput, type BoiCanhKhach, type TuanKyThuat } from '@/app/actions'
 import { LOAI_VIEC_KT, NHAN_LOAI_VIEC } from '@/lib/danhSach'
-import { TINH_VN } from '@/lib/tinh'
+import { ChonTinh } from '@/components/ChonTinh'
 import { KhachPicker } from '@/components/KhachPicker'
 import { vnDate } from '@/components/Badge'
 
@@ -119,10 +119,10 @@ export function KyThuatBang({ dsKt, prefill }: {
             <input type="date" value={ngay} onChange={(e) => { setNgay(e.target.value); loadTuan(ktId, e.target.value) }} className={`${oInput} mt-0.5`} />
           </label>
           <label className="text-xs text-slate-600">Tỉnh/TP<br />
-            <select value={tinh} onChange={(e) => setTinh(e.target.value)} className={`${oInput} mt-0.5`}>
-              <option value="">— Chọn tỉnh —</option>
-              {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            {/* Dùng CHUNG `ChonTinh` như mọi màn khác, thay vì tự dựng `<select>` 64 mục ở đây.
+                Tự dựng là (a) vi phạm luật ">10 mục phải gõ để tìm" và (b) khi `ChonTinh` được
+                nâng cấp thì chỗ này không hưởng — đúng thứ đã xảy ra hôm 22/08. */}
+            <ChonTinh value={tinh} onChange={setTinh} />
           </label>
           <label className="text-xs text-slate-600 flex-1 min-w-40">Địa chỉ (tự theo máy → khách; sửa được)<br />
             <input value={diaChi} onChange={(e) => setDiaChi(e.target.value)} className={`${oInput} mt-0.5 w-full`} />

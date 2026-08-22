@@ -106,6 +106,8 @@ export async function themSdtPhu(input: {
   role?: string | null
   is_primary?: boolean
   zalo_ok?: boolean
+  /** Giờ gọi được, số của ai… — màn TẠO vốn có ô này, màn SỬA thì thiếu (CEO bắt được 22/08). */
+  ghi_chu?: string | null
   nguon: NguonGhi
 }): Promise<KetQuaGhi> {
   const tho = (input.phone ?? '').trim()
@@ -124,6 +126,7 @@ export async function themSdtPhu(input: {
       role: (input.role ?? '').trim() || null,
       is_primary: input.is_primary ?? false,
       zalo_ok: input.zalo_ok ?? false,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .select('id')
     .single()
@@ -177,6 +180,7 @@ export async function suaSdtPhu(input: {
   contact_name?: string | null
   role?: string | null
   zalo_ok?: boolean
+  ghi_chu?: string | null
   nguon: NguonGhi
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const tho = (input.phone ?? '').trim()
@@ -190,6 +194,7 @@ export async function suaSdtPhu(input: {
       contact_name: ten || null,
       role: (input.role ?? '').trim() || null,
       zalo_ok: input.zalo_ok ?? false,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .eq('id', input.id)
   if (error) return { ok: false, error: error.message }

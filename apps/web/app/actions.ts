@@ -193,6 +193,8 @@ export type Contact = {
   role: string | null
   is_primary: boolean
   zalo_ok: boolean
+  /** Giờ gọi được, số của ai… — có ở CẢ màn tạo lẫn màn sửa (CEO chốt 22/08: hai bên y hệt nhau). */
+  ghi_chu: string | null
 }
 
 export type Customer = {
@@ -271,7 +273,7 @@ export async function addContact(customerId: string, c: Omit<Contact, 'id'>) {
   const kq = await themSdtPhu({
     customer_id: customerId,
     phone: c.phone, contact_name: c.contact_name, role: c.role,
-    is_primary: c.is_primary, zalo_ok: c.zalo_ok,
+    is_primary: c.is_primary, zalo_ok: c.zalo_ok, ghi_chu: c.ghi_chu,
     nguon: 'cskh',
   })
   if (!kq.ok) return { ok: false as const, error: kq.error }
@@ -600,7 +602,7 @@ export async function suaDiaChiKhachAction(
 /** Sửa một SĐT phụ / người liên hệ. */
 export async function suaLienHe(
   id: string, customerId: string,
-  patch: { phone?: string; contact_name?: string; role?: string; zalo_ok?: boolean },
+  patch: { phone?: string; contact_name?: string; role?: string; zalo_ok?: boolean; ghi_chu?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff()
   await doQuyen('cs.khach.sua')
@@ -3336,7 +3338,7 @@ export async function taoKhachChoDuyet(input: {
   nguoi_dai_dien?: string; chuc_vu_dai_dien?: string
   /** Tạo kèm luôn, khỏi phải mở lại hồ sơ để thêm. */
   sdt_phu?: { phone: string; contact_name?: string; role?: string; zalo_ok?: boolean; ghi_chu?: string }[]
-  dia_chi_phu?: { dia_chi: string; loai: string; tinh?: string }[]
+  dia_chi_phu?: { dia_chi: string; loai: string; tinh?: string; ghi_chu?: string }[]
 }): Promise<{ ok: true; id: string } | { ok: false; error: string; existingId?: string }> {
   await requireStaff()
   await doQuyen('cs.khach.sua')
@@ -3388,23 +3390,26 @@ export async function taoKhachChoDuyet(input: {
 
   // SĐT phụ + địa chỉ phụ chèn SAU khi có id. Hỏng ở bước này KHÔNG huỷ khách vừa
   // tạo — khách đã có là thắng lợi chính, số phụ thiếu thì thêm tay ở hồ sơ.
+  // Đi qua HÀM DÙNG CHUNG `lib/khach-lien-he.ts`, không tự viết insert riêng nữa.
+  // Trước đây màn TẠO ghi thẳng còn màn SỬA gọi hàm chung ⇒ hai đường ghi khác nhau, và đúng
+  // thế là lệch: màn tạo bỏ quên `ghi_chu` của địa chỉ phụ. CEO bắt được 22/08/2026.
+  // Một đường ghi thì không có chỗ để lệch.
   const sdtPhu = (input.sdt_phu ?? []).filter((x) => x.phone?.trim())
-  if (sdtPhu.length) {
-    await db.from('customer_contacts').insert(sdtPhu.map((x) => ({
-      customer_id: id, phone: chuanHoaSdt(x.phone).chuan || x.phone.trim(),
-      contact_name: x.contact_name?.trim() || null,
-      role: x.role?.trim() || 'khac', is_primary: false,
-      zalo_ok: x.zalo_ok ?? true, ghi_chu: x.ghi_chu?.trim() || null,
-    })))
+  for (const x of sdtPhu) {
+    await themSdtPhu({
+      customer_id: id, phone: x.phone, contact_name: x.contact_name,
+      role: x.role?.trim() || 'khac', zalo_ok: x.zalo_ok ?? true,
+      ghi_chu: x.ghi_chu, nguon: 'cskh',
+    })
   }
   const dcPhu = (input.dia_chi_phu ?? []).filter((x) => x.dia_chi?.trim())
-  if (dcPhu.length) {
-    await db.from('customer_addresses').insert(dcPhu.map((x) => ({
-      customer_id: id, dia_chi: x.dia_chi.trim(),
-      loai: ['nha', 'cty', 'lap_dat', 'khac'].includes(x.loai) ? x.loai : 'khac',
-      tinh: x.tinh?.trim() || null,
-    })))
+  for (const x of dcPhu) {
+    await themDiaChiPhu({
+      customer_id: id, dia_chi: x.dia_chi, loai: x.loai,
+      tinh: x.tinh, ghi_chu: x.ghi_chu, nguon: 'cskh',
+    })
   }
+
 
   revalidatePath('/khach'); revalidatePath('/khach-hang')
   return { ok: true, id }

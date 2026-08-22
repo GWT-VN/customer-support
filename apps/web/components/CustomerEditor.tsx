@@ -40,10 +40,10 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
   }
 
   // form thêm SĐT phụ
-  const [np, setNp] = useState({ phone: '', contact_name: '', role: 'helper', zalo_ok: true })
+  const [np, setNp] = useState({ phone: '', contact_name: '', role: 'helper', zalo_ok: true, ghi_chu: '' })
   /** id liên hệ đang sửa tại chỗ; null = không sửa dòng nào. CEO 22/08: SĐT phụ phải SỬA được. */
   const [suaLh, setSuaLh] = useState<string | null>(null)
-  const [lh, setLh] = useState({ phone: '', contact_name: '', role: 'other', zalo_ok: false })
+  const [lh, setLh] = useState({ phone: '', contact_name: '', role: 'other', zalo_ok: false, ghi_chu: '' })
   const [busyLh, setBusyLh] = useState(false)
 
   async function luuLienHe() {
@@ -60,7 +60,7 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
     const r = await addContact(c.id, { ...np, is_primary: false } as Omit<Contact, 'id'>)
     setBusy(false)
     if (!r.ok) setErr(r.error)
-    else { setNp({ phone: '', contact_name: '', role: 'helper', zalo_ok: true }); router.refresh() }
+    else { setNp({ phone: '', contact_name: '', role: 'helper', zalo_ok: true, ghi_chu: '' }); router.refresh() }
   }
 
   return (
@@ -187,6 +187,8 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
                       className="rounded border bg-white px-2 py-1 text-sm">
                       {Object.entries(ROLES).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                     </select>
+                    <input value={lh.ghi_chu} onChange={(e) => setLh({ ...lh, ghi_chu: e.target.value })}
+                      placeholder="Ghi chú: giờ gọi được…" className="w-44 rounded border px-2 py-1 text-sm" />
                     <label className="flex items-center gap-1 text-xs text-slate-600">
                       <input type="checkbox" checked={lh.zalo_ok}
                         onChange={(e) => setLh({ ...lh, zalo_ok: e.target.checked })} />
@@ -210,10 +212,11 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
                   {ct.zalo_ok
                     ? <span className="ml-1 rounded bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-700">Zalo</span>
                     : <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">không Zalo</span>}
+                  {ct.ghi_chu && <span className="block text-xs text-slate-400">{ct.ghi_chu}</span>}
                   <button
                     onClick={() => { setErr(null); setSuaLh(ct.id); setLh({
                       phone: ct.phone ?? '', contact_name: ct.contact_name ?? '',
-                      role: ct.role ?? 'other', zalo_ok: ct.zalo_ok,
+                      role: ct.role ?? 'other', zalo_ok: ct.zalo_ok, ghi_chu: ct.ghi_chu ?? '',
                     }) }}
                     className="ml-3 text-xs text-sky-700 underline">sửa</button>
                 </span>
@@ -251,6 +254,14 @@ export function CustomerEditor({ customer, contacts }: { customer: Customer; con
               className="mt-1 rounded-lg border px-2 py-1.5 text-sm bg-white">
               {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
+          </label>
+          <label className="block">
+            {/* Màn TẠO khách vốn có ô này, màn SỬA thì thiếu — CEO bắt được 22/08.
+                Hai màn phải y hệt nhau, không thì nhập ở màn này sang màn kia không thấy đâu. */}
+            <span className="text-xs text-slate-600">Ghi chú</span>
+            <input value={np.ghi_chu} onChange={(e) => setNp({ ...np, ghi_chu: e.target.value })}
+              placeholder="Giờ gọi được, số của ai…"
+              className="mt-1 w-44 rounded-lg border px-2 py-1.5 text-sm" />
           </label>
           <label className="flex items-center gap-1.5 text-sm pb-1.5">
             <input type="checkbox" checked={np.zalo_ok} onChange={(e) => setNp({ ...np, zalo_ok: e.target.checked })} />
