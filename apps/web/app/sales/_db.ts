@@ -2,6 +2,7 @@ import 'server-only'
 import { dataClient } from '@/lib/nen-tang/db'
 import { deriveSourceTab, TAB_LETTER, phoneChuan, lineAmount, isMaintenance, yymmdd, nextSeqCode } from './_calc'
 import type { CatalogPick, ChannelOpt, CustomerInput, NewOrderInput, OrderFormInitial } from './_types'
+import { maDaCap, type DongCoMa } from './_ma-khach'
 
 // ───────────── Nguồn cho form ─────────────
 export async function listCatalogForPicker(): Promise<CatalogPick[]> {
@@ -315,12 +316,33 @@ function cleanCustomerAppFields(input: CustomerInput) {
   }
 }
 
+/** Mã khách hệ mới cho người sắp tạo — tra SĐT trước, hết cách mới cấp số mới. */
+async function maKhachMoi(db: ReturnType<typeof dataClient>, phone: string | null): Promise<string | null> {
+  const [cs, sales] = await Promise.all([
+    db.from('cs_customers').select('primary_phone, ma_kh').not('ma_kh', 'is', null).limit(5000),
+    db.from('customers').select('phone, ma_kh').not('ma_kh', 'is', null).limit(5000),
+  ])
+  const doi = (ds: unknown, cot: string): DongCoMa[] =>
+    ((ds ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      sdt: (r[cot] as string) ?? null,
+      ma_kh: (r.ma_kh as string) ?? null,
+    }))
+
+  const cu = maDaCap(doi(cs.data, 'primary_phone'), doi(sales.data, 'phone'), phone)
+  if (cu) return cu
+
+  // Người mới thật -> bộ cấp số dùng chung (có khoá, hai khu bấm cùng lúc không đụng mã).
+  const { data } = await db.rpc('cap_ma_kh')
+  return (data as string) ?? null
+}
+
 export async function createCustomer(input: CustomerInput): Promise<{ customer_code: string }> {
   const db = dataClient()
   const fields = cleanCustomer(input)
+  const ma_kh = await maKhachMoi(db, input.phone)
   for (let attempt = 0; attempt < 6; attempt++) {
     const code = await nextCustomerCode(db)
-    const { error } = await db.from('customers').insert({ customer_code: code, ...fields })
+    const { error } = await db.from('customers').insert({ customer_code: code, ma_kh, ...fields })
     if (error) {
       if ((error as { code?: string }).code === '23505') continue
       throw error
