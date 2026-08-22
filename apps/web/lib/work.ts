@@ -168,6 +168,10 @@ export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null
     case 'assigned': return `gán ${p.ten ?? 'ai đó'} · ${NHAN_VAI_TRO[String(p.role)] ?? p.role}`
     case 'unassigned': return 'bỏ một người khỏi việc'
     case 'commented': return 'bình luận'
+    case 'mentioned': {
+      const ten = Array.isArray(p.ten) ? p.ten.filter(Boolean) : []
+      return `nhắc ${ten.length ? ten.join(', ') : 'ai đó'} trong bình luận`
+    }
     case 'linked':
     case 'unlinked': {
       const dau = verb === 'linked' ? 'gắn' : 'bỏ gắn'
@@ -283,4 +287,72 @@ export function thuTuMoi(truoc?: number, sau?: number): number {
   // `truoc` một chút, thứ tự cuối cùng vẫn ổn định vì còn tiêu chí phụ là id.
   if (sau <= truoc) return truoc - 0.5
   return (truoc + sau) / 2
+}
+
+// ── Nhắc người trong bình luận (@tên) ──────────────────────────────────────
+
+/**
+ * Người dùng có đang gõ `@ai` ngay trước con trỏ không.
+ *
+ * Trả `null` nghĩa là không phải đang nhắc ai — đừng mở danh sách gợi ý. Ba ca
+ * phải loại, nếu không danh sách bật lên loạn xạ giữa lúc gõ:
+ *  · `@` nằm SAU con trỏ (người dùng quay lại sửa chỗ khác)
+ *  · đã có khoảng trắng giữa `@` và con trỏ (tên đã chọn xong)
+ *  · `@` dính vào chữ phía trước — đó là email, không phải nhắc người
+ */
+export function tokenNhac(body: string, caret: number): { tuKhoa: string; batDau: number } | null {
+  const truoc = body.slice(0, caret)
+  const at = truoc.lastIndexOf('@')
+  if (at < 0) return null
+  if (at > 0 && !/\s/.test(truoc[at - 1])) return null   // ai@gwt.vn
+  const tuKhoa = truoc.slice(at + 1)
+  if (/\s/.test(tuKhoa)) return null
+  return { tuKhoa, batDau: at }
+}
+
+/**
+ * Thay đoạn `@dangGo` bằng `@Tên ` và trả vị trí con trỏ mới.
+ *
+ * Không thêm dấu cách nếu ngay sau con trỏ đã có sẵn một cái — chèn giữa câu mà
+ * thêm nữa là ra hai dấu cách, người dùng phải tự đi xoá.
+ */
+export function chenNhac(
+  body: string, batDau: number, caret: number, ten: string,
+): { body: string; caret: number } {
+  const con = body.slice(caret)
+  const themCach = !/^\s/.test(con)
+  const moi = `${body.slice(0, batDau)}@${ten}${themCach ? ' ' : ''}${con}`
+  return { body: moi, caret: batDau + ten.length + 2 }
+}
+
+/**
+ * Cắt câu bình luận thành các mảnh để tô đậm tên được nhắc.
+ *
+ * CHỈ tô tên có trong `daNhac` (lấy từ `work.comment.mentions`), không tô mọi
+ * chuỗi bắt đầu bằng `@`. Tô theo dấu `@` thì một câu nhắc email hay giá "@50k"
+ * cũng sáng lên như người thật.
+ *
+ * Tên DÀI khớp trước: "Dev" và "Dev Admin" cùng có thì "@Dev Admin" phải ăn trọn,
+ * không phải tô "@Dev" rồi bỏ lại chữ "Admin".
+ */
+export function chiaTheoNhac(
+  body: string, daNhac: readonly string[],
+): { text: string; nhac: boolean }[] {
+  const ten = [...daNhac].filter(Boolean).sort((a, b) => b.length - a.length)
+  if (ten.length === 0) return [{ text: body, nhac: false }]
+
+  const ra: { text: string; nhac: boolean }[] = []
+  let i = 0, dem = ''
+  while (i < body.length) {
+    const khop = body[i] === '@' ? ten.find((t) => body.startsWith(`@${t}`, i)) : undefined
+    if (khop) {
+      if (dem) { ra.push({ text: dem, nhac: false }); dem = '' }
+      ra.push({ text: `@${khop}`, nhac: true })
+      i += khop.length + 1
+    } else {
+      dem += body[i]; i++
+    }
+  }
+  if (dem) ra.push({ text: dem, nhac: false })
+  return ra
 }

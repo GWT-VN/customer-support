@@ -4,7 +4,7 @@
  * Panel chi tiết 1 việc (trượt từ phải). Dùng chung cho "Việc của tôi" và "Bảng team".
  * Tự nạp dữ liệu khi mở để danh sách ngoài không phải mang theo comment/nhật ký.
  */
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   chiTietViec, suaViec, ganNguoi, boNguoi, themBinhLuan, doiTrangThai,
   type ChiTietViec as Ct, type NenTang, type KQ,
@@ -12,7 +12,9 @@ import {
 import {
   TRANG_THAI, VAI_TRO, NHAN_VAI_TRO, NHAN_UU_TIEN,
   nhanHan, inputTuIso, isoTuOInput, moTaNhatKy, mocThoiGian,
+  tokenNhac, chenNhac, chiaTheoNhac,
 } from '@/lib/work'
+import { boDau } from '@/bang'
 import { Avatar, Chip, Nut, oNhap, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
 import { GanErp } from './GanErp'
 
@@ -61,6 +63,10 @@ export function ChiTietViec({
   const [binhLuan, setBinhLuan] = useState('')
   const [themAi, setThemAi] = useState('')
   const [themVai, setThemVai] = useState('doer')
+  /** Người đã chèn vào ô bình luận bằng @tên: tên -> id. */
+  const [daNhac, setDaNhac] = useState<Record<string, string>>({})
+  const [goiYNhac, setGoiYNhac] = useState<{ tuKhoa: string; batDau: number; caret: number } | null>(null)
+  const oBinhLuan = useRef<HTMLInputElement>(null)
 
   /*
     Báo cho TRANG biết panel đang mở, để nó giãn ra nhường chỗ. Đặt class lên
@@ -369,7 +375,14 @@ export function ChiTietViec({
                       <p
                         className="whitespace-pre-wrap break-words mt-0.5 px-2.5 py-2"
                         style={{ fontSize: 13, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 9 }}
-                      >{c.body}</p>
+                      >
+                        {chiaTheoNhac(c.body, c.nhac_ten ?? []).map((m, i) =>
+                          m.nhac ? (
+                            <b key={i} style={{ fontWeight: 650, color: 'var(--accent-ink)' }}>{m.text}</b>
+                          ) : (
+                            <span key={i}>{m.text}</span>
+                          ))}
+                      </p>
                     </div>
                   </li>
                 ))}
@@ -383,17 +396,66 @@ export function ChiTietViec({
                   e.preventDefault()
                   const b = binhLuan.trim()
                   if (!b) return
-                  setBinhLuan('')
-                  chay(() => themBinhLuan(t.id, b))
+                  // Chỉ gửi người mà tên VẪN CÒN trong câu: gõ @Hiền rồi xoá đi thì
+                  // không được nhắc họ nữa.
+                  const nhac = Object.entries(daNhac)
+                    .filter(([ten]) => b.includes('@' + ten))
+                    .map(([, id]) => id)
+                  setBinhLuan(''); setDaNhac({}); setGoiYNhac(null)
+                  chay(() => themBinhLuan(t.id, b, nhac))
                 }}
               >
-                <input
-                  value={binhLuan}
-                  onChange={(e) => setBinhLuan(e.target.value)}
-                  placeholder="Viết bình luận…"
-                  className="flex-1"
-                  style={oNhap}
-                />
+                <span className="relative flex-1">
+                  <input
+                    ref={oBinhLuan}
+                    value={binhLuan}
+                    onChange={(e) => {
+                      setBinhLuan(e.target.value)
+                      const c = e.target.selectionStart ?? e.target.value.length
+                      const tk = tokenNhac(e.target.value, c)
+                      setGoiYNhac(tk ? { ...tk, caret: c } : null)
+                    }}
+                    onBlur={() => setTimeout(() => setGoiYNhac(null), 150)}
+                    placeholder="Viết bình luận…  (gõ @ để nhắc ai đó)"
+                    className="w-full"
+                    style={oNhap}
+                  />
+                  {goiYNhac && (() => {
+                    const tk = boDau(goiYNhac.tuKhoa)
+                    const ds = nenTang.nhan_su
+                      .filter((n) => boDau(n.ten).includes(tk))
+                      .slice(0, 6)
+                    if (ds.length === 0) return null
+                    return (
+                      <div
+                        className="absolute z-30 bottom-full mb-1 w-full min-w-[200px] overflow-auto rounded-lg"
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
+                      >
+                        {ds.map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            onMouseDown={(ev) => {
+                              // onMouseDown chứ không onClick: onBlur của ô nhập chạy trước
+                              // onClick và đóng mất danh sách.
+                              ev.preventDefault()
+                              const r = chenNhac(binhLuan, goiYNhac.batDau, goiYNhac.caret, n.ten)
+                              setBinhLuan(r.body)
+                              setDaNhac((cu) => ({ ...cu, [n.ten]: n.id }))
+                              setGoiYNhac(null)
+                              requestAnimationFrame(() => {
+                                oBinhLuan.current?.focus()
+                                oBinhLuan.current?.setSelectionRange(r.caret, r.caret)
+                              })
+                            }}
+                            className="block w-full px-3 py-1.5 text-left hover:opacity-80"
+                            style={{ fontSize: 13 }}
+                          >{n.ten}</button>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </span>
                 <Nut chinh type="submit" disabled={pending || !binhLuan.trim()}>Gửi</Nut>
               </form>
             </section>

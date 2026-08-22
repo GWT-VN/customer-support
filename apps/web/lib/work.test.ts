@@ -3,6 +3,7 @@ import {
   nhomTheoHan, nhanHan, gomTheoHan, soNgayToiHan, chuTat,
   isoTuOInput, inputTuIso, moTaNhatKy, mocThoiGian, THU_TU_NHOM,
   duongDanLink, catChip, NHAN_LOAI_LINK, nhanChip, thuTuMoi,
+  tokenNhac, chenNhac, chiaTheoNhac,
 } from './work'
 
 // Mốc cố định: 15/09/2026 lúc 10:00 giờ địa phương.
@@ -125,6 +126,13 @@ describe('moTaNhatKy', () => {
     // Khách CSKH chưa có mã thì `ma` là uuid — đọc "gắn Khách 2cf50482-…" vô nghĩa.
     expect(moTaNhatKy('linked', { loai: 'khach', ma: '2cf50482-d32c-432e-8daa-318695a33bdc' }))
       .toBe('gắn Khách')
+  })
+  it('nhắc người thì kể tên ra', () => {
+    expect(moTaNhatKy('mentioned', { ten: ['Hiền'] })).toBe('nhắc Hiền trong bình luận')
+    expect(moTaNhatKy('mentioned', { ten: ['Hiền', 'Bella'] })).toBe('nhắc Hiền, Bella trong bình luận')
+  })
+  it('nhắc mà thiếu tên thì không in "undefined"', () => {
+    expect(moTaNhatKy('mentioned', {})).toBe('nhắc ai đó trong bình luận')
   })
   it('verb lạ thì trả nguyên văn, không vỡ', () => {
     expect(moTaNhatKy('chua_biet', null)).toBe('chua_biet')
@@ -257,5 +265,71 @@ describe('thuTuMoi — vị trí khi thả thẻ vào cột kanban', () => {
     const kq = thuTuMoi(3, 3)
     expect(Number.isFinite(kq)).toBe(true)
     expect(kq).toBeLessThanOrEqual(3)
+  })
+})
+
+describe('tokenNhac — đang gõ @ai ở đâu', () => {
+  it('gõ @ rồi vài chữ -> trả từ khoá và vị trí dấu @', () => {
+    // caret 7 = ngay sau 'hi'. Đặt 8 là đã qua dấu cách, lúc đó token coi như xong.
+    const b = 'nhờ @hi xem giúp'
+    expect(tokenNhac(b, 7)).toEqual({ tuKhoa: 'hi', batDau: 4 })
+  })
+
+  it('vừa gõ mỗi dấu @ -> từ khoá rỗng, vẫn mở danh sách', () => {
+    expect(tokenNhac('nhờ @', 5)).toEqual({ tuKhoa: '', batDau: 4 })
+  })
+
+  it('không có @ trước con trỏ -> không phải đang nhắc ai', () => {
+    expect(tokenNhac('không nhắc ai', 5)).toBeNull()
+  })
+
+  it('@ nằm sau con trỏ thì không tính — người dùng đang sửa chỗ khác', () => {
+    expect(tokenNhac('abc @Hien', 3)).toBeNull()
+  })
+
+  it('đã có khoảng trắng sau @ thì coi như xong, không mở lại danh sách', () => {
+    // "@Hien " đã chọn xong; gõ tiếp chữ thường không được bật lại gợi ý.
+    expect(tokenNhac('@Hien xem giup', 14)).toBeNull()
+  })
+
+  it('email trong câu không bị nhầm thành nhắc ai', () => {
+    expect(tokenNhac('gửi ai@gwt.vn nhé', 13)).toBeNull()
+  })
+})
+
+describe('chenNhac — thay đoạn đang gõ bằng tên đầy đủ', () => {
+  it('thay từ dấu @ tới con trỏ, thêm khoảng trắng phía sau', () => {
+    expect(chenNhac('nhờ @hi xem giúp', 4, 7, 'Hiền'))
+      .toEqual({ body: 'nhờ @Hiền xem giúp', caret: 10 })
+  })
+
+  it('chèn ở cuối câu vẫn có khoảng trắng để gõ tiếp', () => {
+    expect(chenNhac('nhờ @', 4, 5, 'Bella')).toEqual({ body: 'nhờ @Bella ', caret: 11 })
+  })
+})
+
+describe('chiaTheoNhac — tô đậm tên được nhắc khi hiển thị', () => {
+  it('cắt đúng đoạn tên, phần còn lại giữ nguyên', () => {
+    expect(chiaTheoNhac('nhờ @Hiền xem giúp', ['Hiền'])).toEqual([
+      { text: 'nhờ ', nhac: false },
+      { text: '@Hiền', nhac: true },
+      { text: ' xem giúp', nhac: false },
+    ])
+  })
+
+  it('tên không nằm trong danh sách nhắc thì KHÔNG tô — tránh tô nhầm chữ có @', () => {
+    expect(chiaTheoNhac('gửi @AiĐó nhé', ['Hiền'])).toEqual([{ text: 'gửi @AiĐó nhé', nhac: false }])
+  })
+
+  it('tên dài khớp trước tên ngắn', () => {
+    // "Dev Admin" và "Dev" cùng có mặt; phải tô "@Dev Admin", không phải "@Dev".
+    expect(chiaTheoNhac('@Dev Admin ok', ['Dev', 'Dev Admin'])).toEqual([
+      { text: '@Dev Admin', nhac: true },
+      { text: ' ok', nhac: false },
+    ])
+  })
+
+  it('không có ai được nhắc -> trả nguyên câu, một mảnh', () => {
+    expect(chiaTheoNhac('bình luận thường', [])).toEqual([{ text: 'bình luận thường', nhac: false }])
   })
 })

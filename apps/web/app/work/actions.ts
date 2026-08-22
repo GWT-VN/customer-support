@@ -61,7 +61,11 @@ export type ChiTietViec = {
   assignees: NguoiLam[]
   co_the_sua: boolean
   links: LienKet[]
-  comments: { id: number; body: string; ten: string | null; created_at: string }[]
+  comments: {
+    id: number; body: string; ten: string | null; created_at: string
+    /** Tên những người được nhắc — dùng để tô đậm đúng chỗ, xem chiaTheoNhac(). */
+    nhac_ten: string[]
+  }[]
   activity: { id: number; verb: string; payload: Record<string, unknown> | null; ten: string | null; created_at: string }[]
   subtasks: { id: number; ref: string; title: string; status: string }[]
 }
@@ -226,9 +230,20 @@ export async function keoTha(taskId: number, status: string, thuTu: number): Pro
   })
 }
 
-export async function themBinhLuan(taskId: number, body: string): Promise<KQ<void>> {
+/**
+ * Thêm bình luận, kèm danh sách người được nhắc (@tên).
+ *
+ * Người được nhắc sẽ được kéo vào việc với vai Theo dõi, nên việc hiện luôn trong
+ * "Việc của tôi" của họ — RPC lo phần đó. Server vẫn lọc lại `mentions`, client
+ * gửi gì cũng phải là nhân sự đang hoạt động.
+ */
+export async function themBinhLuan(
+  taskId: number, body: string, nhac?: string[],
+): Promise<KQ<void>> {
   return boc(async () => {
-    await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
+    await goi<void>('work_them_binh_luan', {
+      p_task_id: taskId, p_body: body, p_mentions: nhac?.length ? nhac : null,
+    })
     lamMoi()
   })
 }
