@@ -46,8 +46,70 @@ export type NewOrderInput = {
   shipping_code: string | null
   install_date: string | null // YYYY-MM-DD
   note: string | null
+
+  // ── Cột Sheet còn thiếu, bổ sung 22/08 để nhập được đơn thật trên app ──────
+  /** Chi tiết kênh — ô chữ tự do, Sheet vẫn dùng cho ghi chú nguồn đơn. */
+  channel_detail: string | null
+  qua_tang: string | null
+  su_dung_qua_tang: string | null
+  tracking_url: string | null
+  kich_hoat_bh: boolean
+  email: string | null
+  /** POE gọi "Tiền cọc đã thu", POU gọi "Số tiền đã cọc" — cùng một thứ. */
+  tien_coc: number | null
+
+  // POU
+  gui_hdsd: boolean
+  xuat_hoa_don: boolean
+  da_doi_soat: boolean
+  ngay_doi_soat: string | null
+
+  // POE
+  so_hd: string | null
+  ten_goi_khach: string | null
+  ten_folder: string | null
+  ten_khach_theo_doi: string | null
+  tien_se_thu: number | null
+  bien_ban_xac_nhan: boolean
+  bao_cao_lap_dat: boolean
+  tien_do_lap_dat: string | null
+  ngay_hoan_thanh_lap: string | null
+  tu_dien: string | null
+  version: string | null
+  nghe_nghiep: string | null
+  ngay_sinh: string | null
+  gioi_tinh: string | null
+  do_tuoi: string | null
+  loai_nha: string | null
+  tinh_trang_nha: string | null
+  cong_ty_xuat_hd: string | null
+  mst: string | null
+  dia_chi_xuat_hd: string | null
+
   items: NewOrderItem[]
 }
+
+/** Giá trị mặc định cho các ô mới — dùng chung cho form và cho đơn cũ chưa có cột. */
+export const DON_MAC_DINH = {
+  channel_detail: null, qua_tang: null, su_dung_qua_tang: null, tracking_url: null,
+  kich_hoat_bh: false, email: null, tien_coc: null,
+  gui_hdsd: false, xuat_hoa_don: false, da_doi_soat: false, ngay_doi_soat: null,
+  so_hd: null, ten_goi_khach: null, ten_folder: null, ten_khach_theo_doi: null,
+  tien_se_thu: null, bien_ban_xac_nhan: false, bao_cao_lap_dat: false,
+  tien_do_lap_dat: null, ngay_hoan_thanh_lap: null, tu_dien: null, version: null,
+  nghe_nghiep: null, ngay_sinh: null, gioi_tinh: null, do_tuoi: null,
+  loai_nha: null, tinh_trang_nha: null, cong_ty_xuat_hd: null, mst: null,
+  dia_chi_xuat_hd: null,
+} as const
+
+/** Ô chỉ có nghĩa với một loại đơn — form ẩn bớt cho đỡ rối. */
+export const O_THEO_TAB = {
+  POE: ['so_hd', 'ten_goi_khach', 'ten_folder', 'ten_khach_theo_doi', 'tien_se_thu',
+        'bien_ban_xac_nhan', 'bao_cao_lap_dat', 'tien_do_lap_dat', 'ngay_hoan_thanh_lap',
+        'tu_dien', 'version', 'nghe_nghiep', 'ngay_sinh', 'gioi_tinh', 'do_tuoi',
+        'loai_nha', 'tinh_trang_nha', 'cong_ty_xuat_hd', 'mst', 'dia_chi_xuat_hd'],
+  POU: ['gui_hdsd', 'xuat_hoa_don', 'da_doi_soat', 'ngay_doi_soat', 'email'],
+} as const
 
 export type OrderFormInitial = NewOrderInput
 

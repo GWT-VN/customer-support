@@ -90,6 +90,49 @@ function buildItems(input: NewOrderInput, orderId?: string) {
 }
 
 // ───────────── Tạo đơn ─────────────
+
+/**
+ * Các ô Sheet bổ sung 22/08. Gom một chỗ để đường TẠO và đường SỬA không bao giờ lệch —
+ * đúng lỗi CEO bắt được ở màn khách (màn tạo tự viết insert riêng, màn sửa gọi hàm chung).
+ */
+function oSheetBoSung(input: NewOrderInput) {
+  const so = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v))
+  const chu = (v: string | null | undefined) => (v ?? '').trim() || null
+  return {
+    channel_detail: chu(input.channel_detail),
+    qua_tang: chu(input.qua_tang),
+    su_dung_qua_tang: chu(input.su_dung_qua_tang),
+    tracking_url: chu(input.tracking_url),
+    kich_hoat_bh: !!input.kich_hoat_bh,
+    email: chu(input.email),
+    tien_coc: so(input.tien_coc),
+    gui_hdsd: !!input.gui_hdsd,
+    xuat_hoa_don: !!input.xuat_hoa_don,
+    da_doi_soat: !!input.da_doi_soat,
+    ngay_doi_soat: input.ngay_doi_soat || null,
+    so_hd: chu(input.so_hd),
+    ten_goi_khach: chu(input.ten_goi_khach),
+    ten_folder: chu(input.ten_folder),
+    ten_khach_theo_doi: chu(input.ten_khach_theo_doi),
+    tien_se_thu: so(input.tien_se_thu),
+    bien_ban_xac_nhan: !!input.bien_ban_xac_nhan,
+    bao_cao_lap_dat: !!input.bao_cao_lap_dat,
+    tien_do_lap_dat: chu(input.tien_do_lap_dat),
+    ngay_hoan_thanh_lap: input.ngay_hoan_thanh_lap || null,
+    tu_dien: chu(input.tu_dien),
+    version: chu(input.version),
+    nghe_nghiep: chu(input.nghe_nghiep),
+    ngay_sinh: input.ngay_sinh || null,
+    gioi_tinh: chu(input.gioi_tinh),
+    do_tuoi: chu(input.do_tuoi),
+    loai_nha: chu(input.loai_nha),
+    tinh_trang_nha: chu(input.tinh_trang_nha),
+    cong_ty_xuat_hd: chu(input.cong_ty_xuat_hd),
+    mst: chu(input.mst),
+    dia_chi_xuat_hd: chu(input.dia_chi_xuat_hd),
+  }
+}
+
 export async function createSalesOrder(
   input: NewOrderInput,
   createdBy: string | null
@@ -122,6 +165,7 @@ export async function createSalesOrder(
         payment_method: input.payment_method || null,
         shipping_code: input.shipping_code || null,
         install_date: input.install_date || null,
+        ...oSheetBoSung(input),
         total_vat: total,
         note: input.note || null,
         created_by: createdBy,
@@ -171,6 +215,7 @@ export async function updateSalesOrder(orderCode: string, input: NewOrderInput):
       payment_method: input.payment_method || null,
       shipping_code: input.shipping_code || null,
       install_date: input.install_date || null,
+      ...oSheetBoSung(input),
       total_vat: total,
       note: input.note || null,
       updated_at: new Date().toISOString(),
@@ -219,6 +264,37 @@ export async function getOrderForEdit(orderCode: string): Promise<OrderFormIniti
     payment_method: (header.payment_method as string) ?? null,
     shipping_code: (header.shipping_code as string) ?? null,
     install_date: ((header.install_date as string) ?? '')?.slice(0, 10) || null,
+    channel_detail: (header.channel_detail as string) ?? null,
+    qua_tang: (header.qua_tang as string) ?? null,
+    su_dung_qua_tang: (header.su_dung_qua_tang as string) ?? null,
+    tracking_url: (header.tracking_url as string) ?? null,
+    kich_hoat_bh: !!header.kich_hoat_bh,
+    email: (header.email as string) ?? null,
+    tien_coc: header.tien_coc == null ? null : Number(header.tien_coc),
+    gui_hdsd: !!header.gui_hdsd,
+    xuat_hoa_don: !!header.xuat_hoa_don,
+    da_doi_soat: !!header.da_doi_soat,
+    ngay_doi_soat: ((header.ngay_doi_soat as string) ?? '')?.slice(0, 10) || null,
+    so_hd: (header.so_hd as string) ?? null,
+    ten_goi_khach: (header.ten_goi_khach as string) ?? null,
+    ten_folder: (header.ten_folder as string) ?? null,
+    ten_khach_theo_doi: (header.ten_khach_theo_doi as string) ?? null,
+    tien_se_thu: header.tien_se_thu == null ? null : Number(header.tien_se_thu),
+    bien_ban_xac_nhan: !!header.bien_ban_xac_nhan,
+    bao_cao_lap_dat: !!header.bao_cao_lap_dat,
+    tien_do_lap_dat: (header.tien_do_lap_dat as string) ?? null,
+    ngay_hoan_thanh_lap: ((header.ngay_hoan_thanh_lap as string) ?? '')?.slice(0, 10) || null,
+    tu_dien: (header.tu_dien as string) ?? null,
+    version: (header.version as string) ?? null,
+    nghe_nghiep: (header.nghe_nghiep as string) ?? null,
+    ngay_sinh: ((header.ngay_sinh as string) ?? '')?.slice(0, 10) || null,
+    gioi_tinh: (header.gioi_tinh as string) ?? null,
+    do_tuoi: (header.do_tuoi as string) ?? null,
+    loai_nha: (header.loai_nha as string) ?? null,
+    tinh_trang_nha: (header.tinh_trang_nha as string) ?? null,
+    cong_ty_xuat_hd: (header.cong_ty_xuat_hd as string) ?? null,
+    mst: (header.mst as string) ?? null,
+    dia_chi_xuat_hd: (header.dia_chi_xuat_hd as string) ?? null,
     note: (header.note as string) ?? null,
     items: ((items ?? []) as Array<Record<string, unknown>>).map((it) => ({
       internal_code: (it.internal_code as string) ?? '',
