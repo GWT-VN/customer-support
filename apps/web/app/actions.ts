@@ -4557,3 +4557,103 @@ export async function auditLog(limit = 100, hanhDong?: string): Promise<AuditRow
   if (error) throw new Error(error.message)
   return (data ?? []) as AuditRow[]
 }
+
+// ── Nối máy đã lắp với ĐƠN CỦA ĐẠI LÝ (CEO dump 22/08/2026) ────────────────
+export type DonDaiLy = {
+  order_code: string
+  dai_ly: string
+  ngay: string | null
+  khach_tren_don: string | null
+  mat_hang: string | null
+}
+
+/**
+ * Danh sách ĐƠN CỦA ĐẠI LÝ để CS chọn khi kích hoạt bảo hành.
+ *
+ * Vì sao gom theo `order_code`: một đơn có nhiều dòng hàng, CS chỉ cần chọn ĐƠN.
+ * Đo prod 22/08: 27 đơn đại lý của 10 đại lý — dưới ngưỡng nạp hết, nhưng vẫn trả kèm tên đại
+ * lý + khách trên đơn để ô gõ-để-tìm khớp được cả ba thứ.
+ */
+export async function donDaiLyChon(): Promise<DonDaiLy[]> {
+  await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
+  const { data, error } = await dataClient()
+    .from('sales_order_lines')
+    .select('order_code, channel_detail, order_date, customer_name, product_name')
+    .eq('channel', 'Đại lý')
+    .order('order_date', { ascending: false, nullsFirst: false })
+  if (error) throw new Error(error.message)
+
+  const gom = new Map<string, DonDaiLy>()
+  for (const r of (data ?? []) as Record<string, string | null>[]) {
+    const ma = r.order_code
+    if (!ma || gom.has(ma)) continue
+    gom.set(ma, {
+      order_code: ma,
+      dai_ly: r.channel_detail ?? '(không rõ đại lý)',
+      ngay: r.order_date,
+      khach_tren_don: r.customer_name,
+      mat_hang: r.product_name,
+    })
+  }
+  return [...gom.values()]
+}
+
+/**
+ * Gán / gỡ đơn đại lý cho một con máy.
+ *
+ * CHÉP tên đại lý vào `installed_base` chứ không chỉ giữ mã đơn: `sales_order_lines` bị xoá sạch
+ * rồi nạp lại mỗi lần sync Google Sheet, nên mã đơn có thể biến mất. Thông tin bảo hành phải
+ * sống lâu hơn một lần sync.
+ */
+export async function ganDonDaiLyChoMay(
+  serial: string, orderCode: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireStaff()
+  await doQuyen('cs.may.kich_hoat_bh')
+  const db = dataClient()
+
+  if (!orderCode) {
+    const { error } = await db.from('installed_base')
+      .update({ dai_ly_ten: null, dai_ly_don: null, dai_ly_gan_luc: null, updated_at: new Date().toISOString() })
+      .eq('serial', serial)
+    if (error) return { ok: false, error: error.message }
+    await ghiAudit('go_don_dai_ly', `may:${serial}`)
+    revalidatePath(`/may/${encodeURIComponent(serial)}`)
+    return { ok: true }
+  }
+
+  const { data: don } = await db.from('sales_order_lines')
+    .select('channel_detail').eq('order_code', orderCode).limit(1)
+  const tenDaiLy = (don?.[0] as { channel_detail: string | null } | undefined)?.channel_detail
+  if (!don?.length) return { ok: false, error: `Không thấy đơn ${orderCode}.` }
+
+  const { error } = await db.from('installed_base').update({
+    dai_ly_ten: tenDaiLy || '(không rõ đại lý)',
+    dai_ly_don: orderCode,
+    dai_ly_gan_luc: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq('serial', serial)
+  if (error) return { ok: false, error: error.message }
+
+  await ghiAudit('gan_don_dai_ly', `may:${serial}`, { order_code: orderCode, dai_ly: tenDaiLy })
+  revalidatePath(`/may/${encodeURIComponent(serial)}`)
+  return { ok: true }
+}
+
+/**
+ * Đại lý đã bán con máy này. Đọc THẲNG `installed_base`, cố ý KHÔNG đi qua `v_installed_base`.
+ *
+ * View đó là danh sách cột chọn lọc (không phải `select *`) nên cột mới không tự có mặt; viết
+ * lại định nghĩa view chỉ để lấy 2 cột là rủi ro thừa cho một view nhiều khu đang đọc.
+ */
+export async function daiLyCuaMay(serial: string): Promise<{
+  dai_ly_ten: string | null; dai_ly_don: string | null
+}> {
+  await requireStaff()
+  await doQuyen('cs.may.xem')
+  const { data } = await dataClient()
+    .from('installed_base').select('dai_ly_ten, dai_ly_don').eq('serial', serial).maybeSingle()
+  const r = data as { dai_ly_ten: string | null; dai_ly_don: string | null } | null
+  return { dai_ly_ten: r?.dai_ly_ten ?? null, dai_ly_don: r?.dai_ly_don ?? null }
+}
