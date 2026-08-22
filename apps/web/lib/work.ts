@@ -263,3 +263,24 @@ export function duongDanLink(
 export function catChip<T>(ds: readonly T[], toiDa = 2): { hien: T[]; du: number } {
   return { hien: ds.slice(0, toiDa), du: Math.max(0, ds.length - toiDa) }
 }
+
+/**
+ * Vị trí mới cho thẻ vừa thả vào cột kanban.
+ *
+ * `work.task.sort_order` là `double precision`, cố ý: chèn bằng TRUNG ĐIỂM thì
+ * luôn còn chỗ giữa hai số, không phải đánh số lại cả cột mỗi lần kéo. Đánh số
+ * lại là ghi hàng chục dòng cho một thao tác kéo, và hai người kéo cùng lúc là
+ * đè nhau.
+ *
+ * `truoc` = sort_order của thẻ ngay TRÊN chỗ thả, `sau` = thẻ ngay DƯỚI.
+ * Thiếu bên nào nghĩa là thả sát đầu hoặc sát cuối cột.
+ */
+export function thuTuMoi(truoc?: number, sau?: number): number {
+  if (truoc == null && sau == null) return 0
+  if (truoc == null) return sau! - 1
+  if (sau == null) return truoc + 1
+  // Trùng số (data cũ đều bằng 0) thì không có khe để chèn — lùi xuống dưới
+  // `truoc` một chút, thứ tự cuối cùng vẫn ổn định vì còn tiêu chí phụ là id.
+  if (sau <= truoc) return truoc - 0.5
+  return (truoc + sau) / 2
+}

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   nhomTheoHan, nhanHan, gomTheoHan, soNgayToiHan, chuTat,
   isoTuOInput, inputTuIso, moTaNhatKy, mocThoiGian, THU_TU_NHOM,
-  duongDanLink, catChip, NHAN_LOAI_LINK, nhanChip,
+  duongDanLink, catChip, NHAN_LOAI_LINK, nhanChip, thuTuMoi,
 } from './work'
 
 // Mốc cố định: 15/09/2026 lúc 10:00 giờ địa phương.
@@ -220,5 +220,42 @@ describe('nhanChip', () => {
   it('chết mà cũng không có tên chụp lại: rơi về mã, không để trống', () => {
     expect(nhanChip({ ma: 'TK-9', nhan: null }))
       .toEqual({ ten: 'TK-9', treo: true, giaiThich: 'Mã TK-9 không còn trong hệ thống (bị gộp hoặc xoá)' })
+  })
+})
+
+describe('thuTuMoi — vị trí khi thả thẻ vào cột kanban', () => {
+  it('cột rỗng -> 0', () => {
+    expect(thuTuMoi(undefined, undefined)).toBe(0)
+  })
+
+  it('thả xuống cuối -> lớn hơn thẻ cuối', () => {
+    expect(thuTuMoi(10, undefined)).toBeGreaterThan(10)
+  })
+
+  it('thả lên đầu -> nhỏ hơn thẻ đầu', () => {
+    expect(thuTuMoi(undefined, 10)).toBeLessThan(10)
+  })
+
+  it('thả vào giữa -> nằm hẳn giữa hai thẻ', () => {
+    expect(thuTuMoi(4, 6)).toBe(5)
+  })
+
+  it('chèn giữa liên tục vẫn ra số mới, không bao giờ cạn chỗ', () => {
+    // sort_order là double precision nên trung điểm luôn còn chỗ — không phải
+    // đánh số lại cả cột mỗi lần kéo. Chèn 30 lần vào cùng một khe.
+    let tren = 0, duoi = 1
+    for (let i = 0; i < 30; i++) {
+      const moi = thuTuMoi(tren, duoi)
+      expect(moi).toBeGreaterThan(tren)
+      expect(moi).toBeLessThan(duoi)
+      duoi = moi
+    }
+  })
+
+  it('hai thẻ trùng số thì không đẻ ra NaN hay số ngoài khoảng', () => {
+    // Dữ liệu cũ đều sort_order = 0, nên trùng là chuyện thường, không phải ngoại lệ.
+    const kq = thuTuMoi(3, 3)
+    expect(Number.isFinite(kq)).toBe(true)
+    expect(kq).toBeLessThanOrEqual(3)
   })
 })

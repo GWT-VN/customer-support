@@ -9,8 +9,8 @@
  */
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { bangTeam, doiTrangThai, type ViecTeamRow, type NenTang } from '@/app/work/actions'
-import { TRANG_THAI, NHAN_TRANG_THAI, nhanHan } from '@/lib/work'
+import { bangTeam, doiTrangThai, keoTha, type ViecTeamRow, type NenTang } from '@/app/work/actions'
+import { TRANG_THAI, NHAN_TRANG_THAI, nhanHan, thuTuMoi } from '@/lib/work'
 import { DongViec } from './DongViec'
 import { ChiTietViec } from './ChiTietViec'
 import { FormTaoViec } from './FormTaoViec'
@@ -31,6 +31,41 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
   const [pending, start] = useTransition()
   const [chon, setChon] = useState<Set<number>>(new Set())
   const [thongBao, setThongBao] = useState<string | null>(null)
+  /** Thẻ đang được nhấc lên, và chỗ nó sẽ rơi xuống. */
+  const [dangKeo, setDangKeo] = useState<number | null>(null)
+  const [choTha, setChoTha] = useState<{ cot: string; viTri: number } | null>(null)
+
+  /** Việc của một cột, đã xếp theo thứ tự người dùng tự kéo. */
+  function cotCua(status: string) {
+    return rows
+      .filter((v) => v.status === status)
+      .sort((a, b) =>
+        (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.priority - b.priority || a.id - b.id)
+  }
+
+  function thaXuong(cot: string, viTri: number) {
+    const id = dangKeo
+    setDangKeo(null); setChoTha(null)
+    if (id == null) return
+    // Bỏ chính thẻ đang kéo ra khỏi danh sách trước khi tính hàng xóm, nếu không
+    // kéo trong cùng một cột sẽ tính vị trí so với chính nó.
+    const ds = cotCua(cot).filter((v) => v.id !== id)
+    const cu = rows.find((v) => v.id === id)
+    const truoc = viTri > 0 ? ds[viTri - 1]?.sort_order : undefined
+    const sau = ds[viTri]?.sort_order
+    const moi = thuTuMoi(truoc ?? undefined, sau ?? undefined)
+    if (cu && cu.status === cot && (cu.sort_order ?? 0) === moi) return  // không đổi gì
+
+    // Cập nhật ngay trên màn hình rồi mới gọi server: kéo xong mà thẻ nhảy về chỗ
+    // cũ chờ mạng thì cảm giác như thao tác trượt.
+    setRows((r) => r.map((v) => (v.id === id ? { ...v, status: cot, sort_order: moi } : v)))
+    start(async () => {
+      const kq = await keoTha(id, cot, moi)
+      if (!kq.ok) { setLoi(kq.loi); nap(); return }   // hỏng thì nạp lại cho khớp server
+      setLoi(null)
+      nap()
+    })
+  }
 
   function doiChon(id: number, c: boolean) {
     setChon((cu) => {
@@ -191,12 +226,23 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
       ) : (
         <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-5 items-start">
           {TRANG_THAI.map((cot) => {
-            const cua = rows.filter((v) => v.status === cot.v)
+            const cua = cotCua(cot.v)
+            const laDich = choTha?.cot === cot.v
             return (
               <section
                 key={cot.v}
                 className="flex flex-col gap-2.5 p-2.5"
-                style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11 }}
+                onDragOver={(e) => {
+                  if (dangKeo == null) return
+                  e.preventDefault()                       // không chặn thì trình duyệt từ chối thả
+                  if (!laDich) setChoTha({ cot: cot.v, viTri: cua.filter((v) => v.id !== dangKeo).length })
+                }}
+                onDrop={(e) => { e.preventDefault(); thaXuong(cot.v, choTha?.viTri ?? 0) }}
+                style={{
+                  background: laDich ? 'var(--surface-3)' : 'var(--surface-2)',
+                  border: `1px solid ${laDich ? 'var(--accent-ink)' : 'var(--border)'}`,
+                  borderRadius: 11,
+                }}
               >
                 <h3 className="flex items-center gap-2 m-0.5" style={{ fontSize: 12.5, fontWeight: 650 }}>
                   <span
@@ -211,15 +257,36 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
 
                 {cua.map((v) => {
                   const han = nhanHan(v.due_at)
+                  const conLai = cua.filter((x) => x.id !== dangKeo)
+                  const viTriTrong = conLai.findIndex((x) => x.id === v.id)
+                  const vachTren = laDich && choTha?.viTri === viTriTrong && v.id !== dangKeo
                   return (
+                    <div key={v.id} className="flex flex-col gap-2.5">
+                    {vachTren && (
+                      // Vạch chỉ chỗ thẻ sẽ rơi. Không có nó thì kéo là đoán mò.
+                      <span style={{ height: 2, borderRadius: 2, background: 'var(--accent-ink)' }} />
+                    )}
                     <button
-                      key={v.id}
+                      draggable
+                      onDragStart={(e) => { setDangKeo(v.id); e.dataTransfer.effectAllowed = 'move' }}
+                      onDragEnd={() => { setDangKeo(null); setChoTha(null) }}
+                      onDragOver={(e) => {
+                        if (dangKeo == null || dangKeo === v.id) return
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const o = e.currentTarget.getBoundingClientRect()
+                        const nuaTren = e.clientY < o.top + o.height / 2
+                        const j = cua.filter((x) => x.id !== dangKeo).findIndex((x) => x.id === v.id)
+                        if (j >= 0) setChoTha({ cot: cot.v, viTri: nuaTren ? j : j + 1 })
+                      }}
                       onClick={() => setMo(v.id)}
                       className="w-full text-left flex flex-col gap-2.5"
                       style={{
                         background: 'var(--surface)', border: '1px solid var(--border)',
                         borderLeft: `3px solid ${MAU_UT_VAR[v.priority] ?? 'var(--border-strong)'}`,
                         borderRadius: 9, padding: '11px 12px', boxShadow: 'var(--shadow)',
+                        opacity: dangKeo === v.id ? .4 : 1,
+                        cursor: 'grab',
                       }}
                     >
                       <span style={{ fontWeight: 560, fontSize: 13.5, letterSpacing: '-.006em', lineHeight: 1.35 }}>
@@ -247,8 +314,13 @@ export function BangTeam({ rowsBanDau, nenTang }: { rowsBanDau: ViecTeamRow[]; n
                         <ChongAvatar nguoi={v.assignees.map((a) => ({ ten: a.ten, role: a.role }))} toiDa={2} co={22} />
                       </span>
                     </button>
+                    </div>
                   )
                 })}
+                {/* Vạch cuối cột — thả xuống dưới cùng. */}
+                {laDich && choTha?.viTri === cua.filter((x) => x.id !== dangKeo).length && (
+                  <span style={{ height: 2, borderRadius: 2, background: 'var(--accent-ink)' }} />
+                )}
 
                 {cua.length === 0 && (
                   <p className="px-1" style={{ fontSize: 11.5, color: 'var(--faint)' }}>

@@ -38,6 +38,8 @@ export type ViecRow = {
 
 export type ViecTeamRow = Omit<ViecRow, 'description' | 'start_at' | 'my_role'> & {
   creator_ten: string | null
+  /** Vị trí trong cột kanban. Chỉ work_bang_team trả cột này. */
+  sort_order: number
 }
 
 export type NenTang = {
@@ -207,6 +209,19 @@ export async function ganNguoi(taskId: number, staffId: string, role = 'doer'): 
 export async function boNguoi(taskId: number, staffId: string): Promise<KQ<void>> {
   return boc(async () => {
     await goi<void>('work_bo_nguoi', { p_task_id: taskId, p_staff_id: staffId })
+    lamMoi()
+  })
+}
+
+/**
+ * Kéo thẻ trên bảng kanban: đổi trạng thái VÀ vị trí trong một lệnh gọi.
+ *
+ * Gộp làm một, không tách hai lệnh: kéo một phát mà nửa đường gãy thì thẻ nằm
+ * sai cột với thứ tự của cột cũ, người dùng không hiểu vì sao.
+ */
+export async function keoTha(taskId: number, status: string, thuTu: number): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_keo_tha', { p_task_id: taskId, p_status: status, p_sort_order: thuTu })
     lamMoi()
   })
 }
