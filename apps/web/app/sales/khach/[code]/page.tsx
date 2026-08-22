@@ -107,6 +107,8 @@ export default async function ChiTietKhachPage({
             <Field label="MST" value={c.tax_code} />
             <Field label="Địa chỉ công ty" value={c.dia_chi_cty} />
             <Field label="SĐT công ty" value={c.sdt_cty} />
+            <Field label="Người đại diện" value={c.nguoi_dai_dien} />
+            <Field label="Chức danh" value={c.chuc_vu_dai_dien} />
             <Field label="Mã khách (hệ mới)" value={c.ma_kh} />
           </dl>
           {c.note && <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">📝 {c.note}</p>}

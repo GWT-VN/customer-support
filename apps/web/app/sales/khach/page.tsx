@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { BoLocChon, OTimKiem, ThanhDangLoc } from '@/bang'
-import { danhSachKhach, kenhChonDuoc, kenhTrongDon, khachTrungSdt, tinhTrongKhach } from '../actions'
+import { danhSachKhach, kenhChonDuoc, kenhTrongDon, khachTrungSdt, nhanVienChonDuoc, tinhTrongKhach } from '../actions'
 import { TaoKhachButton } from '../TaoKhachButton'
 
 export const metadata = { title: 'Khách hàng · GWT Sales' }
@@ -24,12 +24,13 @@ export default async function SalesKhachPage({
   await requireNhanSu()
   if (!(await coTheVaoSales())) redirect('/?loi=khong_du_quyen')
   const { q, tinh, kenh } = await searchParams
-  const [rows, tinhOpts, kenhOpts, kenhDim, trung] = await Promise.all([
+  const [rows, tinhOpts, kenhOpts, kenhDim, trung, nhanVien] = await Promise.all([
     danhSachKhach(q ?? '', { tinh, kenh }),
     tinhTrongKhach(),
     kenhTrongDon(),
     kenhChonDuoc(),
     khachTrungSdt(),
+    nhanVienChonDuoc(),
   ])
   const dieuKien = [
     tinh ? { nhan: 'Tỉnh/TP', giaTri: tinh } : null,
@@ -44,7 +45,7 @@ export default async function SalesKhachPage({
             <h1 className="text-xl font-semibold text-slate-900">Khách hàng</h1>
             <p className="text-sm text-slate-500">{rows.length} khách · <span className="font-mono">KH…</span> từ Sheet · <span className="font-mono">KA…</span> tạo trên app</p>
           </div>
-          <TaoKhachButton kenh={kenhDim} />
+          <TaoKhachButton kenh={kenhDim} nhanVien={nhanVien} />
         </header>
 
         {/* Cảnh báo trùng — CEO chốt 22/08: đếm và nói ra, không chặn cứng ở DB. */}

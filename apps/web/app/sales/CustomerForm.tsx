@@ -7,7 +7,8 @@ import { ChonTinh } from '@/components/ChonTinh'
 import { ChonKenh } from '@/components/ChonKenh'
 import { nhanKetQuaTra, type KetQuaTraKhach } from '@/lib/tra-khach-chung'
 import type { Kenh } from '@/app/actions'
-import { taoKhach, suaKhach, traSdtSales } from './actions'
+import { OChonGoiY } from '@/bang'
+import { taoKhach, suaKhach, traSdtSales, type NhanVienChon } from './actions'
 import type { CustomerInput } from './_types'
 
 const inp =
@@ -31,6 +32,7 @@ export function CustomerForm({
   customerCode,
   initial,
   kenh,
+  nhanVien,
   khoaSheet = false,
   onXong,
 }: {
@@ -38,6 +40,7 @@ export function CustomerForm({
   customerCode?: string
   initial?: CustomerInput
   kenh: Kenh[]
+  nhanVien: NhanVienChon[]
   /** Khách từ Google Sheet: mấy ô Sheet dựng lại từ đơn thì khoá, sửa cũng bị đè. */
   khoaSheet?: boolean
   onXong?: () => void
@@ -59,6 +62,8 @@ export function CustomerForm({
   const [sdtCty, setSdtCty] = useState(initial?.sdt_cty ?? '')
   const [emailCty, setEmailCty] = useState(initial?.email_cty ?? '')
   const [salesOwner, setSalesOwner] = useState(initial?.sales_owner ?? '')
+  const [daiDien, setDaiDien] = useState(initial?.nguoi_dai_dien ?? '')
+  const [chucVu, setChucVu] = useState(initial?.chuc_vu_dai_dien ?? '')
 
   const [khop, setKhop] = useState<KetQuaTraKhach | null>(null)
   const [dangTra, setDangTra] = useState(false)
@@ -109,6 +114,8 @@ export function CustomerForm({
       dia_chi_cty: diaChiCty.trim() || null,
       sdt_cty: sdtCty.trim() || null,
       email_cty: emailCty.trim() || null,
+      nguoi_dai_dien: daiDien.trim() || null,
+      chuc_vu_dai_dien: chucVu.trim() || null,
       sales_owner: salesOwner.trim() || null,
     }
     const res = isEdit && customerCode ? await suaKhach(customerCode, input) : await taoKhach(input)
@@ -230,7 +237,13 @@ export function CustomerForm({
 
           <div>
             <label className={lbl}>Sales phụ trách</label>
-            <input className={inp} value={salesOwner} onChange={(e) => setSalesOwner(e.target.value)} placeholder="email nhân viên" />
+            <OChonGoiY
+              giaTri={salesOwner || null}
+              onChon={(v) => setSalesOwner(v ?? '')}
+              tuyChon={nhanVien.map((n) => ({ gt: n.email, nhan: n.ten, phu: n.vai_tro.join(', ') }))}
+              choTrong="— chưa giao —"
+              choPhepXoa
+            />
           </div>
 
           <div className="border-t border-slate-100 pt-3">
@@ -255,6 +268,14 @@ export function CustomerForm({
               <div>
                 <label className={lbl}>Email công ty</label>
                 <input className={inp} type="email" value={emailCty} onChange={(e) => setEmailCty(e.target.value)} />
+              </div>
+              <div>
+                <label className={lbl}>Người đại diện</label>
+                <input className={inp} value={daiDien} onChange={(e) => setDaiDien(e.target.value)} placeholder="Người ký hợp đồng / hoá đơn" />
+              </div>
+              <div>
+                <label className={lbl}>Chức danh</label>
+                <input className={inp} value={chucVu} onChange={(e) => setChucVu(e.target.value)} placeholder="Giám đốc, Kế toán trưởng…" />
               </div>
             </div>
           </div>

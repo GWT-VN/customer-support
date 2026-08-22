@@ -66,6 +66,9 @@ export type CustomerInput = {
   dia_chi_cty: string | null
   sdt_cty: string | null
   email_cty: string | null
+  nguoi_dai_dien: string | null
+  chuc_vu_dai_dien: string | null
+  /** email nhân viên trong `staff` — chọn từ danh sách, không gõ tay. */
   sales_owner: string | null
 }
 

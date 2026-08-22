@@ -241,7 +241,7 @@ export function isAppCustomer(code: string | null | undefined): boolean {
 }
 
 const CUST_COLS =
-  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note, channel_id, email, ngay_sinh, dia_chi_cty, sdt_cty, email_cty, sales_owner'
+  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note, channel_id, email, ngay_sinh, dia_chi_cty, sdt_cty, email_cty, nguoi_dai_dien, chuc_vu_dai_dien, sales_owner'
 
 export async function findCustomerByPhone(phone: string): Promise<{ customer_code: string; name: string | null } | null> {
   const db = dataClient()
@@ -270,6 +270,8 @@ export async function getCustomerForEdit(code: string): Promise<CustomerInput | 
     dia_chi_cty: (c.dia_chi_cty as string) ?? null,
     sdt_cty: (c.sdt_cty as string) ?? null,
     email_cty: (c.email_cty as string) ?? null,
+    nguoi_dai_dien: (c.nguoi_dai_dien as string) ?? null,
+    chuc_vu_dai_dien: (c.chuc_vu_dai_dien as string) ?? null,
     sales_owner: (c.sales_owner as string) ?? null,
   }
 }
@@ -307,6 +309,8 @@ function cleanCustomerAppFields(input: CustomerInput) {
     dia_chi_cty: input.dia_chi_cty?.trim() || null,
     sdt_cty: input.sdt_cty?.trim() || null,
     email_cty: input.email_cty?.trim() || null,
+    nguoi_dai_dien: input.nguoi_dai_dien?.trim() || null,
+    chuc_vu_dai_dien: input.chuc_vu_dai_dien?.trim() || null,
     sales_owner: input.sales_owner?.trim() || null,
   }
 }

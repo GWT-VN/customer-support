@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Kenh } from '@/app/actions'
 import { CustomerForm } from './CustomerForm'
+import type { NhanVienChon } from './actions'
 
 /**
  * MỘT nút tạo khách. CEO chốt 22/08/2026 — làm giống CSKH:
@@ -14,7 +15,7 @@ import { CustomerForm } from './CustomerForm'
  *
  * `/sales/khach/moi` vẫn giữ cho ai mở thẳng bằng đường dẫn — dùng CHUNG `CustomerForm`.
  */
-export function TaoKhachButton({ kenh }: { kenh: Kenh[] }) {
+export function TaoKhachButton({ kenh, nhanVien }: { kenh: Kenh[]; nhanVien: NhanVienChon[] }) {
   const [mo, setMo] = useState(false)
   const router = useRouter()
 
@@ -36,7 +37,7 @@ export function TaoKhachButton({ kenh }: { kenh: Kenh[] }) {
                 className="text-slate-400 hover:text-slate-900" aria-label="Đóng">✕</button>
             </div>
             <div className="rounded-b-xl bg-slate-50 p-4">
-              <CustomerForm mode="create" kenh={kenh} onXong={() => { setMo(false); router.refresh() }} />
+              <CustomerForm mode="create" kenh={kenh} nhanVien={nhanVien} onXong={() => { setMo(false); router.refresh() }} />
             </div>
           </div>
         </div>

@@ -668,6 +668,8 @@ export type KhachChiTiet = {
     email: string | null
     dia_chi_cty: string | null
     sdt_cty: string | null
+    nguoi_dai_dien: string | null
+    chuc_vu_dai_dien: string | null
     ma_kh: string | null
   }
   daNoiCS: boolean
@@ -720,7 +722,7 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
     db
       .from('customers')
       .select(
-        'customer_code, name, phone, phone_chuan, province, province_moi, address, company_invoice, tax_code, total_orders, total_gift_orders, first_order_date, last_order_date, note, channel_id, sales_owner, email, dia_chi_cty, sdt_cty, email_cty, ma_kh'
+        'customer_code, name, phone, phone_chuan, province, province_moi, address, company_invoice, tax_code, total_orders, total_gift_orders, first_order_date, last_order_date, note, channel_id, sales_owner, email, dia_chi_cty, sdt_cty, email_cty, nguoi_dai_dien, chuc_vu_dai_dien, ma_kh'
       )
       .eq('customer_code', customerCode)
       .maybeSingle(),
@@ -734,6 +736,14 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
   if (cErr) throw cErr
   if (!c) return null
   const cu = c as Record<string, unknown>
+
+  // Người phụ trách: hồ sơ hiện TÊN, không hiện email — email là khoá lưu, không phải thứ để đọc.
+  let tenNguoiPhuTrach: string | null = (cu.sales_owner as string) ?? null
+  if (tenNguoiPhuTrach) {
+    const { data: nv } = await db.from('staff').select('ten').eq('email', tenNguoiPhuTrach).maybeSingle()
+    const t = (nv as { ten?: string } | null)?.ten
+    if (t) tenNguoiPhuTrach = t
+  }
 
   // Tên kênh 2 cấp — hồ sơ hiện chữ, không hiện số id.
   let tenKenh: string | null = null
@@ -822,10 +832,12 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
       last_order_date: (cu.last_order_date as string) ?? null,
       note: (cu.note as string) ?? null,
       kenh: tenKenh,
-      sales_owner: (cu.sales_owner as string) ?? null,
+      sales_owner: tenNguoiPhuTrach,
       email: (cu.email as string) ?? null,
       dia_chi_cty: (cu.dia_chi_cty as string) ?? null,
       sdt_cty: (cu.sdt_cty as string) ?? null,
+      nguoi_dai_dien: (cu.nguoi_dai_dien as string) ?? null,
+      chuc_vu_dai_dien: (cu.chuc_vu_dai_dien as string) ?? null,
       ma_kh: (cu.ma_kh as string) ?? null,
     },
     daNoiCS: !!csRow,
@@ -1094,4 +1106,32 @@ export async function khachTrungSdt(): Promise<KhachTrung[]> {
     .filter(([, v]) => v.ma.length > 1)
     .map(([sdt9, v]) => ({ sdt9, ...v }))
     .sort((a, b) => b.ma.length - a.ma.length)
+}
+
+export type NhanVienChon = { email: string; ten: string; vai_tro: string[] }
+
+/**
+ * Nhân viên để chọn làm "Sales phụ trách" — CEO chốt 22/08: **chọn từ danh sách**,
+ * không gõ tay email. Gõ tay là sớm muộn có `an.nguyen@gwt.vn` và `An Nguyễn` cùng
+ * chỉ một người, rồi lọc theo người phụ trách ra thiếu.
+ *
+ * Không dùng `listStaff()` của khu CS: hàm đó đi qua `requireStaff()` — cổng CS —
+ * nên **đá văng nhân viên Sales thuần** (đúng lỗi nền tảng đã vá 19/08). Sales gác
+ * bằng cổng Sales rồi đọc thẳng bảng dùng chung.
+ */
+export async function nhanVienChonDuoc(): Promise<NhanVienChon[]> {
+  await chanSales()
+  const { data } = await dataClient()
+    .from('staff')
+    .select('ten, email, vai_tro')
+    .eq('hoat_dong', true)
+    .not('email', 'is', null)
+    .order('ten')
+  return ((data ?? []) as Array<Record<string, unknown>>)
+    .map((r) => ({
+      email: (r.email as string) ?? '',
+      ten: (r.ten as string) || ((r.email as string) ?? ''),
+      vai_tro: Array.isArray(r.vai_tro) ? (r.vai_tro as string[]) : [],
+    }))
+    .filter((r) => r.email)
 }
