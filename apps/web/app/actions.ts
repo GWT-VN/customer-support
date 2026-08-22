@@ -1139,16 +1139,27 @@ export async function maintenanceCounts() {
   return out
 }
 
-/** Đánh dấu 1 lượt bảo trì đã làm (ghi completed_at). */
+/**
+ * Đánh dấu 1 lượt bảo trì đã làm (ghi completed_at) — rồi TRẢ VỀ ĐỀ XUẤT dời các lượt sau.
+ *
+ * Trước 22/08 nút này chỉ ghi ngày, **không dời gì, không báo gì**, trong khi nút "+ kết quả đo"
+ * ngay cạnh lại dời. CS nào bấm nút nhanh (không có chỉ số nước để nhập) là lịch **im lặng không
+ * dời** — đo prod 21/08: trong 23 hồ sơ có lượt đã làm kèm lượt sau chưa làm, chỉ **1 hồ sơ**
+ * có chuỗi khớp đúng chu kỳ.
+ *
+ * Nay HAI nút cùng một luật: ghi ngày xong thì **hỏi lại**, CS đồng ý mới đổi lịch (CEO chốt
+ * 21/08). Không đồng ý thì lượt vẫn xong, chỉ là lịch giữ nguyên.
+ */
 export async function markMaintenanceDone(visitId: string, date: string) {
   await requireStaff()
   await doQuyen('cs.bao_tri.ghi_ket_qua')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false as const, error: 'Ngày không hợp lệ.' }
-  const { error } = await dataClient()
-    .from('maintenance_visit').update({ completed_at: date }).eq('id', visitId)
+  const db = dataClient()
+  const { error } = await db.from('maintenance_visit').update({ completed_at: date }).eq('id', visitId)
   if (error) return { ok: false as const, error: error.message }
+  const deXuat = await tinhDoiLichSau(db, visitId, date)
   revalidatePath('/bao-tri')
-  return { ok: true as const }
+  return { ok: true as const, deXuat }
 }
 
 /** Bỏ đánh dấu (ghi nhầm). */
@@ -1162,6 +1173,91 @@ export async function unmarkMaintenanceDone(visitId: string) {
   return { ok: true as const }
 }
 
+/** Một lượt sẽ bị dời, kèm ngày cũ để CS đối chiếu trước khi đồng ý. */
+export type DoiLichMuc = { id: string; lan_thu: number | null; cu: string | null; moi: string }
+
+/**
+ * Tính XEM sẽ dời những lượt nào — KHÔNG ghi gì.
+ *
+ * Tách khỏi lệnh ghi vì CEO chốt 21/08: **hỏi lại rồi CS xác nhận mới đổi**, không dời ngầm.
+ * Lịch bảo trì là thứ khách đã được hẹn miệng; đổi sau lưng CS thì CS gọi khách sai ngày.
+ *
+ * Chỉ trả về lượt THẬT SỰ đổi ngày — lượt đã đúng ngày rồi thì bỏ, để câu hỏi không kể ra
+ * những thứ không đổi (hỏi thừa vài lần là CS bấm đồng ý theo phản xạ, hết tác dụng).
+ */
+async function tinhDoiLichSau(
+  db: ReturnType<typeof dataClient>, visitId: string, ngayThuc: string,
+): Promise<DoiLichMuc[]> {
+  const { data: v } = await db.from('maintenance_visit')
+    .select('plan_id, lan_thu').eq('id', visitId).maybeSingle()
+  const vv = v as { plan_id: string | null; lan_thu: number | null } | null
+  if (!vv?.plan_id || vv.lan_thu == null) return []
+
+  const { data: plan } = await db.from('maintenance_plan')
+    .select('customer_id, chu_ky_thang, vung').eq('id', vv.plan_id).maybeSingle()
+  const p = plan as { customer_id: string | null; chu_ky_thang: number | null; vung: Vung | null } | null
+  const chuKy = p?.chu_ky_thang ?? 0
+  if (!p || chuKy <= 0) return []
+
+  const { data: sau } = await db.from('maintenance_visit').select('id, lan_thu, due_date')
+    .eq('plan_id', vv.plan_id).is('completed_at', null).gt('lan_thu', vv.lan_thu).order('lan_thu')
+  const ds = (sau ?? []) as { id: string; lan_thu: number | null; due_date: string | null }[]
+  if (!ds.length) return []
+
+  const { data: kh } = await db.from('cs_customers')
+    .select('province').eq('id', p.customer_id ?? '').maybeSingle()
+  const vung: Vung = p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
+  const ngayMoi = sinhLichBaoTri(ngayThuc, chuKy, ds.length + 1, vung).slice(1)  // mốc SAU ngày thực
+
+  const out: DoiLichMuc[] = []
+  for (let i = 0; i < ds.length && i < ngayMoi.length; i++) {
+    const cu = ds[i].due_date?.slice(0, 10) ?? null
+    if (cu === ngayMoi[i]) continue           // đã đúng ngày -> không kể vào câu hỏi
+    out.push({ id: ds[i].id, lan_thu: ds[i].lan_thu, cu, moi: ngayMoi[i] })
+  }
+  return out
+}
+
+/** Đề xuất dời lịch cho một lượt đã đánh dấu xong — để màn hình hỏi lại CS. Không ghi gì. */
+export async function deXuatDoiLich(visitId: string, ngayThuc: string): Promise<DoiLichMuc[]> {
+  await requireStaff()
+  await doQuyen('cs.bao_tri.xem')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ngayThuc)) return []
+  return tinhDoiLichSau(dataClient(), visitId, ngayThuc)
+}
+
+/**
+ * ÁP DỤNG việc dời lịch — chỉ chạy sau khi CS bấm đồng ý.
+ *
+ * Tính LẠI đề xuất tại đây thay vì nhận danh sách id/ngày từ trình duyệt: giữa lúc hỏi và lúc
+ * bấm, phiên khác có thể đã đổi lịch; nhận danh sách cũ là ghi đè thầm việc của người khác.
+ */
+export async function apDungDoiLich(
+  visitId: string, ngayThuc: string,
+): Promise<{ ok: true; doi: number } | { ok: false; error: string }> {
+  await requireStaff()
+  await doQuyen('cs.bao_tri.ghi_ket_qua')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ngayThuc)) return { ok: false, error: 'Ngày không hợp lệ.' }
+  const db = dataClient()
+  const muc = await tinhDoiLichSau(db, visitId, ngayThuc)
+
+  let doi = 0
+  const loi: string[] = []
+  for (const m of muc) {
+    // `count` = số dòng THẬT SỰ đổi, không phải số dòng định đổi. Báo con số đo được.
+    const { error, count } = await db.from('maintenance_visit')
+      .update({ due_date: m.moi }, { count: 'exact' })
+      .eq('id', m.id).is('completed_at', null)
+    if (error) loi.push(`lượt ${m.lan_thu ?? '?'}: ${error.message}`)
+    else doi += count ?? 0
+  }
+  await ghiAudit('doi_lich_bao_tri', `visit:${visitId}`,
+    { ngay: ngayThuc, de_xuat: muc.length, doi, loi }, loi.length ? 'loi' : 'ok')
+  revalidatePath('/bao-tri'); revalidatePath('/ky-thuat')
+  if (loi.length) return { ok: false, error: `Dời được ${doi}/${muc.length} lượt. Lỗi: ${loi.join(' · ')}` }
+  return { ok: true, doi }
+}
+
 export type KetQuaDo = {
   ngay: string; ghi_chu?: string
   tds_truoc?: number; tds_sau?: number; ph_truoc?: number; ph_sau?: number
@@ -1169,11 +1265,12 @@ export type KetQuaDo = {
 }
 
 /**
- * Ghi KẾT QUẢ ĐO khi bảo trì (TDS/pH/độ cứng/Clo dư trước-sau lọc) + đánh dấu xong theo NGÀY
- * THỰC, rồi DỜI LỊCH DÂY CHUYỀN: các lượt sau (chưa làm) tính lại từ ngày thực (né cuối tuần).
- * VD lịch 1/8 nhưng làm 10/8 -> lượt sau thành 10/11 thay vì 1/11.
+ * Ghi KẾT QUẢ ĐO khi bảo trì (TDS/pH/độ cứng/Clo dư trước-sau lọc) + đánh dấu xong theo NGÀY THỰC.
+ *
+ * Trả về ĐỀ XUẤT dời các lượt sau (lịch 1/8 mà làm 10/8 thì lượt sau nên thành 10/11 chứ không
+ * phải 1/11) — nhưng **không tự đổi**: CEO chốt 21/08 là CS phải xác nhận trước.
  */
-export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ ok: true; doi: number } | { ok: false; error: string }> {
+export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ ok: true; deXuat: DoiLichMuc[] } | { ok: false; error: string }> {
   await requireStaff()
   await doQuyen('cs.bao_tri.ghi_ket_qua')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(kq.ngay)) return { ok: false, error: 'Ngày không hợp lệ.' }
@@ -1188,29 +1285,12 @@ export async function ghiKetQuaBaoTri(visitId: string, kq: KetQuaDo): Promise<{ 
     do_cung_truoc: num(kq.do_cung_truoc), do_cung_sau: num(kq.do_cung_sau), clo_truoc: num(kq.clo_truoc), clo_sau: num(kq.clo_sau),
   }).eq('id', visitId)
   if (error) return { ok: false, error: error.message }
-  // Dời lịch dây chuyền cho các lượt SAU chưa làm.
-  let doi = 0
-  if (vv.plan_id && vv.lan_thu != null) {
-    const { data: plan } = await db.from('maintenance_plan').select('customer_id, chu_ky_thang, vung').eq('id', vv.plan_id).maybeSingle()
-    const p = plan as { customer_id: string | null; chu_ky_thang: number | null; vung: Vung | null } | null
-    const chuKy = p?.chu_ky_thang ?? 0
-    if (p && chuKy > 0) {
-      const { data: sau } = await db.from('maintenance_visit').select('id')
-        .eq('plan_id', vv.plan_id).is('completed_at', null).gt('lan_thu', vv.lan_thu).order('lan_thu')
-      const ds = (sau ?? []) as { id: string }[]
-      if (ds.length) {
-        const { data: kh } = await db.from('cs_customers').select('province').eq('id', p.customer_id ?? '').maybeSingle()
-        const vung: Vung = p.vung ?? vungTheoTinh((kh as { province: string | null } | null)?.province ?? null)
-        const ngayMoi = sinhLichBaoTri(kq.ngay, chuKy, ds.length + 1, vung).slice(1)  // mốc sau ngày thực
-        for (let i = 0; i < ds.length && i < ngayMoi.length; i++) {
-          await db.from('maintenance_visit').update({ due_date: ngayMoi[i] }).eq('id', ds[i].id); doi++
-        }
-      }
-    }
-  }
-  await ghiAudit('ghi_ket_qua_bao_tri', `visit:${visitId}`, { ngay: kq.ngay, doi_lich: doi })
+  // ĐỔI 22/08: KHÔNG dời ngầm nữa — chỉ đề xuất, CS bấm đồng ý thì `apDungDoiLich` mới ghi.
+  // Lịch bảo trì là thứ khách đã được hẹn miệng; đổi sau lưng CS thì CS gọi khách sai ngày.
+  const deXuat = await tinhDoiLichSau(db, visitId, kq.ngay)
+  await ghiAudit('ghi_ket_qua_bao_tri', `visit:${visitId}`, { ngay: kq.ngay, de_xuat_doi: deXuat.length })
   revalidatePath('/bao-tri')
-  return { ok: true, doi }
+  return { ok: true, deXuat }
 }
 
 // ── Đợt 1: nền lịch bảo trì tự động + map khách bảo trì với khách kích hoạt máy ──

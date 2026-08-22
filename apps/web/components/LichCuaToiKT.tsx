@@ -73,7 +73,12 @@ function DoNuocViec({
     const r = await ghiKetQuaBaoTri(visitId, kq)
     setBusy(false)
     if (!r.ok) { setErr(r.error); return }
-    setMsg(r.doi > 0 ? `Đã lưu + dời ${r.doi} lượt sau.` : 'Đã lưu kết quả đo.')
+    // CỐ Ý không hỏi kỹ thuật có dời lịch không: CEO chốt 21/08 là **CS** xác nhận rồi mới đổi.
+    // Kỹ thuật đang ở nhà khách, không nắm được lịch hẹn miệng của các lượt sau. Chỉ báo cho
+    // biết lịch chưa đụng tới, để không ai tưởng hệ thống đã tự dời.
+    setMsg(r.deXuat.length
+      ? `Đã lưu kết quả đo. ${r.deXuat.length} lượt sau lệch ngày — CS sẽ xác nhận dời.`
+      : 'Đã lưu kết quả đo.')
     router.refresh()
   }
 
