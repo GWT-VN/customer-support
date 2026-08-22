@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { chinhSachGia } from '../actions'
+import { chinhSachGia, lichSuChinhSach } from '../actions'
 import { quyenCtkm } from '../../ctkm/actions'
 import { BangChinhSach } from '../BangChinhSach'
 
@@ -7,7 +7,7 @@ export const metadata = { title: 'Chính sách giá đại lý · GWT Sales' }
 export const dynamic = 'force-dynamic'
 
 export default async function ChinhSachPage() {
-  const [ds, quyen] = await Promise.all([chinhSachGia(), quyenCtkm()])
+  const [ds, lichSu, quyen] = await Promise.all([chinhSachGia(), lichSuChinhSach(), quyenCtkm()])
   const daDat = ds.filter((d) => d.bac.NPP || d.bac.DAI_LY || d.bac.GIOI_THIEU).length
 
   return (
@@ -32,7 +32,7 @@ export default async function ChinhSachPage() {
           </p>
         )}
 
-        <BangChinhSach ds={ds} coQuyenSoan={quyen.soan} />
+        <BangChinhSach ds={ds} lichSu={lichSu} coQuyenSoan={quyen.soan} />
 
         <p className="text-xs text-slate-500">
           📌 <b>Rebate 5% cuối quý</b> (USH10 · CTS10 · CTD50 · CTS20, tổng mua quý vượt 140 triệu)

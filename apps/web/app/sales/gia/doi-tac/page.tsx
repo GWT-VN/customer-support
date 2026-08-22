@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { danhSachDoiTac } from '../actions'
+import { danhSachDoiTac, lichSuBac } from '../actions'
 import { quyenCtkm } from '../../ctkm/actions'
 import { GanBac } from './GanBac'
 
@@ -7,7 +7,7 @@ export const metadata = { title: 'Đối tác đại lý · GWT Sales' }
 export const dynamic = 'force-dynamic'
 
 export default async function DoiTacPage() {
-  const [ds, quyen] = await Promise.all([danhSachDoiTac(), quyenCtkm()])
+  const [ds, lichSu, quyen] = await Promise.all([danhSachDoiTac(), lichSuBac(), quyenCtkm()])
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-[1000px] space-y-4 p-4 sm:p-6">
@@ -22,7 +22,7 @@ export default async function DoiTacPage() {
             hưởng khuyến mãi theo <b>kênh của đơn</b>.
           </p>
         </header>
-        <GanBac ds={ds} coQuyenSoan={quyen.soan} />
+        <GanBac ds={ds} lichSu={lichSu} coQuyenSoan={quyen.soan} />
       </div>
     </main>
   )
