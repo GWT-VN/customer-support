@@ -29,6 +29,25 @@ export function macDinhTheoBoMay(boMay: string | null | undefined): { soLan: num
   return s.includes('ECO') ? { soLan: 2, chuKy: 3 } : { soLan: 4, chuKy: 3 }
 }
 
+/**
+ * Suy LOẠI MÁY (POU máy uống / POE lọc tổng) từ tên BỘ MÁY của lịch bảo trì.
+ *
+ * ⚠️ **HIỆN KHÔNG DÙNG — CEO chốt 21/08/2026 KHÔNG suy loại máy từ ô này.** Đừng bật lại mà
+ * chưa hỏi. Lý do CEO đưa, đúng và quan trọng: tên bộ máy trong lịch bảo trì (WH15A/WH30A) chỉ
+ * nói về **hệ lọc tổng** khách lắp — nó **không cho biết khách có thêm máy lọc nước UỐNG hay
+ * không**. Suy ra POE rồi ẩn TDS/pH là **giấu mất chỉ tiêu kỹ thuật cần ghi** ở những khách có
+ * cả hai loại máy.
+ * ⇒ Chừng nào chưa map được lượt bảo trì tới đúng con máy thì form **hiện đủ 4 chỉ số**.
+ *
+ * Giữ hàm + test lại vì phép nhận dạng vẫn đúng và sẽ dùng được khi có map máy↔khách; xoá đi
+ * thì phiên sau lại phải dò lại từ đầu.
+ */
+export function loaiMayTheoBoMay(boMay: string | null | undefined): 'POU' | 'POE' | null {
+  if (!boMay) return null
+  const s = boMay.toUpperCase().replace(/\s+/g, '')
+  return s.includes('WH15A') || s.includes('WH30A') ? 'POE' : null
+}
+
 /** Bỏ dấu + thường hoá để so tên tỉnh. */
 function boDau(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().trim()
