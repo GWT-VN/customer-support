@@ -43,8 +43,10 @@ export function GanErp({
     chay(() => ganErp(taskId, loai, ma))
   }
 
+  const khachDaGan = links.find((l) => l.loai === 'khach')
+
   async function timTheoLoai(loai: LoaiLink, tuKhoa: string): Promise<MucChon[]> {
-    const kq = await timErp(loai, tuKhoa)
+    const kq = await timErp(loai, tuKhoa, taskId)
     if (!kq.ok) throw new Error(kq.loi ?? 'Không tìm được')
     return kq.duLieu.map((g) => ({ gt: g.ma, nhan: g.nhan, phu: g.phu ?? undefined }))
   }
@@ -79,12 +81,17 @@ export function GanErp({
                   }}
                 >
                   {href ? (
-                    <Link href={href} className="inline-flex items-center gap-1.5" style={{ color: 'var(--accent-ink)' }}>
+                    <Link
+                      href={href}
+                      title={l.phu ?? undefined}
+                      className="inline-flex items-center gap-1.5"
+                      style={{ color: 'var(--accent-ink)' }}
+                    >
                       {noiDung}
                     </Link>
                   ) : (
                     // Mã treo: giữ chip để không mất dấu, nhưng nói rõ vì sao không bấm được.
-                    <span className="inline-flex items-center gap-1.5" title={giaiThich ?? undefined}>
+                    <span className="inline-flex items-center gap-1.5" title={giaiThich ?? l.phu ?? undefined}>
                       {noiDung}
                     </span>
                   )}
@@ -130,6 +137,13 @@ export function GanErp({
             ))}
           </div>
 
+          {dangThem && khachDaGan && dangThem !== 'khach' && (
+            // Không nói ra thì "tìm mãi không thấy ticket" trông y như phần mềm hỏng.
+            <p className="m-0" style={{ fontSize: 11, color: 'var(--faint)' }}>
+              Chỉ tìm trong {NHAN_LOAI_LINK[dangThem].toLowerCase()} của khách{' '}
+              <b style={{ fontWeight: 600 }}>{nhanChip(khachDaGan).ten}</b> — bỏ chip khách để tìm rộng hơn.
+            </p>
+          )}
           {dangThem && (
             <OChonTimXa
               key={dangThem}
