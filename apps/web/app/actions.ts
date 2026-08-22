@@ -8,7 +8,7 @@ import { chuanHoaVaiTro } from '@/lib/nen-tang/vai-tro'
 import { KHONG_DU_QUYEN } from '@/lib/nen-tang/nhan-su-luat'
 import { currentStaff } from '@/lib/nen-tang/nhan-su'
 import { ghiAudit } from '@/lib/nen-tang/nhat-ky'
-import { themSdtPhu, themDiaChiPhu, xoaDiaChiPhu, suaDiaChiPhu, suaSdtPhu } from '@/lib/khach-lien-he'
+import { themSdtPhu, themDiaChiPhu, xoaDiaChiPhu, suaDiaChiPhu, suaSdtPhu, locVeTinh, maKhCuaKhachCS } from '@/lib/khach-lien-he'
 import { coQuyen, doQuyen } from '@/lib/nen-tang/kiem-quyen'
 import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/bang'
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
@@ -215,17 +215,22 @@ export type Customer = {
   email_cty: string | null
   nguoi_dai_dien: string | null
   chuc_vu_dai_dien: string | null
+  /** Mã khách dùng chung hai khu — cũng là KHOÁ của SĐT phụ / địa chỉ phụ. */
+  ma_kh: string | null
 }
 
 export async function getCustomer(id: string) {
   await requireStaff()
   await doQuyen('cs.khach.xem')
   const db = dataClient()
-  const [{ data: c, error: e1 }, { data: contacts, error: e2 }] = await Promise.all([
-    db.from('cs_customers').select('*').eq('id', id).maybeSingle(),
-    db.from('customer_contacts').select('*').eq('customer_id', id).order('is_primary', { ascending: false }),
-  ])
+  // ĐỌC BẰNG `ma_kh` (migration 22/08): dòng do Sales ghi không có `customer_id` — đi mỗi
+  // `customer_id` là màn hình trống mà không có lỗi nào để lần. Phải lấy hồ sơ trước để có mã,
+  // nên hai câu này không chạy song song được nữa; đổi lại không sót dữ liệu của khu kia.
+  const { data: c, error: e1 } = await db.from('cs_customers').select('*').eq('id', id).maybeSingle()
   if (e1) throw new Error(e1.message)
+  const { data: contacts, error: e2 } = await db.from('customer_contacts').select('*')
+    .or(locVeTinh((c as Customer | null)?.ma_kh ?? null, id))
+    .order('is_primary', { ascending: false })
   if (e2) throw new Error(e2.message)
   return { customer: (c as Customer) ?? null, contacts: (contacts ?? []) as Contact[] }
 }
@@ -502,6 +507,8 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
   await requireStaff()
   await doQuyen('cs.khach.xem')
   const db = dataClient()
+  // Phải có mã trước để đọc dòng vệ tinh — xem chú thích ở `getCustomer`.
+  const maKh = await maKhCuaKhachCS(id)
   const [{ data: k }, may, ticket, plan, lienHe, diaChiPhu] = await Promise.all([
     db.from('cs_customers')
       .select('id, full_name, primary_phone, address, province, customer_code, channel_id, source, partner_ref, notes, created_at, ten_cty, mst, dia_chi_cty, sdt_cty, email_cty, address_truoc_sap_nhap, province_truoc_sap_nhap')
@@ -511,8 +518,8 @@ export async function khachDayDu(id: string): Promise<KhachDayDu | null> {
     db.from('maintenance_plan').select('id', { count: 'exact', head: true }).eq('customer_id', id),
     // Lấy CẢ NỘI DUNG chứ không chỉ đếm: gộp xong hai bộ SĐT phụ / địa chỉ phụ
     // nhập vào nhau, CS phải nhìn được chúng TRƯỚC khi bấm.
-    db.from('customer_contacts').select('phone, contact_name, role').eq('customer_id', id),
-    db.from('customer_addresses').select('dia_chi, loai').eq('customer_id', id),
+    db.from('customer_contacts').select('phone, contact_name, role').or(locVeTinh(maKh, id)),
+    db.from('customer_addresses').select('dia_chi, loai').or(locVeTinh(maKh, id)),
   ])
   if (!k) return null
   const r = k as Record<string, unknown>
@@ -568,7 +575,7 @@ export async function diaChiCuaKhach(customerId: string): Promise<DiaChiKhach[]>
   await doQuyen('cs.khach.xem')
   const { data, error } = await dataClient().from('customer_addresses')
     .select('id, dia_chi, loai, tinh, ghi_chu, created_at')
-    .eq('customer_id', customerId).order('created_at')
+    .or(locVeTinh(await maKhCuaKhachCS(customerId), customerId)).order('created_at')
   if (error) throw new Error(error.message)
   return (data ?? []) as DiaChiKhach[]
 }
@@ -1300,11 +1307,12 @@ export async function ganKhachBaoTri(
       }
 
       if (soPhu.hopLe) {
+        const maKhPlan = await maKhCuaKhachCS(customerId)
         const { data: daCo } = await db.from('customer_contacts')
-          .select('id').eq('customer_id', customerId).ilike('phone', `%${soPhu.cuoi9}`).limit(1)
+          .select('id').or(locVeTinh(maKhPlan, customerId)).ilike('phone', `%${soPhu.cuoi9}`).limit(1)
         if (!daCo || daCo.length === 0) {
           await db.from('customer_contacts').insert({
-            customer_id: customerId, phone: soPhu.chuan,
+            customer_id: customerId, ma_kh: maKhPlan, phone: soPhu.chuan,
             contact_name: (pl as { source_customer_name: string | null } | null)?.source_customer_name ?? null,
             role: 'khac', is_primary: false, zalo_ok: true,
             ghi_chu: sdtChinh === 'plan' ? 'Số cũ trong hồ sơ' : 'Số ghi trên lịch bảo trì',
