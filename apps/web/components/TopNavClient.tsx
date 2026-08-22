@@ -30,7 +30,7 @@ const CHA: ReadonlyArray<readonly [string, string]> = [
   // '/khach/gop' phải đứng TRƯỚC '/khach/': find() lấy cái khớp đầu tiên, để sau
   // thì màn gộp lại sáng đèn ở mục "Khách hàng".
   ['/khach/gop', '/khach/gop'], ['/khach/', '/khach-hang'],
-  ['/sales/don/', '/sales'], ['/sales/khach/', '/sales/khach'], ['/sales/ctkm/', '/sales/ctkm'],
+  ['/sales/don/', '/sales'], ['/sales/khach/', '/sales/khach'], ['/sales/ctkm/', '/sales/ctkm'], ['/sales/gia/', '/sales/gia'],
 ]
 function khopHref(pathname: string, href: string): boolean {
   if (pathname === href) return true
@@ -100,6 +100,7 @@ export function TopNavClient({
       { nhan: 'Đơn hàng', href: '/sales' },
       { nhan: 'Khách hàng', href: '/sales/khach' },
       { nhan: 'Khuyến mãi', href: '/sales/ctkm' },
+      { nhan: 'Bảng giá & đại lý', href: '/sales/gia' },
       { nhan: 'Báo giá', href: '/sales', soon: true },
       { nhan: 'Hợp đồng', href: '/sales', soon: true },
       { nhan: 'Kênh / đối tác', href: '/sales', soon: true },
