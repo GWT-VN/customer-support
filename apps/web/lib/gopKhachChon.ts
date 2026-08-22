@@ -104,7 +104,9 @@ export function dungPChon(giu: KhachDayDu, gop: KhachDayDu, lc: LuaChon): PChon 
   if (lc.sdtPhuGiuLai) {
     const benPhu = lc.truong.primary_phone === 'gop' ? giu : gop
     const so = giaTriTruong(benPhu, 'primary_phone')
-    if (so !== '') sdt_phu.push({ phone: so, contact_name: benPhu.full_name, role: 'khac' })
+    if (so !== '') // 'other' chứ không phải 'khac': DB chỉ nhận 5 vai trò tiếng Anh, gửi 'khac' là
+    // cả lệnh gộp ném lỗi và KHÔNG kéo được số phụ nào sang. Xem VAI_TRO_LIEN_HE.
+    sdt_phu.push({ phone: so, contact_name: benPhu.full_name, role: 'other' })
   }
 
   const dia_chi_them: PChon['dia_chi_them'] = []

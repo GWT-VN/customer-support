@@ -126,6 +126,25 @@ export function dangLuuSdtPhu(raw: string | null | undefined): string | null {
   return hopLe ? chuan : tho
 }
 
+/**
+ * Vai trò người liên hệ. DB chỉ nhận đúng 5 giá trị TIẾNG ANH này
+ * (`customer_contacts_role_check`) — khác với `loai` của địa chỉ vốn là tiếng Việt.
+ *
+ * Hai bảng hai thứ tiếng là chỗ rất dễ nhầm, và đã nhầm thật: app gửi `'khac'` cho vai trò,
+ * DB chối, **mọi đường thêm SĐT phụ đều gãy** — đo prod 22/08: 0 dòng `customer_contacts`,
+ * 0 lượt nhật ký `them_sdt_phu`, dù màn hình có nút từ lâu. Không ai báo vì lỗi nằm ở
+ * tầng DB, giao diện chỉ hiện một dòng đỏ khó hiểu.
+ */
+export const VAI_TRO_LIEN_HE = ['owner', 'family', 'helper', 'manager', 'other'] as const
+export type VaiTroLienHe = (typeof VAI_TRO_LIEN_HE)[number]
+
+/** Giá trị lạ (kể cả `'khac'` cũ) -> `other`: thà xếp nhầm nhóm còn hơn mất số của khách. */
+export function chuanHoaVaiTro(v: string | null | undefined): VaiTroLienHe | null {
+  const t = (v ?? '').trim()
+  if (!t) return null
+  return (VAI_TRO_LIEN_HE as readonly string[]).includes(t) ? (t as VaiTroLienHe) : 'other'
+}
+
 export async function themSdtPhu(input: {
   customer_id: string
   /** Khoá thật của dòng — xem chú thích ở `themDiaChiPhu`. */
@@ -153,7 +172,7 @@ export async function themSdtPhu(input: {
       ma_kh: input.ma_kh ?? (await maKhCuaKhachCS(input.customer_id)),
       phone,
       contact_name: ten || null,
-      role: (input.role ?? '').trim() || null,
+      role: chuanHoaVaiTro(input.role),
       is_primary: input.is_primary ?? false,
       zalo_ok: input.zalo_ok ?? false,
       ghi_chu: (input.ghi_chu ?? '').trim() || null,
@@ -222,7 +241,7 @@ export async function suaSdtPhu(input: {
     .update({
       phone: dangLuuSdtPhu(tho),
       contact_name: ten || null,
-      role: (input.role ?? '').trim() || null,
+      role: chuanHoaVaiTro(input.role),
       zalo_ok: input.zalo_ok ?? false,
       ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })

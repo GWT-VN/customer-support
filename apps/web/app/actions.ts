@@ -1314,7 +1314,7 @@ export async function ganKhachBaoTri(
           await db.from('customer_contacts').insert({
             customer_id: customerId, ma_kh: maKhPlan, phone: soPhu.chuan,
             contact_name: (pl as { source_customer_name: string | null } | null)?.source_customer_name ?? null,
-            role: 'khac', is_primary: false, zalo_ok: true,
+            role: 'other', is_primary: false, zalo_ok: true,
             ghi_chu: sdtChinh === 'plan' ? 'Số cũ trong hồ sơ' : 'Số ghi trên lịch bảo trì',
           })
           themSdtPhu = true
@@ -3421,7 +3421,7 @@ export async function taoKhachChoDuyet(input: {
   for (const x of sdtPhu) {
     await themSdtPhu({
       customer_id: id, phone: x.phone, contact_name: x.contact_name,
-      role: x.role?.trim() || 'khac', zalo_ok: x.zalo_ok ?? true,
+      role: x.role, zalo_ok: x.zalo_ok ?? true,
       ghi_chu: x.ghi_chu, nguon: 'cskh',
     })
   }

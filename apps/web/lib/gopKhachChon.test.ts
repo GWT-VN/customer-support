@@ -74,7 +74,7 @@ describe('dungPChon — payload gửi xuống RPC', () => {
     const lc = macDinhLuaChon(giu, gop)
     lc.truong.primary_phone = 'giu'
     const p = dungPChon(giu, gop, lc)
-    expect(p.sdt_phu).toEqual([{ phone: '0900000022', contact_name: 'Cô Mai', role: 'khac' }])
+    expect(p.sdt_phu).toEqual([{ phone: '0900000022', contact_name: 'Cô Mai', role: 'other' }])
   })
 
   it('đảo lựa chọn SĐT thì số phụ cũng đảo theo', () => {

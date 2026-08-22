@@ -196,7 +196,7 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-slate-700">SĐT phụ</span>
-                <button type="button" onClick={() => setSdtPhu([...sdtPhu, { phone: '', contact_name: '', role: 'khac', zalo_ok: true, ghi_chu: '' }])}
+                <button type="button" onClick={() => setSdtPhu([...sdtPhu, { phone: '', contact_name: '', role: 'other', zalo_ok: true, ghi_chu: '' }])}
                   className="text-xs text-[#0a6771] underline">＋ thêm dòng</button>
               </div>
               {sdtPhu.length === 0 && <p className="mt-1 text-xs text-slate-400">Chưa có. Số công ty, giúp việc, người nhà…</p>}
@@ -215,7 +215,7 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
                     <option value="family">Người nhà</option>
                     <option value="helper">Giúp việc</option>
                     <option value="manager">Quản lý</option>
-                    <option value="khac">Khác</option>
+                    <option value="other">Khác</option>
                   </select>
                   <label className="flex items-center gap-1.5 text-sm text-slate-700">
                     <input type="checkbox" checked={x.zalo_ok}
@@ -256,7 +256,7 @@ export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => vo
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm">
                     <option value="nha">Nhà</option>
                     <option value="lap_dat">Lắp đặt</option>
-                    <option value="khac">Khác</option>
+                    <option value="other">Khác</option>
                   </select>
                   {/* Ô ghi chú — màn SỬA vốn có, màn TẠO thì thiếu. CEO bắt được 22/08:
                       hai màn phải y hệt nhau, không thì nhập ở màn này rồi sang màn kia
