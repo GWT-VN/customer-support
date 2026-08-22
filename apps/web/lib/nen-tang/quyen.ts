@@ -37,8 +37,11 @@ export const NHAN_NHOM: Record<NhomQuyen, string> = {
  *  CS    — mọi nhân viên vào được khu CS (đúng bằng VAI_TRO_VAO_APP)
  *  NS    — mọi nhân sự đang hoạt động, không cần vai trò cụ thể
  *  SALES — người vào được khu Sales
+ *  CEO   — chỉ CEO (và Quản trị). Dùng cho việc DUYỆT/phê chuẩn: người soạn và
+ *          người duyệt phải là hai vai khác nhau. Cấp thêm cho vai khác thì tick
+ *          trên màn ma trận, không phải sửa code.
  */
-export type MucMacDinh = 'A' | 'TCS' | 'CS' | 'NS' | 'SALES'
+export type MucMacDinh = 'A' | 'TCS' | 'CS' | 'NS' | 'SALES' | 'CEO'
 
 const VAI_TRO_THEO_MUC: Record<MucMacDinh, readonly VaiTro[]> = {
   A: ['admin'],
@@ -49,6 +52,9 @@ const VAI_TRO_THEO_MUC: Record<MucMacDinh, readonly VaiTro[]> = {
   CS: ['admin', 'cs_manager', 'cs'],
   NS: VAI_TRO,
   SALES: ['admin', 'sales_manager', 'sales'],
+  // admin đi kèm vì quyenCuaToi() đọc thẳng bảng quyen_vai_tro, KHÔNG miễn trừ admin.
+  // Thiếu admin ở đây là admin mất quyền duyệt.
+  CEO: ['admin', 'ceo'],
 }
 
 type HoSo = {
@@ -116,6 +122,12 @@ const BANG_QUYEN = {
 
   'sales.don.xem': { nhom: 'sales', nhan: 'Xem đơn hàng Sales', mucMacDinh: 'SALES', chiXem: true },
   'sales.don.ghi': { nhom: 'sales', nhan: 'Tạo / sửa / xoá đơn Sales', mucMacDinh: 'SALES' },
+  'sales.ctkm.xem': { nhom: 'sales', nhan: 'Xem khuyến mãi & chính sách giá', mucMacDinh: 'SALES', chiXem: true },
+  'sales.ctkm.soan': { nhom: 'sales', nhan: 'Soạn / sửa chương trình khuyến mãi (bản nháp)', mucMacDinh: 'SALES' },
+  // CEO chốt 21/08/2026: NV Sales và Trưởng Sales được LÊN chương trình, chỉ CEO
+  // được DUYỆT. Đặt mức 'CEO' thay vì gán cứng, để sau cấp thêm cho Trưởng Sales
+  // chỉ cần tick ô trên màn ma trận.
+  'sales.ctkm.duyet': { nhom: 'sales', nhan: 'Duyệt & ban hành chương trình khuyến mãi', mucMacDinh: 'CEO' },
 
   'he_thong.nhan_su.xem': { nhom: 'he_thong', nhan: 'Xem danh sách nhân sự', mucMacDinh: 'A', chiXem: true },
   'he_thong.nhan_su.sua': { nhom: 'he_thong', nhan: 'Đổi vai trò, khoá, mời người', mucMacDinh: 'A' },
@@ -198,7 +210,10 @@ export const MAC_DINH: Record<VaiTro, MaQuyen[]> = Object.fromEntries(
   VAI_TRO.map((v) => [
     v,
     v === 'ceo'
-      ? [...QUYEN_CHI_XEM]
+      // CEO: toàn bộ quyền chỉ-xem, CỘNG các quyền đặt mức 'CEO' (duyệt/phê chuẩn).
+      // Nhánh này cố tình BỎ QUA mucMacDinh cho phần còn lại, nên quyền mức CEO
+      // phải cộng tay ở đây — không tự chảy vào như các vai khác.
+      ? [...new Set([...QUYEN_CHI_XEM, ...QUYEN.filter((q) => HO_SO_QUYEN[q].mucMacDinh === 'CEO')])]
       : v === 'quan_tri_ht'
         ? [...QUYEN_QUAN_TRI_HT]
         : v === 'ky_thuat'
