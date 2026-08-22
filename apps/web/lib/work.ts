@@ -207,10 +207,37 @@ export type LienKet = {
   id: number
   loai: LoaiLink
   ma: string
-  nhan: string
+  /** Tên đọc từ bản ghi ĐANG SỐNG. null = mã không còn ở bảng nào. */
+  nhan: string | null
+  /** Tên chụp lại lúc gắn — phao cứu sinh khi mã bị khai tử sau đó. */
+  nhan_luc_gan?: string | null
   phu?: string | null
   dich?: 'sales' | 'cs' | null
   khach_id?: string | null
+}
+
+/**
+ * Tên hiển thị của chip, và nó có đang treo không.
+ *
+ * Vì sao cần: mã khách bị khai tử ÂM THẦM. Gộp khách chạy trong Google Sheet
+ * (dựng lại DM_KHACH gộp hai dòng cùng SĐT, mã thua bị bỏ) — không ai bấm nút
+ * xoá, không có nhật ký, không phiên nào báo. Nếu chip chỉ đọc bản ghi đang sống
+ * thì hôm sau nó thành ô trống và mất luôn dấu vết việc này từng của ai.
+ *
+ * Phiên Sales đã xác nhận mã KHÔNG BAO GIỜ bị dùng lại (nextSeq = maxSeq + 1),
+ * nên trường hợp xấu nhất là chip treo — không bao giờ là chip trỏ nhầm người.
+ */
+export function nhanChip(l: Pick<LienKet, 'ma' | 'nhan' | 'nhan_luc_gan'>): {
+  ten: string
+  treo: boolean
+  giaiThich: string | null
+} {
+  if (l.nhan) return { ten: l.nhan, treo: false, giaiThich: null }
+  return {
+    ten: l.nhan_luc_gan || l.ma,
+    treo: true,
+    giaiThich: `Mã ${l.ma} không còn trong hệ thống (bị gộp hoặc xoá)`,
+  }
 }
 
 /**

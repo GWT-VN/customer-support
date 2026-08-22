@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   nhomTheoHan, nhanHan, gomTheoHan, soNgayToiHan, chuTat,
   isoTuOInput, inputTuIso, moTaNhatKy, mocThoiGian, THU_TU_NHOM,
-  duongDanLink, catChip, NHAN_LOAI_LINK,
+  duongDanLink, catChip, NHAN_LOAI_LINK, nhanChip,
 } from './work'
 
 // Mốc cố định: 15/09/2026 lúc 10:00 giờ địa phương.
@@ -201,5 +201,24 @@ describe('NHAN_LOAI_LINK', () => {
     expect(NHAN_LOAI_LINK.khach).toBe('Khách')
     expect(NHAN_LOAI_LINK.ticket).toBe('Ticket')
     expect(NHAN_LOAI_LINK.don).toBe('Đơn')
+  })
+})
+
+describe('nhanChip', () => {
+  it('bản ghi còn sống: chỉ tên', () => {
+    expect(nhanChip({ ma: 'KH-1', nhan: 'Chị Nhi' }))
+      .toEqual({ ten: 'Chị Nhi', treo: false, giaiThich: null })
+  })
+
+  it('mã đã chết: vẫn nói được nó từng là ai', () => {
+    // Gộp khách ở Google Sheet khai tử mã âm thầm — không ai bấm nút xoá, không
+    // có nhật ký. Chip mất tên là mất luôn dấu vết việc này từng của ai.
+    expect(nhanChip({ ma: 'KH-cu', nhan: null, nhan_luc_gan: 'Anh Dương' }))
+      .toEqual({ ten: 'Anh Dương', treo: true, giaiThich: 'Mã KH-cu không còn trong hệ thống (bị gộp hoặc xoá)' })
+  })
+
+  it('chết mà cũng không có tên chụp lại: rơi về mã, không để trống', () => {
+    expect(nhanChip({ ma: 'TK-9', nhan: null }))
+      .toEqual({ ten: 'TK-9', treo: true, giaiThich: 'Mã TK-9 không còn trong hệ thống (bị gộp hoặc xoá)' })
   })
 })
