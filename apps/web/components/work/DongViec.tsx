@@ -8,7 +8,7 @@
  * Ô tick và ô trạng thái ghi thẳng; phần thân bấm vào là mở panel chi tiết.
  */
 import type { NguoiLam } from '@/app/work/actions'
-import { TRANG_THAI, NHAN_VAI_TRO, nhanHan } from '@/lib/work'
+import { TRANG_THAI, NHAN_VAI_TRO, nhanHan, catChip, NHAN_LOAI_LINK, type LienKet } from '@/lib/work'
 import { Chip, ChongAvatar, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
 
 export type ViecHienThi = {
@@ -23,6 +23,7 @@ export type ViecHienThi = {
   sub_n: number
   assignees: NguoiLam[]
   my_role?: string | null
+  links?: LienKet[]
 }
 
 export function DongViec({
@@ -38,6 +39,7 @@ export function DongViec({
   onChon?: (id: number, chon: boolean) => void
 }) {
   const han = nhanHan(v.due_at)
+  const chip = catChip(v.links ?? [])
   const quaHan = han.startsWith('Quá hạn')
   const homNay = han === 'Hôm nay'
   const xong = v.status === 'done'
@@ -101,6 +103,23 @@ export function DongViec({
             )}
             {v.sub_n > 0 && (
               <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)' }}>{v.sub_n} việc con</span>
+            )}
+            {/*
+              Chip gắn khách/ticket/đơn — liếc danh sách là biết việc này của ai.
+              Ở ĐÂY CỐ Ý KHÔNG bấm được: cả khối này nằm trong <button> mở panel,
+              nhét <a> vào trong <button> là HTML không hợp lệ. Bấm sang hồ sơ thì
+              làm trong panel, nơi chip là thẻ <a> thật.
+            */}
+            {chip.hien.map((l) => (
+              <Chip key={l.id}>
+                <span style={{ fontSize: 10, fontWeight: 700, opacity: .6, textTransform: 'uppercase' }}>
+                  {NHAN_LOAI_LINK[l.loai]}
+                </span>
+                <span className="truncate" style={{ maxWidth: 150 }}>{l.nhan}</span>
+              </Chip>
+            ))}
+            {chip.du > 0 && (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--faint)' }}>+{chip.du}</span>
             )}
           </span>
         </button>

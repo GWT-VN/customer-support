@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { coTheVaoCS } from '@/lib/nen-tang/gac-cong'
 import { requireStaff } from '@/lib/nen-tang/phien'
-import { khachDayDu } from '@/app/actions'
+import { khachDayDu, capKhachNghiTrung } from '@/app/actions'
 import { DauTrang } from '@/components/DauTrang'
 import { GopKhachManHinh } from '@/components/GopKhachManHinh'
+import { GoiYGopKhach } from '@/components/GoiYGopKhach'
 
 export const metadata = { title: 'Gộp khách trùng · GWT CSKH' }
 export const dynamic = 'force-dynamic'
@@ -23,9 +24,10 @@ export default async function GopKhachPage({
   if (!(await coTheVaoCS())) redirect('/work')
   const { giu, gop } = await searchParams
 
-  const [kGiu, kGop] = await Promise.all([
+  const [kGiu, kGop, cap] = await Promise.all([
     giu ? khachDayDu(giu) : Promise.resolve(null),
     gop ? khachDayDu(gop) : Promise.resolve(null),
+    capKhachNghiTrung(),
   ])
 
   return (
@@ -42,7 +44,18 @@ export default async function GopKhachPage({
           {' '}thì hồ sơ giữ thắng — bảng bên dưới nói rõ từng dòng.
         </div>
 
-        <GopKhachManHinh giuBanDau={kGiu} gopBanDau={kGop} />
+        {/* `key` theo đúng cặp id: bấm "Xem & gộp" ở danh sách bên dưới là điều
+            hướng trong CÙNG route /khach/gop, React giữ nguyên component cũ nên
+            state khởi tạo từ props (giu/gop) không bao giờ chạy lại — màn hình
+            trống trơn dù server đã trả đúng hai hồ sơ. Đổi key = ép dựng lại. */}
+        <GopKhachManHinh key={`${giu ?? ''}-${gop ?? ''}`} giuBanDau={kGiu} gopBanDau={kGop} />
+
+        {/* Danh sách việc cần làm nằm DƯỚI khu thao tác: vào thẳng từ menu thì
+            cuộn một chút là thấy, còn vào từ nút trong hồ sơ khách (đã có sẵn một
+            bên) thì phần thao tác vẫn ở ngay trên đầu. */}
+        <div className="pt-2">
+          <GoiYGopKhach cap={cap} />
+        </div>
       </div>
     </main>
   )

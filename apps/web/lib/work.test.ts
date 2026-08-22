@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   nhomTheoHan, nhanHan, gomTheoHan, soNgayToiHan, chuTat,
   isoTuOInput, inputTuIso, moTaNhatKy, mocThoiGian, THU_TU_NHOM,
+  duongDanLink, catChip, NHAN_LOAI_LINK,
 } from './work'
 
 // Mốc cố định: 15/09/2026 lúc 10:00 giờ địa phương.
@@ -116,6 +117,15 @@ describe('moTaNhatKy', () => {
     expect(moTaNhatKy('updated', { title: 'x', priority: 1 })).toBe('sửa tiêu đề, ưu tiên')
     expect(moTaNhatKy('updated', {})).toBe('sửa việc')
   })
+  it('gắn / gỡ chip nói rõ gắn cái gì', () => {
+    expect(moTaNhatKy('linked', { loai: 'ticket', ma: 'TK-1' })).toBe('gắn Ticket TK-1')
+    expect(moTaNhatKy('unlinked', { loai: 'khach', ma: 'KH-9' })).toBe('bỏ gắn Khách KH-9')
+  })
+  it('gắn khách chưa có mã thì không phơi uuid ra nhật ký', () => {
+    // Khách CSKH chưa có mã thì `ma` là uuid — đọc "gắn Khách 2cf50482-…" vô nghĩa.
+    expect(moTaNhatKy('linked', { loai: 'khach', ma: '2cf50482-d32c-432e-8daa-318695a33bdc' }))
+      .toBe('gắn Khách')
+  })
   it('verb lạ thì trả nguyên văn, không vỡ', () => {
     expect(moTaNhatKy('chua_biet', null)).toBe('chua_biet')
   })
@@ -136,5 +146,60 @@ describe('mocThoiGian', () => {
   it('rỗng hoặc hỏng -> chuỗi rỗng, không vỡ', () => {
     expect(mocThoiGian(null, bay)).toBe('')
     expect(mocThoiGian('lung tung', bay)).toBe('')
+  })
+})
+
+// ── Chip gắn khách / ticket / đơn ──────────────────────────────────────────
+
+describe('duongDanLink', () => {
+  it('ticket và đơn đi thẳng theo mã', () => {
+    expect(duongDanLink({ loai: 'ticket', ma: 'TK-0042', dich: null })).toBe('/ticket/TK-0042')
+    expect(duongDanLink({ loai: 'don', ma: 'DH-9', dich: null })).toBe('/sales/don/DH-9')
+  })
+
+  it('khách có ở Sales -> trang khách Sales theo MÃ', () => {
+    expect(duongDanLink({ loai: 'khach', ma: 'KH-01', dich: 'sales' })).toBe('/sales/khach/KH-01')
+  })
+
+  it('khách chỉ có ở CSKH -> trang khách CSKH theo ID, không phải mã', () => {
+    // /khach/[id] đi theo uuid; đưa nhầm mã vào là 404.
+    expect(duongDanLink({ loai: 'khach', ma: 'KH-02', dich: 'cs', khach_id: 'u-1' })).toBe('/khach/u-1')
+  })
+
+  it('mã khách không còn ở bảng nào -> không có đường dẫn', () => {
+    // Mã treo (khách bị gộp/xoá): chip vẫn hiện để không mất dấu, nhưng không bấm được.
+    expect(duongDanLink({ loai: 'khach', ma: 'KH-cu', dich: null })).toBeNull()
+  })
+
+  it('dich=cs mà thiếu id -> không có đường dẫn, không dựng /khach/undefined', () => {
+    expect(duongDanLink({ loai: 'khach', ma: 'KH-03', dich: 'cs', khach_id: null })).toBeNull()
+  })
+})
+
+describe('catChip', () => {
+  const ds = [1, 2, 3, 4].map((n) => ({ id: n }))
+
+  it('ít hơn mức tối đa thì hiện hết, không dư', () => {
+    expect(catChip(ds.slice(0, 2))).toEqual({ hien: ds.slice(0, 2), du: 0 })
+  })
+
+  it('nhiều hơn thì cắt còn 2 và đếm phần dư', () => {
+    expect(catChip(ds)).toEqual({ hien: ds.slice(0, 2), du: 2 })
+  })
+
+  it('rỗng -> không có gì, không vỡ', () => {
+    expect(catChip([])).toEqual({ hien: [], du: 0 })
+  })
+
+  it('đổi được mức tối đa', () => {
+    expect(catChip(ds, 3)).toEqual({ hien: ds.slice(0, 3), du: 1 })
+  })
+})
+
+describe('NHAN_LOAI_LINK', () => {
+  it('ba loại đều có nhãn tiếng Việt', () => {
+    expect(NHAN_LOAI_LINK.khach).toBe('Khách')
+    expect(NHAN_LOAI_LINK.ticket).toBe('Ticket')
+    expect(NHAN_LOAI_LINK.don).toBe('Đơn')
   })
 })

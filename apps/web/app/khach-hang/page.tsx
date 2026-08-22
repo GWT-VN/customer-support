@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { listKhachHang, khoaTatCaKhachHang, exportCuaToi, listBangView } from '@/app/actions'
+import { listKhachHang, khoaTatCaKhachHang, exportCuaToi, listBangView, kenhChon } from '@/app/actions'
 import { ExportKhachButton } from '@/components/ExportKhachButton'
 import { ThaoTacHangLoat } from '@/components/ThaoTacHangLoat'
 import { BangKhach } from '@/components/BangKhach'
@@ -19,7 +19,7 @@ export default async function KhachHangPage({
   const trang = Math.max(1, Number(trangRaw) || 1)
   // Ba nút, ba quyền khác nhau — trước đây gom vào laQuanLy/laAdmin nên tick lại
   // ma trận là nút hiện sai. Cặp (mã quyền, luật cũ) khớp y hệt Server Action.
-  const [{ rows: list, tong, soTrang, sapXep }, quyen, exportDuyet, views] = await Promise.all([
+  const [{ rows: list, tong, soTrang, sapXep }, quyen, exportDuyet, views, kenh] = await Promise.all([
     listKhachHang(q, { trang, cot, chieu }),
     hoiQuyen({
       hangLoat: ['cs.hang_loat.cap_nhat', 'QUANLY'],
@@ -28,13 +28,14 @@ export default async function KhachHangPage({
     }),
     exportCuaToi(),
     listBangView('cs_customers'),
+    kenhChon(),
   ])
 
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
         <DauTrang tieuDe="Khách hàng" phuDe={`${tong.toLocaleString('vi-VN')} khách`}>
-          <TaoKhachButton />
+          <TaoKhachButton kenh={kenh} />
         </DauTrang>
 
         <Suspense>

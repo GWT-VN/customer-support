@@ -175,6 +175,13 @@ export function ViecCuaToi({ rowsBanDau, nenTang }: { rowsBanDau: ViecRow[]; nen
 
       {mo !== null && (
         <ChiTietViec
+          /*
+            key BẮT panel gắn lại khi đổi việc. Không có nó thì ô tiêu đề / mô tả /
+            hạn (dùng defaultValue, tức ô KHÔNG kiểm soát) giữ nguyên giá trị việc
+            cũ — React chỉ áp defaultValue lúc gắn. Nguy hơn: bản nháp bình luận
+            còn sót lại và gửi nhầm sang việc vừa mở.
+          */
+          key={mo}
           taskId={mo}
           nenTang={nenTang}
           onDong={() => setMo(null)}

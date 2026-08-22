@@ -1,5 +1,7 @@
 'use client'
 
+import { OChonGoiY } from '@/bang/OChonGoiY'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ganTicketVaoNhom, boGanNhom, type NhomChon } from '@/app/actions'
@@ -51,10 +53,17 @@ export function GanNhomLoi({ code, daGan, nhomList }: { code: string; daGan: DaG
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <select value={group} onChange={(e) => setGroup(e.target.value)} className="rounded-lg border px-3 py-1.5 text-sm bg-white text-slate-900">
-          <option value="">— Chọn nhóm để gắn tay —</option>
-          {conLai.map((n) => <option key={n.code} value={n.code}>{n.ten}</option>)}
-        </select>
+        {/* Gõ-để-tìm thay cho `<select>` trần: 13 nhóm lỗi, quá ngưỡng 10 mục theo luật CEO
+            chốt 22/08 (`docs/CHUAN-FILTER.md` Luật 2). Dùng chung `OChonGoiY` với các khu khác,
+            không viết bản riêng. */}
+        <div className="min-w-[260px]">
+          <OChonGoiY
+            giaTri={group || null}
+            onChon={setGroup}
+            tuyChon={conLai.map((n) => ({ gt: n.code, nhan: n.ten, phu: n.code }))}
+            choTrong="Gõ mã hoặc tên nhóm lỗi…"
+          />
+        </div>
         <input value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="Lý do (tuỳ chọn)"
           className="rounded-lg border px-3 py-1.5 text-sm text-slate-900" />
         <button disabled={busy || !group} onClick={gan} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm disabled:opacity-50">Gắn</button>

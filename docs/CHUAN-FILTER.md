@@ -33,12 +33,29 @@ một chỗ không ăn chỗ kia. Bản đó đã bị bỏ và viết lại the
 | Ô **LỌC** trên trang danh sách | `<BoLocGoiY param="sp" nhan="Sản phẩm" tuyChon={…} />` | tham số URL |
 | Ô **NHẬP** trong form | `<OChonGoiY giaTri={} onChon={} tuyChon={…} />` | state của form |
 | Danh sách **≤ 10 mục** | `<BoLocChon>` (lọc) hoặc `<select>` (form) | — |
+| Tập **không nạp trước được** | `<OChonTimXa tim={} onChon={} />` | server (mỗi lần gõ) |
 
 Cả hai đều khớp **không dấu**, tìm theo **mã lẫn tên**, và **nói rõ khi cắt bớt** danh sách
 ("Đang hiện 30 / 328 mục — gõ thêm để thu hẹp") thay vì im lặng cắt.
 
+### Khi nào dùng `OChonTimXa` thay `OChonGoiY`
+
+`OChonGoiY` **nạp sẵn cả danh sách** rồi lọc ở trình duyệt — đúng cho tập biết trước và
+hữu hạn (64 tỉnh, 51 mã sản phẩm). `OChonTimXa` gọi server mỗi lần gõ — dùng khi tập
+**không nạp trước được**: khách (hàng trăm và còn tăng), ticket, đơn hàng. Nạp hết về
+trình duyệt vừa nặng vừa cũ ngay khi ai đó thêm bản ghi mới.
+
+Ô tìm-xa có hai bẫy mà `OChonTimXa` đã xử sẵn, đừng tự viết lại:
+1. **Câu trả lời về trễ ghi đè câu mới.** Gõ "ngu" rồi "nguyen"; nếu kết quả của "ngu" về
+   sau thì màn hình hiện sai. Mỗi lượt mang số thứ tự, về muộn thì bỏ.
+2. **Gõ tới đâu gọi tới đó** là spam server. Chờ 250ms im phím mới gọi.
+
+Ngưỡng tối thiểu để gọi server là **2 ký tự** (`TOI_THIEU_KY_TU`) — phải khớp với ngưỡng
+trong RPC, lệch là người dùng gõ 1 ký tự rồi thấy "không có mục nào khớp" thay vì "gõ thêm".
+
 **Chỗ đã áp:** ô lọc Sản phẩm ở `/sales` · ô chọn sản phẩm & quà trong form khuyến mãi ·
-`components/ChonTinh.tsx` (64 tỉnh — dùng chung cả CSKH lẫn Sales).
+`components/ChonTinh.tsx` (64 tỉnh — dùng chung cả CSKH lẫn Sales) ·
+`components/work/GanErp.tsx` (gắn khách / ticket / đơn vào việc — dùng `OChonTimXa`).
 
 *CEO đã phải nhắc chuyện này nhiều lần ở nhiều màn khác nhau. Viết vào đây để module sau
 không phải nghe nhắc lần nữa — sửa filter/ô chọn ở đâu cũng đọc file này trước.*

@@ -1,26 +1,27 @@
 import Link from 'next/link'
 import { NutQuayLai } from '@/components/NutQuayLai'
 import { notFound } from 'next/navigation'
-import { getMachine, ticketsOfSerial, lichSuSerial, dsTrangThai } from '@/app/actions'
+import { getMachine, ticketsOfSerial, lichSuSerial, dsTrangThai, daiLyCuaMay, donDaiLyChon } from '@/app/actions'
 import { NHAN_DO_CHAC } from '@/lib/danhSach'
 import { WarrantyBadge, vnDate } from '@/components/Badge'
 import { ActivateForm } from '@/components/ActivateForm'
 import { TicketList } from '@/components/TicketList'
 import { LoiCuaMay } from '@/components/LoiCuaMay'
 import { QuanLyMay } from '@/components/QuanLyMay'
+import { GanDonDaiLy } from '@/components/GanDonDaiLy'
 import { hoiQuyen } from '@/lib/nen-tang/kiem-quyen'
 
 export default async function MachinePage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params
   const m = await getMachine(decodeURIComponent(serial))
   if (!m) notFound()
-  const [tickets, vongDoi, quyen, dsTT] = await Promise.all([
+  const [tickets, vongDoi, quyen, dsTT, daiLy, donDaiLy] = await Promise.all([
     ticketsOfSerial(m.serial), lichSuSerial(m.serial), hoiQuyen({
       lichKT: ['cs.ky_thuat.ho_so', 'QUANLY'],
       lapThuDoi: ['cs.may.lap_thu_doi', 'QUANLY'],
       suaKhach: ['cs.khach.xin_xoa', 'NHANVIEN'],
       khoSerial: ['cs.serial.kho', 'QUANLY'],
-    }), dsTrangThai(),
+    }), dsTrangThai(), daiLyCuaMay(m.serial), donDaiLyChon(),
   ])
   // Máy này có phải máy THAY THẾ (đổi máy cho khách) không -> hiện tính chuyển tiếp.
   const suKienThayThe = vongDoi.su_kien.find((s) => s.su_kien === 'doi_may_lap_moi')
@@ -123,6 +124,9 @@ export default async function MachinePage({ params }: { params: Promise<{ serial
 
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-medium text-slate-900 mb-3">Quản lý máy</h2>
+          <GanDonDaiLy serial={m.serial} daiLyTen={daiLy.dai_ly_ten}
+            daiLyDon={daiLy.dai_ly_don} donList={donDaiLy} />
+
           <QuanLyMay serial={m.serial} internalCode={m.internal_code} trangThai={vongDoi.trang_thai} suKien={vongDoi.su_kien}
             dangLap={!!m.customer_id} ds={dsTT}
             choLapThuDoi={quyen.lapThuDoi} choSuaKhach={quyen.suaKhach} choKhoSerial={quyen.khoSerial} />

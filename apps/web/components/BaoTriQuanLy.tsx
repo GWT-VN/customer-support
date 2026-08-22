@@ -63,6 +63,9 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
   const [chonTay, setChonTay] = useState<string | null>(null)     // plan id đang chọn khách tay
   // Ứng viên đang xem so sánh trước khi gán (null = chưa mở cái nào).
   const [xem, setXem] = useState<{ planId: string; dangTai: boolean; khach: KhachDayDu | null } | null>(null)
+  // Mặc định giữ số đang có trong hồ sơ — đổi số chính là việc lớn hơn, phải do
+  // người dùng chủ động chọn. Số còn lại vẫn xuống SĐT phụ, không mất.
+  const [sdtChinh, setSdtChinh] = useState<'khach' | 'plan' | 'bo'>('khach')
   const [moLich, setMoLich] = useState<string | null>(null)       // plan id đang mở form lịch
   const [suaLan, setSuaLan] = useState<string | null>(null)       // plan id đang sửa số lần
   const [lanVal, setLanVal] = useState('')
@@ -96,14 +99,24 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
    * nhau, bấm trượt một ô là plan dính vào khách sai mà không có gì báo, lại
    * không hoàn tác được.
    */
-  async function gan(planId: string, customerId: string, tenKhach: string) {
+  async function gan(planId: string, customerId: string, tenKhach: string, sdt: 'khach' | 'plan' | 'bo') {
     setBusy(planId); setErr(null); setMsg(null)
-    const r = await ganKhachBaoTri(planId, customerId)
-    setBusy(null)
-    if (!r.ok) { setErr(r.error); return }
-    setChonTay(null); setXem(null)
-    setMsg(`Đã gán cho "${tenKhach}". Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.`)
-    router.refresh()
+    try {
+      const r = await ganKhachBaoTri(planId, customerId, sdt)
+      if (!r.ok) { setErr(r.error); return }
+      setChonTay(null); setXem(null)
+      setMsg(
+        `Đã gán cho "${tenKhach}".` +
+        (r.themSdtPhu ? ' SĐT trên lịch đã lưu thành SĐT phụ của khách.' : '') +
+        ' Gán nhầm thì bấm "gỡ gán" ở danh sách bên dưới.',
+      )
+      router.refresh()
+    } catch (e) {
+      setErr('Không rõ kết quả — mở lại danh sách kiểm tra trước khi bấm lần nữa. ' +
+        (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(null)
+    }
   }
 
   /** Mở khối so sánh cho một ứng viên: nạp hồ sơ khách đủ trường rồi mới vẽ. */
@@ -251,8 +264,39 @@ export function BaoTriQuanLy({ chuaMap, daMap, sapHet, phan = 'all', moTaoKhach 
                         }}
                         hanhDong={
                           <>
+                            {/* Hai SĐT khác nhau = cùng người, hai số — không phải
+                                mâu thuẫn. Gán xong mà không giữ thì số trên lịch
+                                mất hẳn (ca Đoàn Văn Hậu: lịch 032…, hồ sơ 093…). */}
+                            {(() => {
+                              const soPlan = (p.source_phone ?? '').replace(/\D/g, '')
+                              const soKhach = (xem.khach?.primary_phone ?? '').replace(/\D/g, '')
+                              if (!soPlan || soPlan.slice(-9) === soKhach.slice(-9)) return null
+                              const o = 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm cursor-pointer '
+                              return (
+                                <div className="w-full rounded-lg bg-sky-50 px-3 py-2">
+                                  <p className="text-sm text-sky-900">
+                                    Hai số khác nhau — <b>số nào là số chính của khách?</b>{' '}
+                                    Số còn lại tự xuống <b>SĐT phụ</b>, không mất.
+                                  </p>
+                                  <div className="mt-1.5 flex flex-wrap gap-2">
+                                    <label className={o + (sdtChinh === 'khach' ? 'border-emerald-500 bg-white font-medium' : 'border-slate-200 bg-white/60')}>
+                                      <input type="radio" checked={sdtChinh === 'khach'} onChange={() => setSdtChinh('khach')} />
+                                      Giữ số hồ sơ <span className="font-mono">{xem.khach?.primary_phone || '—'}</span>
+                                    </label>
+                                    <label className={o + (sdtChinh === 'plan' ? 'border-emerald-500 bg-white font-medium' : 'border-slate-200 bg-white/60')}>
+                                      <input type="radio" checked={sdtChinh === 'plan'} onChange={() => setSdtChinh('plan')} />
+                                      Dùng số trên lịch <span className="font-mono">{p.source_phone}</span>
+                                    </label>
+                                    <label className={o + (sdtChinh === 'bo' ? 'border-slate-400 bg-white font-medium' : 'border-slate-200 bg-white/60')}>
+                                      <input type="radio" checked={sdtChinh === 'bo'} onChange={() => setSdtChinh('bo')} />
+                                      Bỏ số trên lịch
+                                    </label>
+                                  </div>
+                                </div>
+                              )
+                            })()}
                             <button disabled={busy === p.id}
-                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name)}
+                              onClick={() => gan(p.id, xem.khach!.id, xem.khach!.full_name, sdtChinh)}
                               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
                               {busy === p.id ? 'Đang gán…' : 'Đúng người, gán'}
                             </button>

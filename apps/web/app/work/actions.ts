@@ -11,6 +11,7 @@
  * đã xác minh — KHÔNG bao giờ nhận email từ tham số client.
  */
 import { dataClient } from '@/lib/nen-tang/db'
+import type { LienKet } from '@/lib/work'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
 import { chuanHoaEmail } from '@/lib/nen-tang/vao-cua'
 import { revalidatePath } from 'next/cache'
@@ -32,6 +33,7 @@ export type ViecRow = {
   my_role: string | null
   sub_n: number
   assignees: NguoiLam[]
+  links: LienKet[]
 }
 
 export type ViecTeamRow = Omit<ViecRow, 'description' | 'start_at' | 'my_role'> & {
@@ -56,6 +58,7 @@ export type ChiTietViec = {
   }
   assignees: NguoiLam[]
   co_the_sua: boolean
+  links: LienKet[]
   comments: { id: number; body: string; ten: string | null; created_at: string }[]
   activity: { id: number; verb: string; payload: Record<string, unknown> | null; ten: string | null; created_at: string }[]
   subtasks: { id: number; ref: string; title: string; status: string }[]
@@ -211,6 +214,29 @@ export async function boNguoi(taskId: number, staffId: string): Promise<KQ<void>
 export async function themBinhLuan(taskId: number, body: string): Promise<KQ<void>> {
   return boc(async () => {
     await goi<void>('work_them_binh_luan', { p_task_id: taskId, p_body: body })
+    lamMoi()
+  })
+}
+
+// ── Gắn khách / ticket / đơn ────────────────────────────────────────────────
+
+/** Gợi ý để chọn. Trả tối đa 8 dòng; dưới 2 ký tự thì không tìm. */
+export async function timErp(loai: string, tuKhoa: string): Promise<KQ<GoiYErp[]>> {
+  return boc(() => goi<GoiYErp[]>('work_tim_erp', { p_loai: loai, p_tu_khoa: tuKhoa }))
+}
+
+export type GoiYErp = { ma: string; nhan: string; phu: string | null }
+
+export async function ganErp(taskId: number, loai: string, ma: string): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_gan_erp', { p_task_id: taskId, p_loai: loai, p_ma: ma })
+    lamMoi()
+  })
+}
+
+export async function boErp(linkId: number): Promise<KQ<void>> {
+  return boc(async () => {
+    await goi<void>('work_bo_erp', { p_link_id: linkId })
     lamMoi()
   })
 }

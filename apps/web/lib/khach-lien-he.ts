@@ -44,6 +44,8 @@ export async function themDiaChiPhu(input: {
   customer_id: string
   dia_chi: string
   loai?: string | null
+  /** Tỉnh/TP của địa chỉ này — ô RIÊNG, không gõ lẫn vào ô địa chỉ (CEO chốt, giống màn tạo khách). */
+  tinh?: string | null
   ghi_chu?: string | null
   nguon: NguonGhi
 }): Promise<KetQuaGhi> {
@@ -57,6 +59,7 @@ export async function themDiaChiPhu(input: {
       customer_id: input.customer_id,
       dia_chi,
       loai,
+      tinh: (input.tinh ?? '').trim() || null,
       ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .select('id')
@@ -103,6 +106,8 @@ export async function themSdtPhu(input: {
   role?: string | null
   is_primary?: boolean
   zalo_ok?: boolean
+  /** Giờ gọi được, số của ai… — màn TẠO vốn có ô này, màn SỬA thì thiếu (CEO bắt được 22/08). */
+  ghi_chu?: string | null
   nguon: NguonGhi
 }): Promise<KetQuaGhi> {
   const tho = (input.phone ?? '').trim()
@@ -121,6 +126,7 @@ export async function themSdtPhu(input: {
       role: (input.role ?? '').trim() || null,
       is_primary: input.is_primary ?? false,
       zalo_ok: input.zalo_ok ?? false,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
     })
     .select('id')
     .single()
@@ -130,4 +136,71 @@ export async function themSdtPhu(input: {
     nguon: input.nguon, chuan_hoa_sdt: daChuanHoa,
   })
   return { ok: true, id: (data as { id: string }).id }
+}
+
+/**
+ * SỬA một địa chỉ phụ. CEO chốt 22/08/2026: *"cho phép sửa SĐT phụ và địa chỉ phụ"* — trước đây
+ * chỉ thêm được và xoá được, gõ sai một chữ là phải xoá rồi nhập lại từ đầu.
+ */
+export async function suaDiaChiPhu(input: {
+  id: string
+  customer_id: string
+  dia_chi: string
+  loai?: string | null
+  tinh?: string | null
+  ghi_chu?: string | null
+  nguon: NguonGhi
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const dia_chi = (input.dia_chi ?? '').trim()
+  if (!dia_chi) return { ok: false, error: 'Nhập địa chỉ đã.' }
+
+  const loai = chuanHoaLoaiDiaChi(input.loai)
+  const { error } = await dataClient()
+    .from('customer_addresses')
+    .update({
+      dia_chi,
+      loai,
+      tinh: (input.tinh ?? '').trim() || null,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
+    })
+    .eq('id', input.id)
+  if (error) return { ok: false, error: error.message }
+
+  await ghiAudit('sua_dia_chi_khach', `khach:${input.customer_id}`, {
+    dia_chi_id: input.id, loai, nguon: input.nguon,
+  })
+  return { ok: true }
+}
+
+/** SỬA một SĐT phụ / người liên hệ. Cùng lý do với `suaDiaChiPhu`. */
+export async function suaSdtPhu(input: {
+  id: string
+  customer_id: string
+  phone?: string | null
+  contact_name?: string | null
+  role?: string | null
+  zalo_ok?: boolean
+  ghi_chu?: string | null
+  nguon: NguonGhi
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tho = (input.phone ?? '').trim()
+  const ten = (input.contact_name ?? '').trim()
+  if (!tho && !ten) return { ok: false, error: 'Nhập số điện thoại hoặc tên người liên hệ.' }
+
+  const { error } = await dataClient()
+    .from('customer_contacts')
+    .update({
+      phone: dangLuuSdtPhu(tho),
+      contact_name: ten || null,
+      role: (input.role ?? '').trim() || null,
+      zalo_ok: input.zalo_ok ?? false,
+      ghi_chu: (input.ghi_chu ?? '').trim() || null,
+    })
+    .eq('id', input.id)
+  if (error) return { ok: false, error: error.message }
+
+  await ghiAudit('sua_sdt_phu', `khach:${input.customer_id}`, {
+    lien_he_id: input.id, nguon: input.nguon,
+  })
+  return { ok: true }
 }
