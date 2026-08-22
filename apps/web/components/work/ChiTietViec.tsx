@@ -14,6 +14,7 @@ import {
   nhanHan, inputTuIso, isoTuOInput, moTaNhatKy, mocThoiGian,
 } from '@/lib/work'
 import { Avatar, Chip, Nut, oNhap, MAU_UT_VAR, MAU_TRANG_THAI } from './ui'
+import { GanErp } from './GanErp'
 
 const NHAN_PHAM_VI: Record<string, string> = {
   private: 'chỉ mình tôi', team: 'cả team', company: 'toàn công ty',
@@ -338,6 +339,18 @@ export function ChiTietViec({
                 </ul>
               </section>
             )}
+
+            {/* Gắn với — khách / ticket / đơn */}
+            <section className="flex flex-col gap-2.5">
+              <Nhan>Gắn với</Nhan>
+              <GanErp
+                taskId={t.id}
+                links={ct.links ?? []}
+                coTheSua={ct.co_the_sua}
+                chay={chay}
+                pending={pending}
+              />
+            </section>
 
             {/* Bình luận */}
             <section className="flex flex-col gap-2.5">

@@ -156,6 +156,8 @@ export function mocThoiGian(iso: string | null | undefined, bayGio: Date = new D
   return `${ngayThang(d)} ${gio}`
 }
 
+const LA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 /** Câu mô tả 1 dòng cho nhật ký. */
 export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null): string {
   const p = payload ?? {}
@@ -166,6 +168,14 @@ export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null
     case 'assigned': return `gán ${p.ten ?? 'ai đó'} · ${NHAN_VAI_TRO[String(p.role)] ?? p.role}`
     case 'unassigned': return 'bỏ một người khỏi việc'
     case 'commented': return 'bình luận'
+    case 'linked':
+    case 'unlinked': {
+      const dau = verb === 'linked' ? 'gắn' : 'bỏ gắn'
+      const ten = NHAN_LOAI_LINK[String(p.loai) as LoaiLink] ?? String(p.loai ?? '')
+      const ma = String(p.ma ?? '')
+      // Khách chưa có mã thì `ma` là uuid — in ra nhật ký chỉ tổ rối mắt.
+      return LA_UUID.test(ma) ? `${dau} ${ten}`.trim() : `${dau} ${ten} ${ma}`.trim()
+    }
     case 'updated': {
       const phan: string[] = []
       if (p.title != null) phan.push('tiêu đề')
@@ -177,4 +187,52 @@ export function moTaNhatKy(verb: string, payload: Record<string, unknown> | null
     }
     default: return verb
   }
+}
+
+// ── Chip gắn khách / ticket / đơn ──────────────────────────────────────────
+
+export type LoaiLink = 'khach' | 'ticket' | 'don'
+
+export const NHAN_LOAI_LINK: Record<LoaiLink, string> = {
+  khach: 'Khách',
+  ticket: 'Ticket',
+  don: 'Đơn',
+}
+
+/**
+ * Một liên kết ERP đã được SQL resolve sẵn nhãn.
+ * `dich` nói mã khách còn sống ở bảng nào — SQL biết, giao diện thì không.
+ */
+export type LienKet = {
+  id: number
+  loai: LoaiLink
+  ma: string
+  nhan: string
+  phu?: string | null
+  dich?: 'sales' | 'cs' | null
+  khach_id?: string | null
+}
+
+/**
+ * Chip bấm sang đâu. Route là chuyện của frontend nên tính ở đây, không bắt SQL
+ * phải biết đường dẫn Next.js.
+ *
+ * Khách có HAI đường vì hai khu giữ khách ở hai bảng: `/sales/khach/[code]` đi
+ * theo mã, còn `/khach/[id]` đi theo uuid. Đưa nhầm mã vào đường sau là 404.
+ * Mã không còn ở bảng nào (khách bị gộp/xoá) thì trả null — chip vẫn hiện để
+ * không mất dấu, chỉ là không bấm được.
+ */
+export function duongDanLink(
+  l: Pick<LienKet, 'loai' | 'ma' | 'dich' | 'khach_id'>,
+): string | null {
+  if (l.loai === 'ticket') return `/ticket/${l.ma}`
+  if (l.loai === 'don') return `/sales/don/${l.ma}`
+  if (l.dich === 'sales') return `/sales/khach/${l.ma}`
+  if (l.dich === 'cs' && l.khach_id) return `/khach/${l.khach_id}`
+  return null
+}
+
+/** Dòng việc chỉ đủ chỗ vài chip; phần còn lại gộp thành "+n". */
+export function catChip<T>(ds: readonly T[], toiDa = 2): { hien: T[]; du: number } {
+  return { hien: ds.slice(0, toiDa), du: Math.max(0, ds.length - toiDa) }
 }
