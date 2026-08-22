@@ -61,7 +61,23 @@ export type CustomerInput = {
   note: string | null
   /** id trong dim_channel. Khách lẻ hưởng khuyến mãi theo kênh này. */
   channel_id: number | null
+  email: string | null
+  ngay_sinh: string | null
+  dia_chi_cty: string | null
+  sdt_cty: string | null
+  email_cty: string | null
+  sales_owner: string | null
 }
+
+/**
+ * Cột `customers` mà Apps Script GHI ĐÈ mỗi lần dựng lại DM_KHACH.
+ * Sửa mấy ô này trong app là mất công — lần sync sau Sheet ghi lại từ đơn.
+ * Đo từ `Code.gs:customersPayload` ngày 22/08/2026.
+ * Bỏ được sau chặng B của `docs/sales/LO-TRINH-BO-APPSCRIPT.md`.
+ */
+export const O_SHEET_GIU = [
+  'name', 'phone', 'address', 'province', 'company_invoice', 'tax_code', 'note',
+] as const satisfies readonly (keyof CustomerInput)[]
 
 export type CustomerHit = {
   customer_code: string

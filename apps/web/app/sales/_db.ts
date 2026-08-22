@@ -241,7 +241,7 @@ export function isAppCustomer(code: string | null | undefined): boolean {
 }
 
 const CUST_COLS =
-  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note, channel_id'
+  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note, channel_id, email, ngay_sinh, dia_chi_cty, sdt_cty, email_cty, sales_owner'
 
 export async function findCustomerByPhone(phone: string): Promise<{ customer_code: string; name: string | null } | null> {
   const db = dataClient()
@@ -265,6 +265,12 @@ export async function getCustomerForEdit(code: string): Promise<CustomerInput | 
     tax_code: (c.tax_code as string) ?? null,
     note: (c.note as string) ?? null,
     channel_id: (c.channel_id as number) ?? null,
+    email: (c.email as string) ?? null,
+    ngay_sinh: (c.ngay_sinh as string) ?? null,
+    dia_chi_cty: (c.dia_chi_cty as string) ?? null,
+    sdt_cty: (c.sdt_cty as string) ?? null,
+    email_cty: (c.email_cty as string) ?? null,
+    sales_owner: (c.sales_owner as string) ?? null,
   }
 }
 
@@ -288,7 +294,20 @@ function cleanCustomer(input: CustomerInput) {
     company_invoice: input.company_invoice?.trim() || null,
     tax_code: input.tax_code?.trim() || null,
     note: input.note?.trim() || null,
+    ...cleanCustomerAppFields(input),
+  }
+}
+
+/** Chỉ những ô Apps Script KHÔNG đụng tới — sửa được ngay cả với khách từ Sheet. */
+function cleanCustomerAppFields(input: CustomerInput) {
+  return {
     channel_id: input.channel_id ?? null,
+    email: input.email?.trim() || null,
+    ngay_sinh: input.ngay_sinh?.trim() || null,
+    dia_chi_cty: input.dia_chi_cty?.trim() || null,
+    sdt_cty: input.sdt_cty?.trim() || null,
+    email_cty: input.email_cty?.trim() || null,
+    sales_owner: input.sales_owner?.trim() || null,
   }
 }
 
@@ -307,11 +326,22 @@ export async function createCustomer(input: CustomerInput): Promise<{ customer_c
   throw new Error('Không sinh được mã khách (đụng mã liên tục). Thử lại.')
 }
 
+/**
+ * Sửa khách. HAI đường, tuỳ khách đến từ đâu:
+ *
+ * - Khách app (`KA…`): app làm chủ mọi ô -> ghi hết.
+ * - Khách Sheet (`KH…`): Apps Script dựng lại tên/SĐT/địa chỉ/tỉnh/công ty/MST/ghi chú
+ *   từ đơn mỗi lần chạy `buildKhachHang`. Ghi mấy ô đó là **mất công lặng lẽ** — lần sync
+ *   sau bị đè. Nên chỉ ghi những ô Sheet không đụng.
+ *
+ * Không ném lỗi với khách Sheet nữa (CEO 22/08: hồ sơ phải sửa được). Ràng buộc nằm ở
+ * chỗ GHI, không nằm ở chỗ chặn — giao diện khoá sẵn mấy ô kia và nói rõ vì sao.
+ * Bỏ được sau chặng B của `docs/sales/LO-TRINH-BO-APPSCRIPT.md`.
+ */
 export async function updateCustomer(code: string, input: CustomerInput): Promise<void> {
-  if (!isAppCustomer(code))
-    throw new Error('Chỉ sửa được khách tạo từ app (mã KA). Khách từ Google Sheet: sửa trong Sheet.')
   const db = dataClient()
-  const { error } = await db.from('customers').update(cleanCustomer(input)).eq('customer_code', code)
+  const fields = isAppCustomer(code) ? cleanCustomer(input) : cleanCustomerAppFields(input)
+  const { error } = await db.from('customers').update(fields).eq('customer_code', code)
   if (error) throw error
 }
 

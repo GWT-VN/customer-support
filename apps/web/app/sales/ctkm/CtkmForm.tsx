@@ -19,6 +19,28 @@ const card = 'rounded-xl border border-slate-200 bg-white shadow-sm'
 /** Mức mặc định khi đổi kiểu giảm — 12% và 12 đồng là hai thứ khác hẳn nhau. */
 const MUC_GOI_Y: Record<KieuGiam, number> = { PCT: 10, TIEN: 1000000, CON: 0 }
 
+/**
+ * Một bước của form. Khai báo NGOÀI component cha — nếu định nghĩa bên trong thì mỗi
+ * lần cha render lại là một kiểu component MỚI, React tháo cả cây con rồi dựng lại:
+ * ô đang gõ mất nội dung và mất luôn con trỏ. Lỗi thật, không phải chuyện dọn dẹp.
+ */
+function Buoc({
+  so, tieuDe, phu, children,
+}: { so: number; tieuDe: string; phu?: string; children: React.ReactNode }) {
+  return (
+    <section className={card}>
+      <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#0e8c9a] text-xs font-bold text-white">{so}</span>
+        <div>
+          <h2 className="text-sm font-bold text-slate-900">{tieuDe}</h2>
+          {phu && <p className="text-xs text-slate-500">{phu}</p>}
+        </div>
+      </div>
+      <div className="space-y-4 p-4">{children}</div>
+    </section>
+  )
+}
+
 export function CtkmForm({
   kenhDs,
   spDs,
@@ -90,18 +112,6 @@ export function CtkmForm({
     })
   }
 
-  const Buoc = ({ so, tieuDe, phu, children }: { so: number; tieuDe: string; phu?: string; children: React.ReactNode }) => (
-    <section className={card}>
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#0e8c9a] text-xs font-bold text-white">{so}</span>
-        <div>
-          <h2 className="text-sm font-bold text-slate-900">{tieuDe}</h2>
-          {phu && <p className="text-xs text-slate-500">{phu}</p>}
-        </div>
-      </div>
-      <div className="space-y-4 p-4">{children}</div>
-    </section>
-  )
 
   return (
     <div className="space-y-4 pb-24">

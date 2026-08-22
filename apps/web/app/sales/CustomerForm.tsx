@@ -31,12 +31,15 @@ export function CustomerForm({
   customerCode,
   initial,
   kenh,
+  khoaSheet = false,
   onXong,
 }: {
   mode?: 'create' | 'edit'
   customerCode?: string
   initial?: CustomerInput
   kenh: Kenh[]
+  /** Khách từ Google Sheet: mấy ô Sheet dựng lại từ đơn thì khoá, sửa cũng bị đè. */
+  khoaSheet?: boolean
   onXong?: () => void
 }) {
   const router = useRouter()
@@ -50,6 +53,12 @@ export function CustomerForm({
   const [company, setCompany] = useState(initial?.company_invoice ?? '')
   const [taxCode, setTaxCode] = useState(initial?.tax_code ?? '')
   const [note, setNote] = useState(initial?.note ?? '')
+  const [email, setEmail] = useState(initial?.email ?? '')
+  const [ngaySinh, setNgaySinh] = useState(initial?.ngay_sinh ?? '')
+  const [diaChiCty, setDiaChiCty] = useState(initial?.dia_chi_cty ?? '')
+  const [sdtCty, setSdtCty] = useState(initial?.sdt_cty ?? '')
+  const [emailCty, setEmailCty] = useState(initial?.email_cty ?? '')
+  const [salesOwner, setSalesOwner] = useState(initial?.sales_owner ?? '')
 
   const [khop, setKhop] = useState<KetQuaTraKhach | null>(null)
   const [dangTra, setDangTra] = useState(false)
@@ -95,6 +104,12 @@ export function CustomerForm({
       tax_code: taxCode.trim() || null,
       note: note.trim() || null,
       channel_id: kenhId ? Number(kenhId) : null,
+      email: email.trim() || null,
+      ngay_sinh: ngaySinh.trim() || null,
+      dia_chi_cty: diaChiCty.trim() || null,
+      sdt_cty: sdtCty.trim() || null,
+      email_cty: emailCty.trim() || null,
+      sales_owner: salesOwner.trim() || null,
     }
     const res = isEdit && customerCode ? await suaKhach(customerCode, input) : await taoKhach(input)
     if (!res.ok) {
@@ -113,12 +128,22 @@ export function CustomerForm({
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {khoaSheet && (
+        <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <b>Khách từ Google Sheet.</b> Tên · SĐT · địa chỉ · tỉnh · công ty xuất hoá đơn · MST ·
+          ghi chú do Sheet <b>dựng lại từ đơn</b> mỗi lần đồng bộ, nên app khoá lại — sửa ở đây
+          cũng bị đè. Muốn đổi thì sửa trong <b>dòng đơn</b> trên Sheet rồi dựng lại DM_KHACH.
+          Các ô còn lại bên dưới là <b>của app</b>, sửa được ngay và không bị đè.
+        </div>
+      )}
+
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         {/* SĐT ĐẦU TIÊN — nhận diện người trước khi bắt gõ gì khác. */}
         <div>
           <label className={lbl}>SĐT</label>
           <input
-            className={`${inp} font-mono`} value={phone} inputMode="tel" placeholder="09xxxxxxxx"
+            className={`${inp} font-mono disabled:bg-slate-100 disabled:text-slate-500`} value={phone}
+            inputMode="tel" placeholder="09xxxxxxxx" disabled={khoaSheet}
             onChange={(e) => { setPhone(e.target.value); setKhop(null) }}
             onBlur={traSdt}
           />
@@ -152,17 +177,19 @@ export function CustomerForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className={lbl}>Tên khách</label>
-            <input className={inp} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nguyễn Văn A" />
+            <input className={inp + ' disabled:bg-slate-100 disabled:text-slate-500'} value={name} disabled={khoaSheet} onChange={(e) => setName(e.target.value)} placeholder="Nguyễn Văn A" />
           </div>
           <div>
             <label className={lbl}>Tỉnh / TP</label>
-            <ChonTinh value={province} onChange={setProvince} />
+            {khoaSheet
+              ? <input className={inp + ' disabled:bg-slate-100 disabled:text-slate-500'} value={province} disabled />
+              : <ChonTinh value={province} onChange={setProvince} />}
           </div>
         </div>
 
         <div>
           <label className={lbl}>Địa chỉ</label>
-          <input className={inp} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã" />
+          <input className={inp + ' disabled:bg-slate-100 disabled:text-slate-500'} value={address} disabled={khoaSheet} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã" />
         </div>
       </div>
 
@@ -170,7 +197,7 @@ export function CustomerForm({
       {!chiTiet ? (
         <button type="button" onClick={() => setChiTiet(true)}
           className="text-sm font-medium text-teal-700 hover:underline">
-          ＋ Thêm chi tiết (kênh, công ty xuất hoá đơn, ghi chú)
+          ＋ Thêm chi tiết (kênh, email, công ty, sales phụ trách, ghi chú)
         </button>
       ) : (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -192,19 +219,50 @@ export function CustomerForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className={lbl}>Công ty xuất hoá đơn</label>
-              <input className={inp} value={company} onChange={(e) => setCompany(e.target.value)} />
+              <label className={lbl}>Email</label>
+              <input className={inp} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div>
-              <label className={lbl}>Mã số thuế</label>
-              <input className={`${inp} font-mono`} value={taxCode} onChange={(e) => setTaxCode(e.target.value)} />
+              <label className={lbl}>Ngày sinh</label>
+              <input className={inp + ' tabular-nums'} type="date" value={ngaySinh} onChange={(e) => setNgaySinh(e.target.value)} />
+            </div>
+          </div>
+
+          <div>
+            <label className={lbl}>Sales phụ trách</label>
+            <input className={inp} value={salesOwner} onChange={(e) => setSalesOwner(e.target.value)} placeholder="email nhân viên" />
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin công ty</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Công ty xuất hoá đơn</label>
+                <input className={inp + ' disabled:bg-slate-100 disabled:text-slate-500'} value={company} disabled={khoaSheet} onChange={(e) => setCompany(e.target.value)} />
+              </div>
+              <div>
+                <label className={lbl}>Mã số thuế</label>
+                <input className={`${inp} font-mono disabled:bg-slate-100 disabled:text-slate-500`} value={taxCode} disabled={khoaSheet} onChange={(e) => setTaxCode(e.target.value)} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={lbl}>Địa chỉ công ty</label>
+                <input className={inp} value={diaChiCty} onChange={(e) => setDiaChiCty(e.target.value)} />
+              </div>
+              <div>
+                <label className={lbl}>SĐT công ty</label>
+                <input className={`${inp} font-mono`} value={sdtCty} onChange={(e) => setSdtCty(e.target.value)} />
+              </div>
+              <div>
+                <label className={lbl}>Email công ty</label>
+                <input className={inp} type="email" value={emailCty} onChange={(e) => setEmailCty(e.target.value)} />
+              </div>
             </div>
           </div>
 
           <div>
             <label className={lbl}>Ghi chú</label>
-            <textarea className={`${inp} min-h-[72px]`} value={note} onChange={(e) => setNote(e.target.value)}
-              placeholder="Lưu ý khi chăm sóc khách này…" />
+            <textarea className={`${inp} min-h-[72px] disabled:bg-slate-100 disabled:text-slate-500`} value={note} disabled={khoaSheet}
+              onChange={(e) => setNote(e.target.value)} placeholder="Lưu ý khi chăm sóc khách này…" />
           </div>
         </div>
       )}

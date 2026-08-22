@@ -168,32 +168,39 @@ export function OrderForm({
   // ── GIÁ TỰ BẮT ───────────────────────────────────────────────────────────
   // CEO chốt: khách có bậc/kênh thì lên đơn tự ăn đúng chính sách đang áp.
   // Gợi ý thôi — người nhập vẫn gõ đè được, chỉ bị nhắc khi bán dưới mức đã duyệt.
-  const [bcGia, setBcGia] = useState<BoiCanhGia | null>(null)
-  /** Giá app gợi ý cho từng dòng, giữ lại để so khi người nhập gõ đè. */
-  const [goiY, setGoiY] = useState<Record<number, GiaGoiY>>({})
-
   const custCode = customerMode === 'existing' ? selectedCust?.customer_code ?? null : null
   const kenhSo = channelId ? Number(channelId) : null
+  /** Khoá của lần tra hiện tại. Đổi khách/kênh/ngày là đổi khoá. */
+  const khoaGia = `${custCode ?? ''}|${kenhSo ?? ''}|${orderDate}`
 
+  // Lưu KÈM khoá rồi so lúc đọc, thay vì xoá state ngay trong effect: kết quả về muộn
+  // của lần tra cũ tự bị bỏ qua vì khoá không khớp, và effect không phải gọi setState
+  // đồng bộ (thứ đẻ ra render dây chuyền).
+  const [bcRaw, setBcRaw] = useState<{ khoa: string; bc: BoiCanhGia } | null>(null)
   useEffect(() => {
+    if (!custCode && kenhSo == null) return
     let huy = false
-    if (!custCode && kenhSo == null) { setBcGia(null); return }
-    boiCanhGia(custCode, kenhSo, orderDate).then((bc) => { if (!huy) setBcGia(bc) })
+    boiCanhGia(custCode, kenhSo, orderDate).then((bc) => { if (!huy) setBcRaw({ khoa: khoaGia, bc }) })
     return () => { huy = true }
-  }, [custCode, kenhSo, orderDate])
+  }, [khoaGia, custCode, kenhSo, orderDate])
+  const bcGia = bcRaw?.khoa === khoaGia ? bcRaw.bc : null
 
-  // Đổi khách/kênh/ngày -> tính lại gợi ý cho các dòng ĐÃ chọn sản phẩm.
-  // Cố ý KHÔNG tự sửa đơn giá đang có: đơn soạn dở mà số nhảy dưới tay người nhập
-  // là mất tin tưởng. Chỉ nhắc, để họ tự bấm áp lại.
-  useEffect(() => {
-    if (!bcGia) return
-    setGoiY((cu) => {
-      const moi = { ...cu }
-      for (const l of lines) if (l.internal_code) moi[l.key] = giaGoiY(bcGia, l.internal_code, orderDate)
-      return moi
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bcGia, orderDate])
+  /**
+   * Giá gợi ý cho từng dòng — DẪN XUẤT, không giữ trong state.
+   *
+   * Giữ bằng state là phải có effect đồng bộ lại mỗi khi đổi khách/kênh/ngày, và
+   * effect đó gọi setState trong lúc render (React cảnh báo đúng). Tính thẳng từ
+   * `lines + bcGia + orderDate` thì không bao giờ lệch pha.
+   *
+   * Đổi khách giữa chừng KHÔNG tự sửa đơn giá đang có — đơn soạn dở mà số nhảy dưới
+   * tay người nhập là mất tin tưởng. Chỉ đổi nhãn, kèm nút để họ tự áp lại.
+   */
+  const goiY = useMemo<Record<number, GiaGoiY>>(() => {
+    if (!bcGia) return {}
+    const m: Record<number, GiaGoiY> = {}
+    for (const l of lines) if (l.internal_code) m[l.key] = giaGoiY(bcGia, l.internal_code, orderDate)
+    return m
+  }, [bcGia, lines, orderDate])
 
   function runSearch(q: string) {
     setCustQuery(q)
@@ -368,11 +375,10 @@ export function OrderForm({
                         // (mục chi phí kế toán) thì để trống chứ không đoán 8%.
                         vat_pct: c.vat_pct,
                         vat_loai: c.vat_loai,
+                        // Chỉ điền khi ô đang trống/0 — không đè số người nhập đã tự gõ.
                         ...(() => {
                           if (!bcGia) return {}
                           const g = giaGoiY(bcGia, c.internal_code, orderDate)
-                          setGoiY((o) => ({ ...o, [l.key]: g }))
-                          // Chỉ điền khi ô đang trống/0 — không đè số người nhập đã tự gõ.
                           return g.gia != null && !Number(l.unit_price_vat) ? { unit_price_vat: g.gia } : {}
                         })(),
                       })

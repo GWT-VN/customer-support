@@ -663,6 +663,12 @@ export type KhachChiTiet = {
     first_order_date: string | null
     last_order_date: string | null
     note: string | null
+    kenh: string | null
+    sales_owner: string | null
+    email: string | null
+    dia_chi_cty: string | null
+    sdt_cty: string | null
+    ma_kh: string | null
   }
   daNoiCS: boolean
   purchases: Array<{
@@ -714,7 +720,7 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
     db
       .from('customers')
       .select(
-        'customer_code, name, phone, phone_chuan, province, province_moi, address, company_invoice, tax_code, total_orders, total_gift_orders, first_order_date, last_order_date, note'
+        'customer_code, name, phone, phone_chuan, province, province_moi, address, company_invoice, tax_code, total_orders, total_gift_orders, first_order_date, last_order_date, note, channel_id, sales_owner, email, dia_chi_cty, sdt_cty, email_cty, ma_kh'
       )
       .eq('customer_code', customerCode)
       .maybeSingle(),
@@ -728,6 +734,15 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
   if (cErr) throw cErr
   if (!c) return null
   const cu = c as Record<string, unknown>
+
+  // Tên kênh 2 cấp — hồ sơ hiện chữ, không hiện số id.
+  let tenKenh: string | null = null
+  if (cu.channel_id != null) {
+    const { data: dc } = await db
+      .from('dim_channel').select('channel_l1, channel_l2').eq('id', cu.channel_id).maybeSingle()
+    const k = dc as { channel_l1?: string; channel_l2?: string | null } | null
+    if (k) tenKenh = [k.channel_l1, k.channel_l2].filter(Boolean).join(' · ') || null
+  }
   const csRow = (cs as { id: string } | null) ?? null
 
   let machines: KhachChiTiet['machines'] = []
@@ -806,6 +821,12 @@ export async function chiTietKhach(customerCode: string): Promise<KhachChiTiet |
       first_order_date: (cu.first_order_date as string) ?? null,
       last_order_date: (cu.last_order_date as string) ?? null,
       note: (cu.note as string) ?? null,
+      kenh: tenKenh,
+      sales_owner: (cu.sales_owner as string) ?? null,
+      email: (cu.email as string) ?? null,
+      dia_chi_cty: (cu.dia_chi_cty as string) ?? null,
+      sdt_cty: (cu.sdt_cty as string) ?? null,
+      ma_kh: (cu.ma_kh as string) ?? null,
     },
     daNoiCS: !!csRow,
     purchases: ((purchases ?? []) as Array<Record<string, unknown>>).map((p, i) => ({
@@ -986,7 +1007,7 @@ export async function boiCanhGia(
 
   const [cs, gia, ct, ctKenh, ctSp] = await Promise.all([
     db.from('sales_chinh_sach_gia').select('*').eq('trang_thai', 'ban_hanh'),
-    db.from('sales_guong_gia_niem_yet').select('internal_code, gia_vat'),
+    db.from('product_price').select('internal_code, gia_vat').eq('kenh', 'NIEM_YET'),
     db.from('sales_ctkm').select('id, ten, tu_ngay, den_ngay, kieu_giam, muc_chung, giam_toi_da, trang_thai')
       .eq('trang_thai', 'ban_hanh'),
     db.from('sales_ctkm_kenh').select('ctkm_id, channel_id'),
@@ -1035,4 +1056,42 @@ export async function boiCanhGia(
     soCtkmKhac: khac.length,
     niemYet,
   }
+}
+
+export type KhachTrung = { sdt9: string; ma: string[]; ten: (string | null)[] }
+
+/**
+ * Đếm khách trùng SĐT — CEO chốt 22/08 chọn **đếm + cảnh báo**, không đặt ràng buộc
+ * duy nhất ở DB.
+ *
+ * Vì sao không chặn cứng: `customers` do Apps Script upsert **theo lô**; một SĐT trùng
+ * là **gãy cả lô sync**, mà lỗi thật lại nằm ở một ô SĐT trong tab đơn từ mấy tuần trước
+ * — báo lỗi ở chỗ cách xa nguyên nhân thì người sửa phải mò ngược. Đếm rồi chỉ thẳng
+ * mã nào thì sửa được ngay.
+ *
+ * So theo **9 SỐ CUỐI**: đó là cách duy nhất bắt được cặp `0xxxxxxxxx` và
+ * cùng số đó bị mất số 0 đầu,
+ * tức đúng loại trùng mà Google Sheet đẻ ra khi ăn mất số 0 đầu.
+ */
+export async function khachTrungSdt(): Promise<KhachTrung[]> {
+  await chanSales()
+  const { data } = await dataClient()
+    .from('customers')
+    .select('customer_code, name, phone')
+    .not('phone', 'is', null)
+    .limit(5000)
+
+  const nhom = new Map<string, { ma: string[]; ten: (string | null)[] }>()
+  for (const r of ((data ?? []) as Array<Record<string, unknown>>)) {
+    const so = String(r.phone ?? '').replace(/\D/g, '')
+    if (so.length < 9) continue
+    const k = so.slice(-9)
+    if (!nhom.has(k)) nhom.set(k, { ma: [], ten: [] })
+    nhom.get(k)!.ma.push(r.customer_code as string)
+    nhom.get(k)!.ten.push((r.name as string) ?? null)
+  }
+  return [...nhom.entries()]
+    .filter(([, v]) => v.ma.length > 1)
+    .map(([sdt9, v]) => ({ sdt9, ...v }))
+    .sort((a, b) => b.ma.length - a.ma.length)
 }
