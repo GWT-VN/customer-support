@@ -1,8 +1,11 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
-import { danhSachDon } from './actions'
+import { BoLocChon, BoLocGoiY, LocNgay, OTimKiem, ThanhDangLoc } from '@/bang'
+import { danhSachDon, kenhChiTietTrongDon, kenhTrongDon, spTrongDon } from './actions'
+import { FULFILL_OPTS, PAYMENT_OPTS } from './_types'
 
 export const metadata = { title: 'Đơn hàng · GWT Sales' }
 export const dynamic = 'force-dynamic'
@@ -23,12 +26,38 @@ const TABS = [
   { key: 'DON_TANG', label: 'Tặng' },
 ]
 
-export default async function SalesDonPage({ searchParams }: { searchParams: Promise<{ q?: string; tab?: string }> }) {
+type ThamSo = {
+  q?: string; tab?: string
+  // Tên tham số lọc ngày theo chuẩn TOÀN APP — xem docs/CHUAN-FILTER.md.
+  ngtu?: string; ngden?: string
+  tt?: string; tp?: string; kenh?: string; kenh2?: string; sp?: string
+}
+
+export default async function SalesDonPage({ searchParams }: { searchParams: Promise<ThamSo> }) {
   await requireNhanSu()
   if (!(await coTheVaoSales())) redirect('/?loi=khong_du_quyen')
-  const { q, tab } = await searchParams
-  const curTab = tab ?? ''
-  const rows = await danhSachDon(q ?? '', curTab)
+  const sp0 = await searchParams
+  const { q, ngtu, ngden, tt, tp, kenh, kenh2, sp } = sp0
+  const curTab = sp0.tab ?? ''
+  const [rows, kenhOpts, kenhCtOpts, spOpts] = await Promise.all([
+    danhSachDon(q ?? '', curTab, { ngtu, ngden, tt, tp, kenh, kenh2, sp }),
+    kenhTrongDon(),
+    kenhChiTietTrongDon(),
+    spTrongDon(),
+  ])
+  // Chọn kênh cấp 1 rồi thì cấp 2 chỉ hiện chi tiết THUỘC kênh đó — đỡ phải cuộn qua
+  // chi tiết của kênh khác. Chưa chọn cấp 1 thì hiện tất cả.
+  const kenh2Opts = (kenh ? kenhCtOpts.filter((k) => k.kenh === kenh) : kenhCtOpts)
+    .map((k) => ({ giaTri: k.chiTiet, nhan: kenh ? k.chiTiet : `${k.chiTiet} (${k.kenh || '—'})` }))
+
+  const dieuKien = [
+    ngtu || ngden ? { nhan: 'Ngày', giaTri: `${ngtu || '…'} → ${ngden || '…'}` } : null,
+    tt ? { nhan: 'Tình trạng', giaTri: tt } : null,
+    tp ? { nhan: 'Thanh toán', giaTri: tp } : null,
+    kenh ? { nhan: 'Kênh', giaTri: kenh } : null,
+    kenh2 ? { nhan: 'Kênh chi tiết', giaTri: kenh2 } : null,
+    sp ? { nhan: 'Sản phẩm', giaTri: sp } : null,
+  ].filter(Boolean) as { nhan: string; giaTri: string }[]
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -41,21 +70,38 @@ export default async function SalesDonPage({ searchParams }: { searchParams: Pro
           <Link href="/sales/don/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Tạo đơn</Link>
         </header>
 
-        <form className="flex gap-2">
-          <input type="hidden" name="tab" value={curTab} />
-          <input
-            name="q"
-            defaultValue={q ?? ''}
-            placeholder="Tìm mã đơn / tên khách / sản phẩm…"
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-          />
-          <button className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-medium text-white hover:bg-[#0a6771]">Tìm</button>
-        </form>
+        {/* Mọi component dưới đây đọc useSearchParams -> BẮT BUỘC bọc Suspense,
+            thiếu là `next build` fail chứ không phải cảnh báo. */}
+        <Suspense fallback={<div className="h-24" />}>
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <OTimKiem placeholder="Tìm mã đơn / tên khách / sản phẩm…" />
+            <div className="flex flex-wrap items-center gap-2">
+              <LocNgay nhan="Ngày đơn" />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <BoLocChon param="tt" nhan="Tình trạng" tuyChon={FULFILL_OPTS.map((o) => ({ giaTri: o, nhan: o }))} />
+              <BoLocChon param="tp" nhan="Thanh toán" tuyChon={PAYMENT_OPTS.map((o) => ({ giaTri: o, nhan: o }))} />
+              <BoLocChon param="kenh" nhan="Kênh" tuyChon={kenhOpts.map((o) => ({ giaTri: o, nhan: o }))} />
+              <BoLocChon param="kenh2" nhan="Kênh chi tiết" tuyChon={kenh2Opts} />
+              {/* Sản phẩm dùng ô GÕ-ĐỂ-GỢI-Ý: danh mục quá dài để cuộn tay. Gõ mã hoặc tên đều ra. */}
+              <BoLocGoiY param="sp" nhan="Sản phẩm" tuyChon={spOpts.map((o) => ({ giaTri: o.ma, nhan: o.ten }))} />
+            </div>
+          </div>
+        </Suspense>
+
+        <ThanhDangLoc dieuKien={dieuKien} hienThi={rows.length} tong={rows.length} nhan="đơn" />
+
+        {sp && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Đang lọc theo sản phẩm <b>{sp}</b> — cột <b>Tổng</b> chỉ cộng các dòng khớp sản phẩm này,
+            không phải tổng cả đơn.
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => {
             const params = new URLSearchParams()
-            if (q) params.set('q', q)
+            for (const [k, v] of Object.entries(sp0)) if (k !== 'tab' && v) params.set(k, v)
             if (t.key) params.set('tab', t.key)
             const href = '/sales' + (params.toString() ? `?${params.toString()}` : '')
             const on = curTab === t.key

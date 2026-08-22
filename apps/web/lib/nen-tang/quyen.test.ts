@@ -4,9 +4,11 @@ import { HO_SO_QUYEN, MAC_DINH, QUYEN, laMaQuyenHopLe } from './quyen'
 import { maTranDangLamLuat } from './kiem-quyen'
 
 describe('kho quyền', () => {
-  it('có đủ 52 quyền, không trùng mã', () => {
-    expect(QUYEN.length).toBe(52)
-    expect(new Set(QUYEN).size).toBe(52)
+  it('có đủ 55 quyền, không trùng mã', () => {
+    // 52 -> 55 ngày 22/08/2026: thêm sales.ctkm.xem / .soan / .duyet cho module
+    // Khuyến mãi & Chiết khấu.
+    expect(QUYEN.length).toBe(55)
+    expect(new Set(QUYEN).size).toBe(55)
   })
 
   it('mã quyền theo khuôn khu.đối_tượng.hành_động', () => {
@@ -55,14 +57,37 @@ describe('giá trị khởi tạo — sinh từ hành vi HÔM NAY', () => {
     }
   })
 
-  it('CEO CHỈ có quyền xem, không có quyền ghi nào', () => {
+  it('CEO chỉ có quyền xem + quyền DUYỆT — không có quyền ghi dữ liệu nghiệp vụ', () => {
+    // Bất biến này SIẾT LẠI ngày 22/08/2026, không phải nới ra.
+    //
+    // Bản cũ: mọi quyền CEO có đều phải `chiXem`. CEO chốt 21/08 rằng "chỉ CEO mới
+    // có quyền DUYỆT chương trình khuyến mãi" -> CEO buộc phải có một quyền không
+    // phải chỉ-xem. Nên khe mở ra ĐÚNG BẰNG mức 'CEO' (các quyền phê chuẩn), chứ
+    // không mở chung cho mọi quyền ghi.
+    //
+    // Ý nghĩa giữ nguyên: CEO KHÔNG được sửa dữ liệu nghiệp vụ (khách, máy, đơn).
+    // Duyệt là phê chuẩn thứ người khác soạn — vai người soạn và người duyệt phải khác nhau.
     expect(MAC_DINH.ceo.length).toBeGreaterThan(0)
     for (const q of MAC_DINH.ceo) {
-      expect(HO_SO_QUYEN[q].chiXem, `CEO không được có quyền ghi: ${q}`).toBe(true)
+      const hs = HO_SO_QUYEN[q]
+      const duocPhep = hs.chiXem === true || hs.mucMacDinh === 'CEO'
+      expect(duocPhep, `CEO không được có quyền ghi dữ liệu: ${q}`).toBe(true)
     }
     expect(MAC_DINH.ceo).toContain('cs.khach.xem')
     expect(MAC_DINH.ceo).toContain('sales.don.xem')
+    expect(MAC_DINH.ceo).toContain('sales.ctkm.duyet')
     expect(MAC_DINH.ceo).not.toContain('cs.khach.sua')
+    // Rào chặt: CEO vẫn KHÔNG được soạn — soạn là việc của Sales.
+    expect(MAC_DINH.ceo).not.toContain('sales.ctkm.soan')
+  })
+
+  it('NV Sales và Trưởng Sales SOẠN được nhưng KHÔNG duyệt được', () => {
+    for (const v of ['sales', 'sales_manager'] as const) {
+      expect(MAC_DINH[v], `${v} phải soạn được`).toContain('sales.ctkm.soan')
+      expect(MAC_DINH[v], `${v} KHÔNG được tự duyệt`).not.toContain('sales.ctkm.duyet')
+    }
+    // Cấp thêm quyền duyệt cho Trưởng Sales là việc TICK trên màn ma trận,
+    // không phải sửa file này.
   })
 
   it('vai trò mới chưa có nghiệp vụ riêng: chỉ được mức "mọi nhân sự"', () => {

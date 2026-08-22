@@ -15,6 +15,8 @@ import {
   updateCustomer,
   deleteCustomer,
 } from './_db'
+import { tinhKhuyenMai, tongDon } from './_calc'
+import { cacBienThe, gomDanhSachTinh } from '@/lib/tinhGom'
 import type { NewOrderInput, CustomerInput } from './_types'
 
 /** Gác khu Sales: nền tảng (mọi nhân sự) + phải có vai trò Sales. */
@@ -80,13 +82,32 @@ async function donTang(s: string): Promise<DonRow[]> {
   return s ? all.filter((g) => g.order_code.toLowerCase().includes(sl) || (g.customer_name ?? '').toLowerCase().includes(sl)) : all
 }
 
+/**
+ * Bộ lọc danh sách đơn. Tên tham số theo `docs/CHUAN-FILTER.md` — `ngtu`/`ngden` là
+ * tên chuẩn TOÀN APP cho lọc ngày, đừng đặt tên khác.
+ */
+export type LocDon = {
+  ngtu?: string
+  ngden?: string
+  tt?: string
+  tp?: string
+  /** Kênh cấp 1 (`sales_order_lines.channel`). */
+  kenh?: string
+  /** Kênh cấp 2 / chi tiết kênh (`sales_order_lines.channel_detail`). */
+  kenh2?: string
+  sp?: string
+}
+
 /** Danh sách đơn: gộp mirror (sales_order_lines) + đơn app (sales_orders) + đơn tặng, lọc theo tab. */
-export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
+export async function danhSachDon(q = '', tab = '', loc: LocDon = {}): Promise<DonRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
   const onlyTang = tab === 'DON_TANG'
   const map = new Map<string, DonRow>()
+  // Đơn TẶNG không có tình trạng / thanh toán / kênh / sản phẩm-lọc-được. Bật một trong
+  // các lọc đó mà vẫn trả đơn tặng thì kết quả lẫn lộn -> loại hẳn nhóm đó ra.
+  const locNghiepVu = !!(loc.tt || loc.tp || loc.kenh || loc.kenh2 || loc.sp)
 
   if (!onlyTang) {
     let mq = db
@@ -96,6 +117,15 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
       .limit(5000)
     if (tab) mq = mq.eq('source_tab', tab)
     if (s) mq = mq.or(`order_code.ilike.%${s}%,customer_name.ilike.%${s}%,product_name.ilike.%${s}%`)
+    if (loc.ngtu) mq = mq.gte('order_date', loc.ngtu)
+    if (loc.ngden) mq = mq.lte('order_date', loc.ngden)
+    if (loc.tt) mq = mq.eq('fulfillment_status', loc.tt)
+    if (loc.tp) mq = mq.eq('payment_status', loc.tp)
+    if (loc.kenh) mq = mq.eq('channel', loc.kenh)
+    if (loc.kenh2) mq = mq.eq('channel_detail', loc.kenh2)
+    // internal_code nằm ở DÒNG, không ở đơn -> lọc sản phẩm trả về đơn CÓ CHỨA sản phẩm đó,
+    // và line_count/total_vat khi ấy chỉ tính các dòng khớp. Giao diện phải nói rõ chuyện này.
+    if (loc.sp) mq = mq.eq('internal_code', loc.sp)
     const { data: lines, error } = await mq
     if (error) throw error
     for (const r of (lines ?? []) as Array<Record<string, unknown>>) {
@@ -123,10 +153,32 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
 
     let aq = db
       .from('sales_orders')
-      .select('order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
+      .select('order_id, order_code, order_date, source_tab, customer_name, province, status, payment_status, total_vat')
       .order('order_date', { ascending: false, nullsFirst: false })
       .limit(2000)
     if (tab) aq = aq.eq('source_tab', tab)
+    if (loc.ngtu) aq = aq.gte('order_date', loc.ngtu)
+    if (loc.ngden) aq = aq.lte('order_date', loc.ngden)
+    if (loc.tt) aq = aq.eq('status', loc.tt)
+    if (loc.tp) aq = aq.eq('payment_status', loc.tp)
+    if (loc.kenh) {
+      // Đơn mirror lưu TÊN kênh (`channel` text); đơn app lưu `channel_id` (số) -> phải
+      // quy tên sang id, không so thẳng được. Không có id nào khớp thì không có đơn app nào
+      // thuộc kênh đó: dùng -1 để truy vấn trả rỗng, thay vì bỏ qua bộ lọc.
+      const { data: dc } = await db.from('dim_channel').select('id').eq('channel_l1', loc.kenh)
+      const ids = ((dc ?? []) as Array<{ id: number }>).map((r) => r.id)
+      aq = aq.in('channel_id', ids.length ? ids : [-1])
+    }
+    // Lọc theo sản phẩm: đơn app giữ sản phẩm ở `sales_order_items`, không có cột nào trên
+    // header để lọc -> lấy trước danh sách order_id có mã đó.
+    // Đơn app chỉ có channel_id (kênh cấp 1), không lưu kênh cấp 2 -> lọc cấp 2 thì
+    // không đơn app nào khớp. Trả rỗng thay vì lờ bộ lọc đi.
+    if (loc.kenh2) aq = aq.in('order_id', ['00000000-0000-0000-0000-000000000000'])
+    if (loc.sp) {
+      const { data: it } = await db.from('sales_order_items').select('order_id').eq('internal_code', loc.sp)
+      const ids = [...new Set(((it ?? []) as Array<{ order_id: string }>).map((r) => r.order_id))]
+      aq = aq.in('order_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
+    }
     const { data: apps } = await aq
     const sl = s.toLowerCase()
     for (const o of (apps ?? []) as Array<Record<string, unknown>>) {
@@ -147,13 +199,81 @@ export async function danhSachDon(q = '', tab = ''): Promise<DonRow[]> {
     }
   }
 
-  if (!tab || onlyTang) {
-    for (const g of await donTang(s)) map.set(g.order_code, g)
+  if ((!tab || onlyTang) && !locNghiepVu) {
+    for (const g of await donTang(s)) {
+      if (loc.ngtu && (g.order_date ?? '') < loc.ngtu) continue
+      if (loc.ngden && (g.order_date ?? '') > loc.ngden) continue
+      map.set(g.order_code, g)
+    }
   }
 
   return [...map.values()]
     .sort((a, b) => (b.order_date ?? '').localeCompare(a.order_date ?? ''))
     .slice(0, 300)
+}
+
+/**
+ * Kênh có THẬT trong đơn (không lấy cả `dim_channel` để khỏi hiện kênh chưa dùng bao giờ).
+ * Gom trùng bằng cách so bản đã bỏ khoảng trắng thừa — xem "một giá trị nhiều cách viết"
+ * trong docs/CHUAN-FILTER.md.
+ */
+export async function kenhTrongDon(): Promise<string[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('channel')
+    .not('channel', 'is', null)
+    .limit(5000)
+  const set = new Map<string, string>()
+  for (const r of (data ?? []) as Array<{ channel: string }>) {
+    const v = String(r.channel).trim()
+    if (v) set.set(v.toLowerCase(), v)
+  }
+  return [...set.values()].sort((a, b) => a.localeCompare(b, 'vi'))
+}
+
+/**
+ * Cặp (kênh cấp 1, kênh cấp 2) có thật trong đơn. Trang dùng để dựng ô lọc cấp 2 và
+ * THU HẸP theo cấp 1 đang chọn — chọn "Đại lý" thì cấp 2 chỉ hiện đại lý, không hiện
+ * chi tiết của kênh khác.
+ */
+export async function kenhChiTietTrongDon(): Promise<{ kenh: string; chiTiet: string }[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('channel, channel_detail')
+    .not('channel_detail', 'is', null)
+    .limit(5000)
+  const set = new Map<string, { kenh: string; chiTiet: string }>()
+  for (const r of (data ?? []) as Array<{ channel: string | null; channel_detail: string }>) {
+    const ct = String(r.channel_detail).trim()
+    if (!ct) continue
+    const k = String(r.channel ?? '').trim()
+    set.set(`${k.toLowerCase()}|${ct.toLowerCase()}`, { kenh: k, chiTiet: ct })
+  }
+  return [...set.values()].sort((a, b) => a.chiTiet.localeCompare(b.chiTiet, 'vi'))
+}
+
+/** Mã sản phẩm có THẬT trong đơn. Nhãn = mã nội bộ (ngắn), như ô lọc Sản phẩm bên CSKH. */
+export async function spTrongDon(): Promise<{ ma: string; ten: string }[]> {
+  await chanSales()
+  const db = dataClient()
+  const { data } = await db
+    .from('sales_order_lines')
+    .select('internal_code, product_name')
+    .not('internal_code', 'is', null)
+    .limit(5000)
+  const set = new Map<string, string>()
+  for (const r of (data ?? []) as Array<{ internal_code: string; product_name: string | null }>) {
+    const ma = String(r.internal_code).trim()
+    if (!ma) continue
+    const ten = String(r.product_name ?? '').trim()
+    // Giữ tên ĐẦU TIÊN gặp được: cùng một mã có thể ghi tên hơi khác nhau giữa các dòng.
+    if (!set.has(ma) || (!set.get(ma) && ten)) set.set(ma, ten)
+  }
+  return [...set.entries()].map(([ma, ten]) => ({ ma, ten })).sort((a, b) => a.ma.localeCompare(b.ma))
 }
 
 export type KhachRow = {
@@ -165,26 +285,81 @@ export type KhachRow = {
   last_order_date: string | null
 }
 
-export async function danhSachKhach(q = ''): Promise<KhachRow[]> {
+/** Mọi giá trị Tỉnh thô đang có trong `customers` — nguồn để dựng ô lọc và tra biến thể. */
+async function tinhThoCuaKhach(db: ReturnType<typeof dataClient>): Promise<string[]> {
+  const { data } = await db.from('customers').select('province').not('province', 'is', null).limit(5000)
+  return ((data ?? []) as Array<{ province: string }>).map((r) => r.province)
+}
+
+/** Danh sách Tỉnh cho ô lọc, đã gom biến thể (HCM / TP. Hồ Chí Minh / Hồ Chí Minh -> một mục). */
+export async function tinhTrongKhach(): Promise<string[]> {
+  await chanSales()
+  return gomDanhSachTinh(await tinhThoCuaKhach(dataClient()))
+}
+
+/**
+ * Kênh của từng khách, SUY TỪ ĐƠN: `customer_purchases` (có customer_code) nối
+ * `sales_order_lines` (có channel) theo `order_code`.
+ *
+ * Vì sao không đọc `customers.channel_id`: cột đó vừa thêm 21/08 và **đang rỗng toàn bộ**
+ * (0/412 khách). Khi nào có người điền thì đọc thẳng cột đó sẽ nhanh hơn.
+ * Hai bảng đều nhỏ (822 + 810 dòng) nên gom trong bộ nhớ là đủ.
+ */
+export async function kenhTheoKhach(): Promise<Map<string, string[]>> {
+  await chanSales()
+  const db = dataClient()
+  const [cp, sol] = await Promise.all([
+    db.from('customer_purchases').select('customer_code, order_code').not('customer_code', 'is', null).limit(5000),
+    db.from('sales_order_lines').select('order_code, channel').not('channel', 'is', null).limit(5000),
+  ])
+  const kenhTheoDon = new Map<string, string>()
+  for (const r of ((sol.data ?? []) as Array<{ order_code: string; channel: string }>)) {
+    if (r.order_code && !kenhTheoDon.has(r.order_code)) kenhTheoDon.set(r.order_code, String(r.channel).trim())
+  }
+  const ra = new Map<string, string[]>()
+  for (const r of ((cp.data ?? []) as Array<{ customer_code: string; order_code: string }>)) {
+    const k = kenhTheoDon.get(r.order_code)
+    if (!k) continue
+    const cur = ra.get(r.customer_code)
+    if (cur) { if (!cur.includes(k)) cur.push(k) } else ra.set(r.customer_code, [k])
+  }
+  return ra
+}
+
+export type LocKhach = { tinh?: string; kenh?: string }
+
+export async function danhSachKhach(q = '', loc: LocKhach = {}): Promise<KhachRow[]> {
   await chanSales()
   const db = dataClient()
   const s = sach(q)
   let query = db
     .from('customers')
-    .select('customer_code, name, phone, phone_chuan, province, province_moi, total_orders, last_order_date')
+    // Dùng `province` (KHÔNG `province_moi`): quy ước chung chốt 21/08 là `province` giữ
+    // tỉnh hiện hành, và `province_moi` sắp bỏ. Xem SYSTEM.md §8.
+    .select('customer_code, name, phone, phone_chuan, province, total_orders, last_order_date')
     .order('last_order_date', { ascending: false, nullsFirst: false })
     .limit(200)
   if (s) query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%,phone_chuan.ilike.%${s}%,customer_code.ilike.%${s}%`)
+  if (loc.tinh) {
+    // Một tỉnh có nhiều cách viết trong DB -> khớp MỌI biến thể, không chỉ tên đã gom.
+    const bienThe = cacBienThe(loc.tinh, await tinhThoCuaKhach(db))
+    query = query.in('province', bienThe.length ? bienThe : ['\u0000'])
+  }
   const { data, error } = await query
   if (error) throw error
-  return ((data ?? []) as Array<Record<string, unknown>>).map((c) => ({
+  let rows = ((data ?? []) as Array<Record<string, unknown>>).map((c) => ({
     customer_code: c.customer_code as string,
     name: (c.name as string) ?? null,
     phone: (c.phone_chuan as string) || (c.phone as string) || null,
-    province: (c.province_moi as string) || (c.province as string) || null,
+    province: (c.province as string) ?? null,
     total_orders: (c.total_orders as number) ?? null,
     last_order_date: (c.last_order_date as string) ?? null,
   }))
+  if (loc.kenh) {
+    const map = await kenhTheoKhach()
+    rows = rows.filter((r) => (map.get(r.customer_code) ?? []).includes(loc.kenh as string))
+  }
+  return rows
 }
 
 // ---------- Chi tiết đơn ----------
@@ -197,6 +372,19 @@ export type DonLine = {
   quantity: number | null
   unit_price_vat: number | null
   amount_vat: number | null
+  /** Giá/tiền TRƯỚC VAT. Chỉ đơn từ Sheet có sẵn; đơn app = null -> suy từ vat_pct. */
+  unit_price_net: number | null
+  amount_net: number | null
+  /** PHÂN SỐ: 0.08 = 8%. Xem tachVat() trong _calc.ts. */
+  vat_pct: number | null
+  /** VAT = chịu thuế · KCT = không chịu thuế (muối) · KAD = không áp dụng (bình gas). */
+  vat_loai: 'VAT' | 'KCT' | 'KAD' | null
+  /** Giá niêm yết 1 đơn vị, ĐÃ GỒM VAT. null = mã chưa có trong bảng giá. */
+  gia_niem_yet: number | null
+  /** (giá niêm yết × SL) − thành tiền. null = không tính được, hoặc dòng quà. */
+  khuyen_mai: number | null
+  /** Đơn bán từ Sheet luôn false — quà từ Sheet là cả một đơn DON_TANG riêng. */
+  is_gift: boolean
   note: string | null
 }
 
@@ -216,7 +404,12 @@ export type DonChiTiet = {
   partner_order_code: string | null
   shipping_code: string | null
   install_date: string | null
+  /** Tổng SAU VAT. */
   total_vat: number
+  /** Tổng TRƯỚC VAT. */
+  total_net: number
+  /** Tiền VAT = total_vat - total_net. */
+  total_vat_tien: number
   note: string | null
   created_by: string | null
   is_app: boolean
@@ -224,9 +417,108 @@ export type DonChiTiet = {
 }
 
 const MIRROR_COLS =
-  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, fulfillment_status, payment_status, note'
+  'id, source_tab, order_code, partner_order_code, category_l1, category_l2, order_date, channel, channel_detail, customer_name, province, internal_code, product_name, quantity, unit_price_vat, amount_vat, unit_price_net, amount_net, vat_pct, vat_loai, fulfillment_status, payment_status, note'
 
-/** Chi tiết 1 đơn: ưu tiên đơn app (sales_orders + items), fallback mirror (sales_order_lines). */
+/**
+ * Giá niêm yết theo mã, lấy bản CÒN HIỆU LỰC tại `ngay` (mặc định hôm nay).
+ * Bảng `product_price` là GƯƠNG từ Masterdata, chỉ đọc.
+ */
+async function giaNiemYetTheoMa(
+  db: ReturnType<typeof dataClient>,
+  maList: string[],
+  ngay: string | null
+): Promise<Map<string, number>> {
+  const ra = new Map<string, number>()
+  const ma = [...new Set(maList.filter(Boolean))]
+  if (!ma.length) return ra
+  const { data } = await db
+    .from('product_price')
+    .select('internal_code, gia_vat, hieu_luc_tu, hieu_luc_den')
+    .in('internal_code', ma)
+    .eq('kenh', 'NIEM_YET')
+  const moc = ngay || new Date().toISOString().slice(0, 10)
+  for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+    const tu = (r.hieu_luc_tu as string) ?? ''
+    const den = (r.hieu_luc_den as string) ?? null
+    // Đơn CŨ hơn ngày bảng giá bắt đầu có hiệu lực vẫn lấy bảng giá hiện có —
+    // thà so với giá đang niêm yết còn hơn bỏ trống cột Khuyến mãi.
+    if (den && moc > den) continue
+    const gia = Number(r.gia_vat) || 0
+    const code = r.internal_code as string
+    // Nhiều mốc hiệu lực -> lấy mốc MỚI NHẤT còn áp dụng được.
+    if (!ra.has(code) || tu <= moc) ra.set(code, gia)
+  }
+  return ra
+}
+
+/**
+ * Chi tiết đơn TẶNG (`source_tab = 'DON_TANG'`) — chỉ tồn tại ở `customer_purchases`.
+ * Bảng đó KHÔNG có cột tiền, nên mọi số tiền để 0 và giao diện không bịa ra giá.
+ */
+async function chiTietDonTang(
+  db: ReturnType<typeof dataClient>,
+  orderCode: string
+): Promise<DonChiTiet | null> {
+  const { data } = await db
+    .from('customer_purchases')
+    .select('id, order_code, order_date, source_tab, customer_code, is_gift, internal_code, product_name, category_l1, category_l2, quantity')
+    .eq('order_code', orderCode)
+    .order('id', { ascending: true })
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  if (rows.length === 0) return null
+  const f = rows[0]
+
+  let customer_name: string | null = null
+  const cc = (f.customer_code as string) ?? null
+  if (cc) {
+    const { data: kh } = await db.from('customers').select('name').eq('customer_code', cc).maybeSingle()
+    customer_name = ((kh as { name: string } | null)?.name) ?? null
+  }
+
+  return {
+    order_code: (f.order_code as string) || orderCode,
+    order_date: (f.order_date as string) ?? null,
+    source_tab: (f.source_tab as string) ?? 'DON_TANG',
+    customer_code: cc,
+    customer_name,
+    province: null,
+    address: null,
+    channel: null,
+    channel_detail: null,
+    fulfillment_status: null,
+    payment_status: null,
+    payment_method: null,
+    partner_order_code: null,
+    shipping_code: null,
+    install_date: null,
+    total_vat: 0,
+    total_net: 0,
+    total_vat_tien: 0,
+    note: null,
+    created_by: null,
+    is_app: false,
+    lines: rows.map((r, i) => ({
+      key: String(r.id ?? `t${i}`),
+      product_name: (r.product_name as string) ?? null,
+      internal_code: (r.internal_code as string) ?? null,
+      category_l1: (r.category_l1 as string) ?? null,
+      category_l2: (r.category_l2 as string) ?? null,
+      quantity: (r.quantity as number) ?? null,
+      unit_price_vat: null,
+      amount_vat: null,
+      unit_price_net: null,
+      amount_net: null,
+      vat_pct: null,
+      vat_loai: null,
+      gia_niem_yet: null,
+      khuyen_mai: null,
+      is_gift: !!r.is_gift, // đơn tặng: cờ quà CÓ THẬT ở bảng này
+      note: null,
+    })),
+  }
+}
+
+/** Chi tiết 1 đơn: đơn app (sales_orders) -> mirror Sheet (sales_order_lines) -> đơn tặng (customer_purchases). */
 export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> {
   await chanSales()
   const db = dataClient()
@@ -249,8 +541,21 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       quantity: (it.quantity as number) ?? null,
       unit_price_vat: (it.unit_price_vat as number) ?? null,
       amount_vat: (it.amount_vat as number) ?? null,
+      unit_price_net: null, // sales_order_items không lưu giá trước VAT
+      amount_net: null,     // -> tongDon() suy từ vat_pct
+      vat_pct: it.vat_pct == null ? null : Number(it.vat_pct),
+      vat_loai: (it.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
+      gia_niem_yet: null,
+      khuyen_mai: null,
+      is_gift: !!it.is_gift,
       note: (it.note as string) ?? null,
     }))
+    const giaMap = await giaNiemYetTheoMa(db, lines.map((l) => l.internal_code ?? ''), (header.order_date as string) ?? null)
+    for (const l of lines) {
+      l.gia_niem_yet = l.internal_code ? giaMap.get(l.internal_code) ?? null : null
+      l.khuyen_mai = tinhKhuyenMai(l.gia_niem_yet, l.quantity, l.amount_vat, l.is_gift)
+    }
+    const tong = tongDon(lines)
     return {
       order_code: header.order_code as string,
       order_date: (header.order_date as string) ?? null,
@@ -267,7 +572,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
       partner_order_code: (header.partner_order_code as string) ?? null,
       shipping_code: (header.shipping_code as string) ?? null,
       install_date: (header.install_date as string) ?? null,
-      total_vat: Number(header.total_vat) || 0,
+      total_vat: tong.sauVat, // lấy từ dòng đang hiện, không từ header — lệch thì phải thấy
+      total_net: tong.net,
+      total_vat_tien: tong.vat,
       note: (header.note as string) ?? null,
       created_by: (header.created_by as string) ?? null,
       is_app: true,
@@ -283,7 +590,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     .order('id', { ascending: true })
   if (error) throw error
   const lr = (rows ?? []) as Array<Record<string, unknown>>
-  if (lr.length === 0) return null
+  // Nhánh 3: đơn TẶNG. Danh sách dựng tab Tặng từ `customer_purchases`, nhưng đơn tặng
+  // KHÔNG có trong sales_orders lẫn sales_order_lines -> bấm vào là 404. Lỗi CEO báo 21/08.
+  if (lr.length === 0) return chiTietDonTang(db, orderCode)
   const f = lr[0]
   const lines: DonLine[] = lr.map((r, i) => ({
     key: (r.id as string) || `l${i}`,
@@ -294,8 +603,21 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     quantity: (r.quantity as number) ?? null,
     unit_price_vat: (r.unit_price_vat as number) ?? null,
     amount_vat: (r.amount_vat as number) ?? null,
+    unit_price_net: (r.unit_price_net as number) ?? null,
+    amount_net: (r.amount_net as number) ?? null,
+    vat_pct: r.vat_pct == null ? null : Number(r.vat_pct),
+    vat_loai: (r.vat_loai as 'VAT' | 'KCT' | 'KAD' | null) ?? null,
+    gia_niem_yet: null,
+    khuyen_mai: null,
+    is_gift: false, // đơn bán từ Sheet KHÔNG có dòng quà — quà là đơn DON_TANG riêng
     note: (r.note as string) ?? null,
   }))
+  const giaMap = await giaNiemYetTheoMa(db, lines.map((l) => l.internal_code ?? ''), (f.order_date as string) ?? null)
+  for (const l of lines) {
+    l.gia_niem_yet = l.internal_code ? giaMap.get(l.internal_code) ?? null : null
+    l.khuyen_mai = tinhKhuyenMai(l.gia_niem_yet, l.quantity, l.amount_vat, l.is_gift)
+  }
+  const tong = tongDon(lines)
   return {
     order_code: (f.order_code as string) || orderCode,
     order_date: (f.order_date as string) ?? null,
@@ -312,7 +634,9 @@ export async function chiTietDon(orderCode: string): Promise<DonChiTiet | null> 
     partner_order_code: (f.partner_order_code as string) ?? null,
     shipping_code: null,
     install_date: null,
-    total_vat: lr.reduce((s, r) => s + (Number(r.amount_vat) || 0), 0),
+    total_vat: tong.sauVat,
+    total_net: tong.net,
+    total_vat_tien: tong.vat,
     note: null,
     created_by: null,
     is_app: false,

@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
 import { requireNhanSu } from '@/lib/nen-tang/phien'
-import { danhSachKhach } from '../actions'
+import { BoLocChon, OTimKiem, ThanhDangLoc } from '@/bang'
+import { danhSachKhach, kenhTrongDon, tinhTrongKhach } from '../actions'
 
 export const metadata = { title: 'Khách hàng · GWT Sales' }
 export const dynamic = 'force-dynamic'
@@ -13,11 +15,23 @@ function fmtDate(d: string | null): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : d
 }
 
-export default async function SalesKhachPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function SalesKhachPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; tinh?: string; kenh?: string }>
+}) {
   await requireNhanSu()
   if (!(await coTheVaoSales())) redirect('/?loi=khong_du_quyen')
-  const { q } = await searchParams
-  const rows = await danhSachKhach(q ?? '')
+  const { q, tinh, kenh } = await searchParams
+  const [rows, tinhOpts, kenhOpts] = await Promise.all([
+    danhSachKhach(q ?? '', { tinh, kenh }),
+    tinhTrongKhach(),
+    kenhTrongDon(),
+  ])
+  const dieuKien = [
+    tinh ? { nhan: 'Tỉnh/TP', giaTri: tinh } : null,
+    kenh ? { nhan: 'Kênh', giaTri: kenh } : null,
+  ].filter(Boolean) as { nhan: string; giaTri: string }[]
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -30,15 +44,25 @@ export default async function SalesKhachPage({ searchParams }: { searchParams: P
           <Link href="/sales/khach/moi" className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a6771]">＋ Thêm khách</Link>
         </header>
 
-        <form className="flex gap-2">
-          <input
-            name="q"
-            defaultValue={q ?? ''}
-            placeholder="Tìm tên / SĐT / mã KH…"
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-          />
-          <button className="rounded-lg bg-[#0e8c9a] px-4 py-2 text-sm font-medium text-white hover:bg-[#0a6771]">Tìm</button>
-        </form>
+        {/* Đọc useSearchParams -> BẮT BUỘC bọc Suspense, xem docs/CHUAN-FILTER.md */}
+        <Suspense fallback={<div className="h-20" />}>
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <OTimKiem placeholder="Tìm tên / SĐT / mã KH…" />
+            <div className="flex flex-wrap items-center gap-2">
+              <BoLocChon param="tinh" nhan="Tỉnh/TP" tuyChon={tinhOpts.map((t) => ({ giaTri: t, nhan: t }))} />
+              <BoLocChon param="kenh" nhan="Kênh" tuyChon={kenhOpts.map((k) => ({ giaTri: k, nhan: k }))} />
+            </div>
+          </div>
+        </Suspense>
+
+        <ThanhDangLoc dieuKien={dieuKien} hienThi={rows.length} tong={rows.length} nhan="khách" />
+
+        {kenh && (
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+            Kênh của khách đang <b>suy từ đơn đã mua</b> — cột <code>channel_id</code> vừa thêm 21/08 và
+            chưa có ai điền. Khách chưa có đơn nào sẽ không hiện khi lọc theo kênh.
+          </p>
+        )}
 
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">

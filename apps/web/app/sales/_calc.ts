@@ -59,3 +59,85 @@ export function nextSeqCode(existing: Array<string | null | undefined>, prefix: 
   }
   return prefix + String(max + 1).padStart(pad, '0')
 }
+
+/**
+ * Quy thuế suất VAT về dạng PHÂN SỐ, chấp được cả hai cách ghi.
+ *
+ * Vì sao cần: Google Sheet lưu phân số (`0.08`), nhưng ô nhập cũ của app ghi nhãn
+ * "VAT%" nên người dùng gõ `8`. Hai cách ghi cùng tồn tại trong dữ liệu cũ, và nếu
+ * đem `8` đi nhân 100 để hiển thị thì ra **800%** — đúng lỗi CEO báo 21/08.
+ *
+ * Luật: giá trị > 1 hiểu là PHẦN TRĂM (8 -> 0.08); ≤ 1 hiểu là PHÂN SỐ (0.08 giữ nguyên).
+ * Không có thuế suất thực tế nào vừa hợp lệ ở cả hai cách hiểu, nên luật này không nhập nhằng.
+ */
+export function chuanVat(v: number | null | undefined): number | null {
+  if (v == null || v === '' as unknown as number) return null
+  const n = Number(v)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n > 1 ? n / 100 : n
+}
+
+/**
+ * Tách tiền TRƯỚC VAT và tiền VAT từ tiền SAU VAT.
+ *
+ * ⚠️ `vatPct` là PHÂN SỐ: 0.08 = 8%. Đây là cách Google Sheet lưu — đo trên production
+ * 21/08/2026: 699/810 dòng `sales_order_lines` có vat_pct = 0.08, và 696/699 dòng khớp
+ * công thức `amount_net * (1 + vat_pct)`. Dùng `1 + p/100` là sai đúng 100 lần.
+ *
+ * null hoặc 0 -> coi như không VAT. KHÔNG đoán thuế suất thay người nhập.
+ */
+export function tachVat(
+  amountVat: number | null | undefined,
+  vatPct: number | null | undefined
+): { net: number; vat: number } {
+  const sau = Math.round(Number(amountVat) || 0)
+  const p = chuanVat(vatPct) ?? 0
+  if (p <= 0) return { net: sau, vat: 0 }
+  const net = Math.round(sau / (1 + p))
+  // Trừ ngược thay vì tính riêng, để net + vat LUÔN khớp đúng tiền sau VAT —
+  // làm tròn hai đầu độc lập sẽ lệch 1 đồng và tổng hoá đơn không cân.
+  return { net, vat: sau - net }
+}
+
+/**
+ * Tổng một đơn: { trước VAT, tiền VAT, sau VAT }.
+ * Có `amount_net` (đơn từ Sheet) thì dùng thẳng; không có (đơn tạo trên app,
+ * `sales_order_items` không lưu giá trước VAT) thì suy từ `vat_pct`.
+ */
+export function tongDon(
+  lines: Array<{ amount_vat: number | null; amount_net: number | null; vat_pct: number | null }>
+): { net: number; vat: number; sauVat: number } {
+  let net = 0
+  let sauVat = 0
+  for (const l of lines) {
+    const sau = Math.round(Number(l.amount_vat) || 0)
+    sauVat += sau
+    net += l.amount_net != null ? Math.round(Number(l.amount_net)) : tachVat(sau, l.vat_pct).net
+  }
+  return { net, vat: sauVat - net, sauVat }
+}
+
+/**
+ * Khuyến mãi của MỘT dòng = (giá niêm yết × SL) − thành tiền thực bán.
+ * Cả hai vế đều là tiền ĐÃ GỒM VAT nên trừ thẳng được.
+ *
+ * Trả `null` khi KHÔNG tính được hoặc không có nghĩa:
+ *  - chưa có giá niêm yết cho mã đó (mới phủ 37/53 mã đang bán) -> đừng bịa số 0;
+ *  - dòng QUÀ: thành tiền = 0 nên hiệu số bằng nguyên giá niêm yết, hiện ra sẽ như một
+ *    khoản giảm giá khổng lồ. Quà là chuyện riêng, theo dõi ở cột Tặng.
+ *
+ * Số ÂM (bán cao hơn niêm yết) vẫn trả về nguyên: đó là thông tin thật, không giấu.
+ */
+export function tinhKhuyenMai(
+  giaNiemYet: number | null | undefined,
+  qty: number | null | undefined,
+  amountVat: number | null | undefined,
+  isGift: boolean
+): number | null {
+  if (isGift) return null
+  const gia = Number(giaNiemYet) || 0
+  if (!giaNiemYet || gia <= 0) return null
+  const sl = Number(qty) || 0
+  const thuc = Math.round(Number(amountVat) || 0)
+  return Math.round(gia * sl) - thuc
+}

@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { PRESETS, khoangPreset } from './ngay'
 
 /**
  * Lọc theo ngày, dùng chung cho mọi bảng có trường ngày. Điều khiển 2 tham số URL
@@ -71,6 +72,25 @@ export function LocNgay({ nhan = 'Ngày' }: { nhan?: string }) {
             onChange={(e) => di(tu, e.target.value)} className={oNgay} />
         </>
       )}
+
+      {/* Preset chỉ set ngtu/ngden rồi đi tiếp — KHÔNG đẻ tham số URL mới, để trang nào
+          dùng LocNgay là tự có preset, không phải sửa gì thêm. */}
+      <span className="flex flex-wrap items-center gap-1">
+        {PRESETS.map((p) => (
+          <button
+            key={p.ma}
+            type="button"
+            onClick={() => {
+              const k = khoangPreset(p.ma, new Date())
+              setChe(k.tu === k.den ? 'dung' : 'khoang')
+              di(k.tu, k.den)
+            }}
+            className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:border-slate-300 hover:text-slate-700"
+          >
+            {p.nhan}
+          </button>
+        ))}
+      </span>
     </div>
   )
 }

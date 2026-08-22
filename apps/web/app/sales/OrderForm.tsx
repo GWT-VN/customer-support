@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { TINH_VN } from '@/lib/tinh'
+import { ChonTinh } from '@/components/ChonTinh'
 import { taoDon, suaDon, timKhachChoDon } from './actions'
 import { fmtVnd } from './_ui'
 import {
@@ -15,6 +15,8 @@ import {
   FULFILL_OPTS,
   PAYMENT_OPTS,
   PAYMETHOD_OPTS,
+  VAT_OPTS,
+  maVat,
 } from './_types'
 
 type Line = NewOrderItem & { key: number }
@@ -28,7 +30,11 @@ const emptyLine = (key: number): Line => ({
   quantity: 1,
   unit_price_vat: 0,
   is_gift: false,
-  vat_pct: null,
+  // Mặc định 8%: 320/328 mã là 8%, và Apps Script cũng mặc định vậy (defaultVatFor_).
+  // Để trống là người nhập dễ quên -> tiền trước VAT tính sai. Chọn sản phẩm xong thì
+  // VAT tự điền lại theo đúng mã (xem onPick của ProductPicker).
+  vat_pct: 0.08,
+  vat_loai: 'VAT' as const,
   note: null,
 })
 
@@ -197,6 +203,7 @@ export function OrderForm({
         unit_price_vat: Number(l.unit_price_vat) || 0,
         is_gift: l.is_gift,
         vat_pct: l.vat_pct == null || (l.vat_pct as unknown as string) === '' ? null : Number(l.vat_pct),
+        vat_loai: l.vat_loai ?? null,
         note: l.note?.trim() || null,
       })),
     }
@@ -274,6 +281,15 @@ export function OrderForm({
           <span className="text-sm font-semibold text-slate-800">Sản phẩm</span>
           <button type="button" onClick={addLine} className="rounded-md bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-200">＋ Thêm dòng</button>
         </div>
+        {/* Hàng tiêu đề: các ô số bên phải rất hẹp, không có nhãn thì không đoán được ô nào là gì. */}
+        <div className="mb-1 hidden grid-cols-12 gap-2 px-2 text-[11px] uppercase tracking-wide text-slate-400 sm:grid">
+          <span className="col-span-5">Sản phẩm</span>
+          <span className="col-span-2 text-right">Số lượng</span>
+          <span className="col-span-2 text-right">Đơn giá (gồm VAT)</span>
+          <span className="col-span-1 text-right">VAT</span>
+          <span className="col-span-1 text-center">Quà</span>
+          <span className="col-span-1" />
+        </div>
         <div className="space-y-2">
           {lines.map((l) => (
             <div key={l.key} className="rounded-lg border border-slate-100 bg-slate-50/50 p-2">
@@ -283,12 +299,35 @@ export function OrderForm({
                     catalog={catalog}
                     code={l.internal_code}
                     name={l.product_name}
-                    onPick={(c) => setLine(l.key, { internal_code: c.internal_code, product_name: c.name, category_l1: c.category_l1, category_l2: c.category_l2 })}
+                    onPick={(c) =>
+                      setLine(l.key, {
+                        internal_code: c.internal_code,
+                        product_name: c.name,
+                        category_l1: c.category_l1,
+                        category_l2: c.category_l2,
+                        // VAT tự điền theo mã nội bộ (CEO chốt 21/08). Mã chưa xếp loại
+                        // (mục chi phí kế toán) thì để trống chứ không đoán 8%.
+                        vat_pct: c.vat_pct,
+                        vat_loai: c.vat_loai,
+                      })
+                    }
                   />
                 </div>
                 <input type="number" min={0} className={inp + ' col-span-3 sm:col-span-2 text-right'} value={l.quantity} onChange={(e) => setLine(l.key, { quantity: Number(e.target.value) })} title="Số lượng (DVBT = số lần)" />
-                <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá" disabled={l.is_gift} title="Đơn giá (sau VAT)" />
-                <input type="number" min={0} className={inp + ' col-span-2 sm:col-span-1 text-right'} value={l.vat_pct ?? ''} onChange={(e) => setLine(l.key, { vat_pct: e.target.value === '' ? null : Number(e.target.value) })} placeholder="VAT%" title="VAT %" />
+                <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá (gồm VAT)" disabled={l.is_gift} title="Đơn giá ĐÃ GỒM VAT — giống cột 'Đơn giá sau VAT' trong Google Sheet. Tiền trước VAT app tự tính ra." />
+                <select
+                  className={inp + ' col-span-2 sm:col-span-1 text-right'}
+                  value={maVat(l.vat_pct, l.vat_loai)}
+                  onChange={(e) => {
+                    const v = VAT_OPTS.find((x) => x.ma === e.target.value)
+                    setLine(l.key, { vat_pct: v?.pct ?? null, vat_loai: v?.loai ?? null })
+                  }}
+                  title="Thuế suất VAT — KCT: không chịu thuế (muối) · KAD: không áp dụng (bình gas)"
+                >
+                  {VAT_OPTS.map((v) => (
+                    <option key={v.ma} value={v.ma}>{v.nhan}</option>
+                  ))}
+                </select>
                 <label className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1 text-xs text-slate-500" title="Hàng tặng"><input type="checkbox" checked={l.is_gift} onChange={(e) => setLine(l.key, { is_gift: e.target.checked })} />Quà</label>
                 <button type="button" onClick={() => removeLine(l.key)} className="col-span-1 text-slate-400 hover:text-rose-600" title="Xoá dòng">✕</button>
               </div>
@@ -321,11 +360,7 @@ export function OrderForm({
           <div><label className={lbl}>Hình thức TT</label><select className={inp} value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>{PAYMETHOD_OPTS.map((o) => <option key={o} value={o}>{o || '— chọn —'}</option>)}</select></div>
           <div><label className={lbl}>Mã vận đơn</label><input className={inp} value={shippingCode} onChange={(e) => setShippingCode(e.target.value)} /></div>
           <div className="sm:col-span-1"><label className={lbl}>Tỉnh / TP</label>
-            <select className={inp} value={province} onChange={(e) => setProvince(e.target.value)}>
-              <option value="">— chọn —</option>
-              {province && !TINH_VN.includes(province) && <option value={province}>{province} (cũ)</option>}
-              {TINH_VN.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <ChonTinh value={province} onChange={setProvince} className={inp} />
           </div>
           <div className="sm:col-span-3"><label className={lbl}>Địa chỉ giao</label><input className={inp} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
         </div>
