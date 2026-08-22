@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { traKhachTheoSdt } from '@/lib/tra-khach'
+import type { KetQuaTraKhach } from '@/lib/tra-khach-chung'
+import type { Kenh } from '@/app/actions'
 import { redirect } from 'next/navigation'
 import { dataClient } from '@/lib/nen-tang/db'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
@@ -921,4 +924,33 @@ export async function xoaKhach(code: string): Promise<Kq> {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+
+/**
+ * Tra SĐT xem đã có khách chưa — DÙNG CHUNG hàm với CSKH (`traKhachTheoSdt`).
+ *
+ * Không gọi `traKhachChung()` của CS: hàm đó gác bằng quyền `cs.khach.xem`, nhân viên Sales
+ * không có. Mỗi khu gác bằng quyền khu mình rồi mới gọi vào lõi chung — đúng luật ghi trong
+ * `lib/khach-lien-he.ts`. Lõi chung thì phải là MỘT, nếu không hai khu tra ra hai kết quả
+ * khác nhau cho cùng một số.
+ */
+export async function traSdtSales(sdt: string): Promise<KetQuaTraKhach> {
+  await chanSales()
+  return traKhachTheoSdt(sdt)
+}
+
+/** dim_channel 2 cấp cho ô chọn kênh. */
+export async function kenhChonDuoc(): Promise<Kenh[]> {
+  await chanSales()
+  const { data } = await dataClient()
+    .from('dim_channel')
+    .select('id, channel_l1, channel_l2')
+    .order('channel_l1')
+    .order('channel_l2')
+  return ((data ?? []) as Array<Record<string, unknown>>).map((d) => ({
+    id: d.id as number,
+    channel_l1: (d.channel_l1 as string) ?? '',
+    channel_l2: (d.channel_l2 as string) ?? null,
+  }))
 }

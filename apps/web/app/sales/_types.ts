@@ -59,6 +59,8 @@ export type CustomerInput = {
   company_invoice: string | null
   tax_code: string | null
   note: string | null
+  /** id trong dim_channel. Khách lẻ hưởng khuyến mãi theo kênh này. */
+  channel_id: number | null
 }
 
 export type CustomerHit = {

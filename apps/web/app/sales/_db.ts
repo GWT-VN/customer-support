@@ -241,7 +241,7 @@ export function isAppCustomer(code: string | null | undefined): boolean {
 }
 
 const CUST_COLS =
-  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note'
+  'customer_code, name, phone, phone_chuan, address, province, province_moi, company_invoice, tax_code, note, channel_id'
 
 export async function findCustomerByPhone(phone: string): Promise<{ customer_code: string; name: string | null } | null> {
   const db = dataClient()
@@ -264,6 +264,7 @@ export async function getCustomerForEdit(code: string): Promise<CustomerInput | 
     company_invoice: (c.company_invoice as string) ?? null,
     tax_code: (c.tax_code as string) ?? null,
     note: (c.note as string) ?? null,
+    channel_id: (c.channel_id as number) ?? null,
   }
 }
 
@@ -287,6 +288,7 @@ function cleanCustomer(input: CustomerInput) {
     company_invoice: input.company_invoice?.trim() || null,
     tax_code: input.tax_code?.trim() || null,
     note: input.note?.trim() || null,
+    channel_id: input.channel_id ?? null,
   }
 }
 
