@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { traKhachTheoSdt } from '@/lib/tra-khach'
 import type { KetQuaTraKhach } from '@/lib/tra-khach-chung'
 import type { Kenh } from '@/app/actions'
+import { ctkmChoDon, type Bac, type BoiCanhGia, type ChinhSachGia, type Ctkm } from './_ctkm'
 import { redirect } from 'next/navigation'
 import { dataClient } from '@/lib/nen-tang/db'
 import { coTheVaoSales } from '@/lib/nen-tang/gac-cong'
@@ -953,4 +954,85 @@ export async function kenhChonDuoc(): Promise<Kenh[]> {
     channel_l1: (d.channel_l1 as string) ?? '',
     channel_l2: (d.channel_l2 as string) ?? null,
   }))
+}
+
+/**
+ * Gom mọi thứ cần để tự bắt giá cho một khách — CEO chốt: *"Khi lên đơn hàng các khách này
+ * trong tháng sẽ tự bắt được ctkm/chiết khấu đang áp dụng"*.
+ *
+ * Gọi MỘT lần lúc chọn khách, không gọi lại theo từng dòng hàng: một đơn 5 dòng mà mỗi dòng
+ * một vòng gọi server là 5 lần chờ, trong khi dữ liệu y hệt nhau.
+ */
+export async function boiCanhGia(
+  customerCode: string | null,
+  channelIdTruyenVao: number | null,
+  ngay: string
+): Promise<BoiCanhGia> {
+  await chanSales()
+  const db = dataClient()
+
+  let bac: Bac | null = null
+  let channelId = channelIdTruyenVao
+
+  if (customerCode) {
+    const [{ data: bacRow }, { data: kh }] = await Promise.all([
+      db.from('sales_bac_khach').select('bac')
+        .eq('customer_code', customerCode).is('hieu_luc_den', null).maybeSingle(),
+      db.from('customers').select('channel_id').eq('customer_code', customerCode).maybeSingle(),
+    ])
+    if (bacRow) bac = (bacRow as { bac: Bac }).bac
+    if (channelId == null) channelId = ((kh as { channel_id: number | null } | null)?.channel_id) ?? null
+  }
+
+  const [cs, gia, ct, ctKenh, ctSp] = await Promise.all([
+    db.from('sales_chinh_sach_gia').select('*').eq('trang_thai', 'ban_hanh'),
+    db.from('sales_guong_gia_niem_yet').select('internal_code, gia_vat'),
+    db.from('sales_ctkm').select('id, ten, tu_ngay, den_ngay, kieu_giam, muc_chung, giam_toi_da, trang_thai')
+      .eq('trang_thai', 'ban_hanh'),
+    db.from('sales_ctkm_kenh').select('ctkm_id, channel_id'),
+    db.from('sales_ctkm_sp').select('ctkm_id, internal_code, muc'),
+  ])
+
+  const niemYet: Record<string, number> = {}
+  for (const g of ((gia.data ?? []) as Array<Record<string, unknown>>)) {
+    const ma = g.internal_code as string
+    const v = Number(g.gia_vat)
+    if (ma && Number.isFinite(v)) niemYet[ma] = v
+  }
+
+  const kenhTheoCtkm = new Map<string, number[]>()
+  for (const k of ((ctKenh.data ?? []) as Array<Record<string, unknown>>)) {
+    const id = k.ctkm_id as string
+    if (!kenhTheoCtkm.has(id)) kenhTheoCtkm.set(id, [])
+    kenhTheoCtkm.get(id)!.push(Number(k.channel_id))
+  }
+  const spTheoCtkm = new Map<string, Record<string, number>>()
+  for (const s of ((ctSp.data ?? []) as Array<Record<string, unknown>>)) {
+    const id = s.ctkm_id as string
+    if (!spTheoCtkm.has(id)) spTheoCtkm.set(id, {})
+    spTheoCtkm.get(id)![s.internal_code as string] = Number(s.muc)
+  }
+
+  const dsCtkm: Ctkm[] = ((ct.data ?? []) as Array<Record<string, unknown>>).map((c) => ({
+    id: c.id as string,
+    ten: c.ten as string,
+    tu_ngay: c.tu_ngay as string,
+    den_ngay: (c.den_ngay as string) ?? null,
+    kieu_giam: c.kieu_giam as Ctkm['kieu_giam'],
+    muc_chung: c.muc_chung == null ? null : Number(c.muc_chung),
+    giam_toi_da: c.giam_toi_da == null ? null : Number(c.giam_toi_da),
+    trang_thai: c.trang_thai as string,
+    kenh: kenhTheoCtkm.get(c.id as string) ?? [],
+  }))
+
+  const { chon, khac } = ctkmChoDon(dsCtkm, ngay, channelId)
+
+  return {
+    bac,
+    channel_id: channelId,
+    chinhSach: ((cs.data ?? []) as unknown) as ChinhSachGia[],
+    ctkm: chon ? { ...chon, sp: spTheoCtkm.get(chon.id) ?? {} } : null,
+    soCtkmKhac: khac.length,
+    niemYet,
+  }
 }

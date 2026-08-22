@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChonTinh } from '@/components/ChonTinh'
-import { taoDon, suaDon, timKhachChoDon } from './actions'
+import { taoDon, suaDon, timKhachChoDon, boiCanhGia } from './actions'
 import { fmtVnd } from './_ui'
 import {
   type CatalogPick,
@@ -18,6 +18,7 @@ import {
   VAT_OPTS,
   maVat,
 } from './_types'
+import { giaGoiY, nhanBac, type BoiCanhGia, type GiaGoiY } from './_ctkm'
 
 type Line = NewOrderItem & { key: number }
 
@@ -164,6 +165,36 @@ export function OrderForm({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ── GIÁ TỰ BẮT ───────────────────────────────────────────────────────────
+  // CEO chốt: khách có bậc/kênh thì lên đơn tự ăn đúng chính sách đang áp.
+  // Gợi ý thôi — người nhập vẫn gõ đè được, chỉ bị nhắc khi bán dưới mức đã duyệt.
+  const [bcGia, setBcGia] = useState<BoiCanhGia | null>(null)
+  /** Giá app gợi ý cho từng dòng, giữ lại để so khi người nhập gõ đè. */
+  const [goiY, setGoiY] = useState<Record<number, GiaGoiY>>({})
+
+  const custCode = customerMode === 'existing' ? selectedCust?.customer_code ?? null : null
+  const kenhSo = channelId ? Number(channelId) : null
+
+  useEffect(() => {
+    let huy = false
+    if (!custCode && kenhSo == null) { setBcGia(null); return }
+    boiCanhGia(custCode, kenhSo, orderDate).then((bc) => { if (!huy) setBcGia(bc) })
+    return () => { huy = true }
+  }, [custCode, kenhSo, orderDate])
+
+  // Đổi khách/kênh/ngày -> tính lại gợi ý cho các dòng ĐÃ chọn sản phẩm.
+  // Cố ý KHÔNG tự sửa đơn giá đang có: đơn soạn dở mà số nhảy dưới tay người nhập
+  // là mất tin tưởng. Chỉ nhắc, để họ tự bấm áp lại.
+  useEffect(() => {
+    if (!bcGia) return
+    setGoiY((cu) => {
+      const moi = { ...cu }
+      for (const l of lines) if (l.internal_code) moi[l.key] = giaGoiY(bcGia, l.internal_code, orderDate)
+      return moi
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bcGia, orderDate])
+
   function runSearch(q: string) {
     setCustQuery(q)
     if (q.trim().length < 2) return setCustHits([])
@@ -290,6 +321,34 @@ export function OrderForm({
           <span className="col-span-1 text-center">Quà</span>
           <span className="col-span-1" />
         </div>
+
+        {/* Nói RÕ khách này đang ăn chính sách nào — không để app lặng lẽ điền số. */}
+        {bcGia && (bcGia.bac || bcGia.ctkm) && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
+            <span className="font-semibold">Đang áp:</span>
+            {bcGia.bac ? (
+              <>
+                <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  {nhanBac(bcGia.bac)}
+                </span>
+                {bcGia.ctkm && (
+                  <span className="text-xs text-teal-700">
+                    (đại lý ăn giá bậc, <b>không</b> cộng thêm khuyến mãi bán lẻ)
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs font-semibold text-white">
+                {bcGia.ctkm?.ten}
+              </span>
+            )}
+            {bcGia.soCtkmKhac > 0 && (
+              <span className="text-xs text-teal-700">
+                · còn {bcGia.soCtkmKhac} chương trình khác cũng khớp, app lấy cái giảm sâu nhất
+              </span>
+            )}
+          </div>
+        )}
         <div className="space-y-2">
           {lines.map((l) => (
             <div key={l.key} className="rounded-lg border border-slate-100 bg-slate-50/50 p-2">
@@ -309,12 +368,25 @@ export function OrderForm({
                         // (mục chi phí kế toán) thì để trống chứ không đoán 8%.
                         vat_pct: c.vat_pct,
                         vat_loai: c.vat_loai,
+                        ...(() => {
+                          if (!bcGia) return {}
+                          const g = giaGoiY(bcGia, c.internal_code, orderDate)
+                          setGoiY((o) => ({ ...o, [l.key]: g }))
+                          // Chỉ điền khi ô đang trống/0 — không đè số người nhập đã tự gõ.
+                          return g.gia != null && !Number(l.unit_price_vat) ? { unit_price_vat: g.gia } : {}
+                        })(),
                       })
                     }
                   />
                 </div>
                 <input type="number" min={0} className={inp + ' col-span-3 sm:col-span-2 text-right'} value={l.quantity} onChange={(e) => setLine(l.key, { quantity: Number(e.target.value) })} title="Số lượng (DVBT = số lần)" />
                 <input type="number" min={0} step={1000} className={inp + ' col-span-4 sm:col-span-2 text-right'} value={l.unit_price_vat} onChange={(e) => setLine(l.key, { unit_price_vat: Number(e.target.value) })} placeholder="Đơn giá (gồm VAT)" disabled={l.is_gift} title="Đơn giá ĐÃ GỒM VAT — giống cột 'Đơn giá sau VAT' trong Google Sheet. Tiền trước VAT app tự tính ra." />
+                <LineGiaNhan
+                  g={goiY[l.key]}
+                  daGo={Number(l.unit_price_vat) || 0}
+                  laQua={l.is_gift}
+                  onApLai={(v) => setLine(l.key, { unit_price_vat: v })}
+                />
                 <select
                   className={inp + ' col-span-2 sm:col-span-1 text-right'}
                   value={maVat(l.vat_pct, l.vat_loai)}
@@ -376,5 +448,38 @@ export function OrderForm({
         {!isEdit && <span className="text-xs text-slate-400">Mã đơn tự sinh (YYMMDD-{'{E|U|O}'}nnn) theo loại sản phẩm.</span>}
       </div>
     </form>
+  )
+}
+
+
+/**
+ * Nhãn dưới ô đơn giá: giá này ở đâu ra, và có đang bán dưới mức đã duyệt không.
+ *
+ * Cảnh báo chứ KHÔNG chặn — CEO chốt bán dưới giá là quyết định kinh doanh, có ca hợp lệ
+ * (đổi trả, thanh lý). Chặn cứng là nhân viên đi đường vòng, app mất luôn dấu vết.
+ */
+function LineGiaNhan({
+  g, daGo, laQua, onApLai,
+}: { g: GiaGoiY | undefined; daGo: number; laQua: boolean; onApLai: (v: number) => void }) {
+  if (!g || laQua) return <div className="col-span-12 hidden" />
+  const lech = g.gia != null && daGo > 0 && daGo !== g.gia
+  const duoi = g.gia != null && daGo > 0 && daGo < g.gia
+
+  return (
+    <div className="col-span-12 -mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-1 text-xs">
+      {g.nguon === 'KHONG_RO' ? (
+        <span className="text-amber-600">⚠ {g.nhan} — nhập tay giúp.</span>
+      ) : (
+        <span className={g.nguon === 'NIEM_YET' ? 'text-slate-400' : 'text-teal-700'}>
+          {g.nguon === 'NIEM_YET' ? 'Giá niêm yết' : `Theo ${g.nhan}`}
+          {g.gia != null && <> · <b>{fmtVnd(g.gia)}</b></>}
+        </span>
+      )}
+      {duoi && <span className="text-rose-600">⚠ đang bán THẤP HƠN mức đã duyệt</span>}
+      {lech && g.gia != null && (
+        <button type="button" onClick={() => onApLai(g.gia as number)}
+          className="text-teal-700 underline hover:text-teal-900">áp lại giá này</button>
+      )}
+    </div>
   )
 }

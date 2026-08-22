@@ -175,3 +175,67 @@ export const NHAN_NHOM_KHACH: Record<string, string> = {
 export function nhanNhomKhach(ma: string): string {
   return NHAN_NHOM_KHACH[ma] ?? ma
 }
+
+// ── Giá gợi ý khi lên đơn ──────────────────────────────────────────────────
+
+/** Mọi thứ cần để tính giá cho một khách, gom sẵn ở server để client khỏi gọi lại từng dòng. */
+export type BoiCanhGia = {
+  /** Bậc đối tác đang hiệu lực. `null` = khách lẻ. */
+  bac: Bac | null
+  /** Kênh của khách — khách lẻ hưởng khuyến mãi theo kênh này. */
+  channel_id: number | null
+  chinhSach: ChinhSachGia[]
+  /** Chương trình khuyến mãi đã chọn (giảm sâu nhất) cho kênh của khách. */
+  ctkm: (Ctkm & { sp: Record<string, number> }) | null
+  /** Số chương trình khác cũng khớp — để giao diện nói ra thay vì im lặng. */
+  soCtkmKhac: number
+  /** Giá niêm yết theo mã. */
+  niemYet: Record<string, number>
+}
+
+export type NguonGia = 'BAC' | 'CTKM' | 'NIEM_YET' | 'KHONG_RO'
+
+export type GiaGoiY = {
+  gia: number | null
+  nguon: NguonGia
+  nhan: string
+  niemYet: number | null
+}
+
+/**
+ * Giá gợi ý cho MỘT mã hàng, theo bối cảnh khách.
+ *
+ * Thứ tự ưu tiên — CEO chốt 22/08: **bậc đại lý thắng khuyến mãi bán lẻ**. Đại lý đã hưởng
+ * giá sỉ theo hợp đồng thì không cộng dồn thêm chương trình bán lẻ, nếu không cùng một máy
+ * bán cho đại lý lại rẻ hơn giá vốn.
+ *
+ * Không có gì khớp -> giá niêm yết. Không có cả giá niêm yết -> `null`, giao diện để trống
+ * cho người nhập tự gõ (đừng bịa số 0 — 0 đồng trông như hàng tặng).
+ */
+export function giaGoiY(bc: BoiCanhGia, internalCode: string, ngay: string): GiaGoiY {
+  const ny = bc.niemYet[internalCode] ?? null
+
+  if (bc.bac) {
+    const g = giaTheoBac(bc.chinhSach, bc.bac, internalCode, ny, ngay)
+    if (g != null) return { gia: g, nguon: 'BAC', nhan: `Giá ${nhanBac(bc.bac)}`, niemYet: ny }
+  }
+
+  if (bc.ctkm && ny != null) {
+    // Mức riêng của mã này thắng mức chung; 0 riêng vẫn thắng (miễn phí là một mức thật).
+    const muc = mucApDung(bc.ctkm.sp[internalCode], bc.ctkm.muc_chung)
+    // Chương trình có liệt kê sản phẩm mà mã này KHÔNG nằm trong đó -> không áp.
+    const coDanhSach = Object.keys(bc.ctkm.sp).length > 0
+    const trongDanhSach = internalCode in bc.ctkm.sp
+    if (muc != null && (!coDanhSach || trongDanhSach)) {
+      const g = giaSauGiam(bc.ctkm.kieu_giam, ny, muc, bc.ctkm.giam_toi_da)
+      return { gia: g, nguon: 'CTKM', nhan: bc.ctkm.ten, niemYet: ny }
+    }
+  }
+
+  if (ny != null) return { gia: ny, nguon: 'NIEM_YET', nhan: 'Giá niêm yết', niemYet: ny }
+  return { gia: null, nguon: 'KHONG_RO', nhan: 'Mã này chưa có giá niêm yết', niemYet: null }
+}
+
+export function nhanBac(b: Bac): string {
+  return b === 'NPP' ? 'Cấp 1 · NPP' : b === 'DAI_LY' ? 'Cấp 2 · Đại lý' : 'Cấp 3 · Giới thiệu'
+}
