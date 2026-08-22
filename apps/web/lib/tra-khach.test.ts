@@ -29,7 +29,7 @@ describe('cuoi9So — khoá so khớp dùng chung hai khu', () => {
 })
 
 describe('nhanKetQuaTra — hai khu phải nói CÙNG một câu', () => {
-  const nen: KetQuaTraKhach = { khop: [], cs: null, sales: null, quaSdtPhu: false }
+  const nen: KetQuaTraKhach = { khop: [], cs: null, sales: null, quaSdtPhu: false, nhieuHoSo: false }
 
   it('không khớp -> null (khách mới thật)', () => {
     expect(nhanKetQuaTra(nen)).toBeNull()
@@ -47,6 +47,16 @@ describe('nhanKetQuaTra — hai khu phải nói CÙNG một câu', () => {
 
   it('khớp cả hai -> nói rõ đừng tạo mới', () => {
     expect(nhanKetQuaTra({ ...nen, khop: ['cs', 'sales'] })).toContain('đừng tạo mới')
+  })
+
+  it('NHIỀU hồ sơ cùng SĐT thì phải cảnh báo, KHÔNG được lặng lẽ chọn hộ', () => {
+    // Đo prod 22/08: 5 người bị tạo trùng hồ sơ bên Sales do Google Sheet ăn mất số 0 đầu SĐT;
+    // hồ sơ "mất số 0" có 0 lịch sử mua. Chọn nhầm nó là nhân viên thấy khách cũ mà hồ sơ trắng.
+    const s = nhanKetQuaTra({ ...nen, khop: ['sales'], nhieuHoSo: true })
+    expect(s).toContain('NHIỀU hồ sơ')
+    expect(s).toContain('gộp')
+    // Ca thường thì không được doạ người dùng bằng cảnh báo thừa.
+    expect(nhanKetQuaTra({ ...nen, khop: ['sales'] })).not.toContain('NHIỀU hồ sơ')
   })
 
   it('khớp qua SĐT phụ thì PHẢI nói ra, không được im', () => {

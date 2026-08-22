@@ -14,6 +14,7 @@ import { antoanChoOr, chuanHoaTuKhoa, mauDauTu, sapXepHopLe, gomKhoa } from '@/b
 import type { KetQuaTrang, TuyChonDanhSach, ThamSoLoc } from '@/bang'
 import { goiYGomTu, type CumGoiY } from '@/lib/goiYNhom'
 import { sinhLichBaoTri, vungTheoTinh, type Vung } from '@/lib/lichBaoTri'
+import { traKhachTheoSdt, type KetQuaTraKhach } from '@/lib/tra-khach'
 import { xepGoiY, type GoiYKhach, type KhachUngVien } from '@/lib/khopPlanKhach'
 import { kiemTraGop, moTaGop, type KhachGon, type KhachDayDu } from '@/lib/gopKhach'
 import type { PChon } from '@/lib/gopKhachChon'
@@ -3234,6 +3235,9 @@ export type KhachKhopSdt = {
 }
 
 /**
+ * ⚠️ CŨ — chỉ còn dùng ở màn tạo khách bản cũ. Việc mới dùng `traKhachChung()` ngay dưới:
+ * nó tra CẢ HAI bảng khách, cảnh báo khi một SĐT ra nhiều hồ sơ, và dùng chung với Sales.
+ *
  * Tra khách theo SĐT (9 số cuối). Ưu tiên khách CS đã có (nguon='cs' -> chọn luôn,
  * không tạo trùng); không có thì soi khách chung với Sales (nguon='sales' -> trả
  * info để form tự điền, cho sửa lại địa chỉ). SĐT sai định dạng -> nguon=null.
@@ -3282,6 +3286,19 @@ export async function timKhachTheoSdt(sdt: string): Promise<KhachKhopSdt> {
   }
 
   return { nguon: null }
+}
+
+/**
+ * Tra khách theo SĐT ở CẢ HAI bảng — CSKH và Sales. CEO chốt 21/08/2026: hai khu phải
+ * "đọc cùng 1 chỗ", nhập SĐT mà đã có bên nào cũng là khách CŨ.
+ *
+ * Phần tra nằm ở `lib/tra-khach.ts` (dùng chung với Sales, cố ý KHÔNG kiểm quyền).
+ * Rào quyền ở ĐÂY — mỗi khu gác bằng quyền của khu mình rồi mới gọi vào.
+ */
+export async function traKhachChung(sdt: string): Promise<KetQuaTraKhach> {
+  await requireStaff()
+  await doQuyen('cs.khach.xem')
+  return traKhachTheoSdt(sdt)
 }
 
 /** Tạo khách mới TỪ CS -> trạng thái chờ admin duyệt (khách đại lý/Shopee đăng ký sau). */

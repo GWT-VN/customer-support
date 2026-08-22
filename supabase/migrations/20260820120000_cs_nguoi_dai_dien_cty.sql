@@ -1,4 +1,10 @@
--- 51 — người đại diện công ty (ký hợp đồng).
+-- cs — người đại diện công ty (ký hợp đồng)
+--
+-- ⚠️ File này TỪNG nằm ở `db/cs/migrations/51_…` — thư mục LƯU TRỮ mà Supabase CLI không đọc
+-- (xem `db/MIGRATIONS-CONVENTION.md`). Hậu quả đo được 22/08/2026: local có đủ 2 cột nên màn
+-- hình chạy ngon, còn **production KHÔNG có cột nào**. Mà cả màn TẠO lẫn màn SỬA khách đều gửi
+-- 2 trường này trong payload ⇒ merge lên prod là **vỡ cả nút Lưu hồ sơ khách**, không phải chỉ
+-- mất 2 ô. Đúng vệt bẫy migration 46. Đã chuyển về đúng thư mục và áp prod.
 --
 -- CEO 20/08/2026: "Thông tin công ty cần người đại diện nữa".
 --

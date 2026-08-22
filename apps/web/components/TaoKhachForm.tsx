@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { taoKhachChoDuyet, timKhachTheoSdt, type KhachKhopSdt, type Kenh } from '@/app/actions'
+import { taoKhachChoDuyet, traKhachChung, type Kenh } from '@/app/actions'
+import { nhanKetQuaTra, type KetQuaTraKhach } from '@/lib/tra-khach'
 import { ChonTinh } from '@/components/ChonTinh'
 import { ChonKenh } from '@/components/ChonKenh'
 import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
@@ -18,7 +19,15 @@ import { canhBaoSdt, chuanHoaSdt } from '@/lib/sdt'
  * SĐT tra TRƯỚC (lỗi #3): gõ xong là dò ngay, trùng thì mời dùng lại hồ sơ cũ
  * thay vì đẻ bản trùng — chống rác ngay tại cửa vào.
  */
-export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
+/**
+ * Dùng ở HAI chỗ, cùng một bộ ô — trang `/khach/moi` và hộp thoại của nút "＋ Tạo khách".
+ * Dùng chung là cố ý: CEO bắt được chuyện màn tạo và màn sửa lệch bộ ô, nên tuyệt đối không
+ * đẻ bản thứ hai của form này.
+ *
+ * `onXong` có = đang mở trong hộp thoại (đóng lại rồi tải lại danh sách);
+ * không có = đang ở trang riêng (nhảy thẳng vào hồ sơ khách vừa tạo).
+ */
+export function TaoKhachForm({ kenh, onXong }: { kenh: Kenh[]; onXong?: () => void }) {
   const [f, setF] = useState({
     full_name: '', primary_phone: '', address: '', province: '',
     notes: '', ten_cty: '', mst: '', dia_chi_cty: '', sdt_cty: '', email_cty: '',
@@ -27,7 +36,7 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
   const [kenhId, setKenhId] = useState('')
   const [sdtPhu, setSdtPhu] = useState<{ phone: string; contact_name: string; role: string; zalo_ok: boolean; ghi_chu: string }[]>([])
   const [dcPhu, setDcPhu] = useState<{ dia_chi: string; loai: string; tinh: string }[]>([])
-  const [khop, setKhop] = useState<KhachKhopSdt | null>(null)
+  const [khop, setKhop] = useState<KetQuaTraKhach | null>(null)
   const [dangTra, setDangTra] = useState(false)
   const [nangCao, setNangCao] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -43,15 +52,16 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
     if (!sdtLuuDuoc) return
     setDangTra(true)
     try {
-      const r = await timKhachTheoSdt(f.primary_phone)
+      const r = await traKhachChung(f.primary_phone)
       setKhop(r)
-      // Khớp khách Sales -> điền sẵn cho khỏi gõ lại, CS sửa được.
-      if (r.nguon === 'sales') {
+      // Khớp khách bên Sales -> điền sẵn cho khỏi gõ lại, CS vẫn sửa được.
+      // Chỉ lấp ô ĐANG TRỐNG: người dùng đã gõ gì thì không được đè lên.
+      if (r.sales && !r.cs) {
         setF((cu) => ({
           ...cu,
-          full_name: cu.full_name || r.full_name || '',
-          address: cu.address || r.address || '',
-          province: cu.province || r.province || '',
+          full_name: cu.full_name || r.sales?.name || '',
+          address: cu.address || r.sales?.address || '',
+          province: cu.province || r.sales?.province || '',
         }))
       }
     } finally {
@@ -73,7 +83,8 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
         if (r.existingId) setTrungId(r.existingId)
         return
       }
-      router.push(`/khach/${r.id}`)
+      if (onXong) onXong()
+      else router.push(`/khach/${r.id}`)
     } catch (e) {
       setErr('Không rõ kết quả — mở danh sách khách kiểm tra trước khi bấm lại. ' +
         (e instanceof Error ? e.message : String(e)))
@@ -103,19 +114,30 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
           </span>
         </label>
 
-        {khop?.nguon === 'cs' && khop.id && (
-          <div className="space-y-1.5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <p>SĐT này đã là khách: <strong>{khop.full_name ?? '—'}</strong> — đừng tạo trùng.</p>
-            <Link href={`/khach/${khop.id}`} prefetch={false}
-              className="inline-block rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white">
-              Mở hồ sơ đã có
-            </Link>
+        {/* Câu nhắc lấy từ `nhanKetQuaTra()` — dùng CHUNG với Sales, để cùng một tình huống
+            thì hai khu nói cùng một câu, nhân viên không phải đoán bên nào đúng. */}
+        {khop && nhanKetQuaTra(khop) && (
+          <div className={`space-y-1.5 rounded-lg px-3 py-2 text-sm ${
+            khop.nhieuHoSo ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'}`}>
+            <p>{nhanKetQuaTra(khop)}</p>
+            {khop.cs && (
+              <p className="text-xs">
+                Hồ sơ CSKH: <strong>{khop.cs.full_name}</strong>
+                {khop.cs.ma_kh ? ` · ${khop.cs.ma_kh}` : ''}
+              </p>
+            )}
+            {khop.sales && !khop.cs && (
+              <p className="text-xs">
+                Bên Sales: <strong>{khop.sales.name ?? '—'}</strong> — đã điền sẵn tên/địa chỉ, sửa lại nếu cần.
+              </p>
+            )}
+            {khop.cs && (
+              <Link href={`/khach/${khop.cs.id}`} prefetch={false}
+                className="inline-block rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white">
+                Mở hồ sơ đã có
+              </Link>
+            )}
           </div>
-        )}
-        {khop?.nguon === 'sales' && (
-          <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
-            Khớp khách bên Sales — đã điền sẵn tên/địa chỉ, sửa lại nếu cần. Lưu xong sẽ tự nối mã KH Sales.
-          </p>
         )}
 
         <label className="block">
@@ -292,7 +314,7 @@ export function TaoKhachForm({ kenh }: { kenh: Kenh[] }) {
       )}
 
       <div className="flex items-center gap-3">
-        <button type="button" onClick={luu} disabled={busy || !f.full_name.trim() || !sdtLuuDuoc || khop?.nguon === 'cs'}
+        <button type="button" onClick={luu} disabled={busy || !f.full_name.trim() || !sdtLuuDuoc || !!khop?.cs}
           className="rounded-lg bg-[#b5642a] px-5 py-2.5 font-medium text-white hover:bg-[#8a4a1c] disabled:opacity-50">
           {busy ? 'Đang tạo…' : 'Tạo khách'}
         </button>
